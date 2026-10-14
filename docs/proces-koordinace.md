@@ -16,7 +16,7 @@ dělá koordinátorka.
 ```
 NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTALACE OK (uzavřeno)
            │    ▲                    │
-           │    │                    └─► marný výjezd ──► mv_N ──► PARKOVÁNO (DOD) Legislatívně problémy
+           │    │                    └─► marný výjezd ──► mv_N ──► PARKOVÁNO (DOD) Legislatívne problémy
            │    │                        (mv_1, mv_2, mv_3 … se číslují      └─► opětovné dojednání termínu
            │    │                         po sobě až do uzavření)
            │    │
@@ -24,7 +24,7 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
            │    │
            │    └── v den příštího kontaktu ◄── PARKOVÁNO (DOD)
            │                                    ├ Zákazník - odklad termínu
-           │                                    ├ Legislatívně problémy (po MV technika)
+           │                                    ├ Legislatívne problémy (po MV technika)
            │                                    └ Počasie
            │
            └─ 6 neúspěšných pokusů (3 pracovní dny × 2) ──► PARKOVÁNO (ZAK) Zákazník - nedostupný
@@ -47,18 +47,26 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
 - **3 po sobě jdoucí pracovní dny** (Po–Pá). Víkend se nepočítá a nepřerušuje řadu.
   Státní svátky se berou jako nepracovní dny (předpoklad, viz kap. 8).
 - **SMS** se posílá podle situace, **typicky jednou denně**, po prvním nedovolaném pokusu dne.
+- Závazné minimum podle normy TMCZ R-280-244 (kap. 9): **min. 3 pokusy během 3 PD s rozestupem 4 h**
+  a **min. 2 SMS během 3 PD s odstupem min. 18 h, jen v čase 8:00–22:00**. Interní pravidlo
+  (6 pokusů) je přísnější, aplikace ale musí hlídat hlavně odstup SMS 18 h.
 - **Nepodaří se kontaktovat** (6 neúspěšných pokusů) → **parkujeme** jako
   *Zákazník - nedostupný (ZAK)*. Ticket řeší PEP T-Mobile a odpověď (další postup)
   vrátí formou nové poznámky v MWF.
 
 ### Chování aplikace
 
+0. Před prvním voláním aplikace zkontroluje, jestli zakázka nemá **rezervační termín od prodejce**
+   (MWF „Zjednané = Áno“) – ten platí a zakázka jde rovnou na technika. Dále ukáže **Poznámku
+   EXT/PAW** a sloupec **Preferovaný dátum**, kde může být termín přání zákazníka od prodejce.
 1. Koordinátorka zapíše výsledek hovoru jedním klikem: **Nedovoláno** nebo **Dovoláno**.
 2. Po **Nedovoláno** aplikace:
    - uloží čas pokusu,
    - u prvního nedovolaného pokusu dne nabídne frázi se SMS (`zkz. nezvedá tlf., sms`)
      a připomene odeslat SMS; u druhého pokusu nabídne frázi bez SMS
      (`zkz. nezvedá tlf.`). Koordinátorka může SMS zapnout nebo vypnout ručně,
+   - SMS nenabídne dřív než 18 h od předchozí SMS (např. Po 16:00 → Út nejdřív 10:00)
+     a upozorní, když by do konce 3. PD nebyly odeslané alespoň 2 SMS,
    - naplánuje další pokus za 4 hodiny. Když by vyšel po konci pracovní doby,
      přesune ho na další pracovní den ráno.
 3. Ve frontě je u zakázky vidět stav, např. `den 2/3 · pokus 1/2 · další pokus 14:10`.
@@ -89,12 +97,12 @@ povinné – bez něj chybí další krok.
 | Odklad na přání zákazníka | `na přání/na žádost kontaktovat DD.MM.RRRR` | r_1 | Zákazník - odklad termínu (DOD) | vrátí zakázku do fronty v daný den |
 | Smlouva s jiným poskytovatelem | `zkz. má smlouvu s JP, ověřuje si výpovědní dobu, přeje si kontaktovat DD.MM.RRRR` | r_2 | Zákazník - odklad termínu (DOD) | do daného data **zablokuje plánování termínu** |
 | Pozdější termín na přání zákazníka | `na přání zákazníka instalace dne DD.MM.RRRR r_1` | r_1 | – (je to termín) | zapíše termín, překročení SLA zdůvodní kódem r_1 |
-| Překážka TMCZ / po marném výjezdu | volný text | mv_N + r_3 (po MV vždy r_3) | Legislatívně problémy (DOD) | po MV nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …), doplní r_3 a vrátí zakázku k opětovnému dojednání |
+| Překážka TMCZ / po marném výjezdu | volný text | mv_N + r_3 (po MV vždy r_3) | Legislatívne problémy (DOD) | po MV nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …), doplní r_3 a vrátí zakázku k opětovnému dojednání |
 | Počasí (záfuky, PIV) | volný text | r_3 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
 | 3 pracovní dny nedovoláno | popis důvodu – návrh: `zkz. nedostupný, kontaktován dle pravidel 3 prac. dny (DD.MM.–DD.MM.RRRR), 6× tlf., sms – prosíme o součinnost PEP` | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
 | Jiná situace, kterou nevyřešíme bez T-Mobile | volný popis důvodu (co se stalo, co jsme zkusili, co potřebujeme od TMCZ) | podle situace | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
-| Nefunkční aplikace | volný text | r_0 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
-| Kapacita Vegacom | volný text | r_4 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
+| Nefunkční aplikace | volný text | r_0 | Legislatívne problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
+| Kapacita Vegacom | volný text | r_4 | Legislatívne problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
 
 ## 4. Kódy důvodů
 
@@ -109,7 +117,7 @@ povinné – bez něj chybí další krok.
 | mv_2 | druhý marný výjezd u stejného zákazníka (musí mu předcházet mv_1) |
 | mv_N | další marné výjezdy; číslují se po sobě, dokud se zakázka neuzavře (instalace, nebo storno) |
 
-Po každém marném výjezdu (mv_N) následuje parkování *Legislatívně problémy (DOD)* a opětovné
+Po každém marném výjezdu (mv_N) následuje parkování *Legislatívne problémy (DOD)* a opětovné
 dojednání termínu. Řada mv pokračuje, dokud zakázka neskončí instalací, nebo stornem.
 
 > Pozor: dashboard v4.3 (`mvEval`) má mv_1 / mv_2 jako „marný výjezd kvůli zákazníkovi /
@@ -123,7 +131,7 @@ rozdělené do dvou skupin: DOD (parkuje dodavatel – Vegacom) a ZAK (zákazní
 | Parkování v MWF | Skupina | Kdy | Následný krok |
 |---|---|---|---|
 | Zákazník - odklad termínu | DOD | zákazníkovi jsme se dovolali a žádá o kontaktování později | kontaktuji následně, dle požadavku zákazníka |
-| Legislatívně problémy | DOD | po MV technika; také při nefunkční aplikaci (r_0) a nedostatečné kapacitě Vegacom (r_4) | po MV, nebo instalace před, kde je překážka k naplánování termínu ze strany TMCZ (nesedí předpis, není přístup atp.) |
+| Legislatívne problémy | DOD | po MV technika; také při nefunkční aplikaci (r_0) a nedostatečné kapacitě Vegacom (r_4) | po MV, nebo instalace před, kde je překážka k naplánování termínu ze strany TMCZ (nesedí předpis, není přístup atp.) |
 | Počasie | DOD | záfuky, PIV, etc. | čekáme na změnu podmínek a opět plánujeme |
 | Zákazník - nedostupný | ZAK | zákazník je nedostupný, byl kontaktován dle pravidel, tj. 3 (pracovní) dny po sobě; obecně každá situace, kterou nejsme schopni vyřešit a potřebuje zásah zadavatele (T-Mobile) | řeší PEP |
 
@@ -147,6 +155,7 @@ výstupu (pevné schéma), výsledek je vždy návrh, který potvrzuje koordiná
 | `dalsi_kontakt` | datum / null | datum dalšího kontaktu |
 | `konec_JP` | datum / null | konec smlouvy s jiným poskytovatelem |
 | `pokyn_PEP` | text / null | pokyn z poslední odpovědi PEP |
+| `preferovany_termin` | datum / null | termín přání zákazníka z Poznámky prodejce |
 | `dalsi_krok` | text | co má koordinátorka udělat |
 
 Když Claude neodpoví, aplikace použije vyhodnocení podle klíčových slov (jako dashboard)
@@ -159,6 +168,8 @@ a zobrazí upozornění.
 - r_2 (smlouva s JP) blokuje plánování termínu do data dalšího kontaktu.
 - Parkování DOD bez data dalšího kontaktu nelze uložit.
 - Parkování ZAK bez popisu důvodu nelze uložit.
+- U ZAK aplikace počítá **5 kalendářních dní** od zaparkování: pokud do té doby nepřijde
+  reakce, PEP podle normy objednávku finálně zamítne (kap. 9).
 - Aplikace sama navrhne ZAK po 6 neúspěšných pokusech ve 3 pracovních dnech. Z jiného důvodu
   (situace pro T-Mobile) ho koordinátorka zvolí ručně a popíše důvod.
 
@@ -168,9 +179,103 @@ a zobrazí upozornění.
 |---|---|---|
 | 1 | 3 dny po sobě = pracovní dny? | **ano, pracovní dny** |
 | 2 | SMS po každém pokusu, nebo jednou denně? | **podle situace, typicky jednou denně** |
-| 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | **Legislatívně problémy (DOD)** |
+| 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | **Legislatívne problémy (DOD)** |
 | 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | **parkování a opětovné dojednání; mv_N pokračují po sobě až do uzavření (instalace, nebo storno)** |
-| 5 | Počasie a Legislatívně problémy: je kód vždy r_3, nebo podle situace? | **ano – Počasie vždy r_3; Legislatívně problémy po marném výjezdu vždy r_3 (spolu s mv_N); r_0 a r_4 zůstávají pro nefunkční app a kapacitu** |
+| 5 | Počasie a Legislatívne problémy: je kód vždy r_3, nebo podle situace? | **ano – Počasie vždy r_3; Legislatívne problémy po marném výjezdu vždy r_3 (spolu s mv_N); r_0 a r_4 zůstávají pro nefunkční app a kapacitu** |
 | 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | **pevná fráze není – popisuje se důvod parkování (situace, kterou nevyřešíme a potřebuje zásah T-Mobile)** |
 | 7 | Počítají se státní svátky jako nepracovní dny? | předpoklad: ano |
 | 8 | Pracovní doba pro volání (od–do)? | předpoklad: 8:00–17:00 (jako v dashboardu) |
+
+## 9. Ověření proti manuálům a MWF exportu (14.10.2026)
+
+Zdroje: složka *Skills + manuály* na Drive – `call script 202602.docx`, `parkování v mwf`,
+`call/skoleni 20260814`, `callscript strukturovany 20260416`, norma TMCZ
+**R-280-244 v10** (Kontaktování zákazníka, rezervace termínu, parkování, zamítání aktivity)
+a MWF export `paw-grid-export-csv 20261014 18_01` (856 zakázek).
+
+### 9.1 Co sedí
+
+- Pravidla kontaktování, fráze, kódy r_0–r_4 / mv_1–mv_2 a tabulka parkování odpovídají
+  call scriptu 202602 a tabulce `parkování v mwf`.
+- V exportu se vyskytuje i **mv_3** (2×) – potvrzuje řadu mv_N.
+- SWAP (CASEID, 7 dní) a FIS MOP (termín až po datu portace) odpovídají call scriptu.
+- Routing nedokončených zakázek: FTTH Praha → Hadravová, FTTH mimo Prahu → Kraitlová,
+  PIV/SAT → Havlíčková.
+
+### 9.2 Opraveno ve specifikaci
+
+| Co | Zdroj | Úprava |
+|---|---|---|
+| Název parkování | MWF export | V MWF je **„Legislatívne problémy“** (slovensky), ne „Legislatívně“. Aplikace musí používat přesné hodnoty z MWF. |
+| SMS | R-280-244 | min. 2 SMS za 3 PD, odstup **min. 18 h**, jen 8:00–22:00 (kap. 2). |
+| Termín od prodejce | R-280-244 | „Zjednané = Áno“ → rezervační termín platí, nedojednává se; vždy číst Poznámku EXT/PAW (kap. 2). |
+| Lhůta PEP | R-280-244 | PEP denně filtruje „Zákazník – nedostupný“; bez reakce prodejce do **5 KD** objednávku finálně zamítne (kap. 7). |
+
+### 9.3 Výsledek dojednávání (sloupec MWF „Výsledok dojednávania“)
+
+V exportu je vyplněný u 424 zakázek a má pevné hodnoty. Aplikace je bude importovat a
+zapisovat jako strukturovaný výsledek hovoru – je to spolehlivější signál než čtení poznámek.
+
+| Hodnota | Výskyt | Vazba v aplikaci |
+|---|---|---|
+| Dohodnutý termín | 147 | stav TERMÍN |
+| Nezastihnutý | 100 | pokus „Nedovoláno“, počítadlo pokusů |
+| Odklad | 108 | parkování Zákazník - odklad termínu |
+| Márny výjazd | 58 | mv_N |
+| Storno | 8 | zamítnutí (kap. 9.5) |
+| Chybný kontakt | 3 | ZAK – PEP ověří kontakt |
+| Problém | 1 | Legislatívne problémy |
+
+Norma R-280-244 říká, že poznámka k parkování ZAK se uvádí právě do záložky
+„Výsledok dojednávania“. U ZAK se v exportu objevují hodnoty *Nezastihnutý*, *Chybný kontakt*,
+*Márny výjazd* a *Odklad* – to jsou podtypy ZAK, které aplikace nabídne.
+
+### 9.4 Rozdíly, které je potřeba rozhodnout
+
+| # | Rozdíl | Zdroje | Otázka |
+|---|---|---|---|
+| A | **Po MV vždy r_3** (vaše odpověď) × praxe | MWF export | V exportu je u zakázek po MV nejčastěji **bez kódu r_x** (94×), pak r_1 (9×), r_3 jen 2×. Call script navíc rozlišuje MV podle příčiny: PRB zákazník / PRB operátor / PRB aplikace. Má aplikace vynucovat r_3, nebo kód podle příčiny (zákazník → r_1, operátor → r_3, aplikace → r_0)? |
+| B | **Parkování po MV** | MWF export | Tabulka říká *Legislatívne problémy*, ale 21 zakázek s výsledkem *Márny výjazd* je zaparkováno jako *Zákazník - odklad termínu*. Má aplikace po MV povolit obojí (podle příčiny), nebo jen Legislatívne problémy? |
+| C | **Další parkovací důvody** | R-280-244, MWF export | Norma povoluje i **Materiál** a **Zákazník – termín – rieši dodávateľ**; v exportu jsou i *Zákazník - termín - rieši dodávateľ* (1×) a *rieši BO* (1×). Interní tabulka je nezná. Zakázat, nebo doplnit? |
+| D | **Kanál hlášení MV** | call script × dashboard | Call script uvádí skupinu v **Telegramu**, dashboard čte stejnojmennou skupinu v **Google Chatu**. Který kanál platí? |
+| E | **SWAP migrace** | call script × školení 14.08.2026 | Call script: CASEID přes Hnízdilovou (603 602 634, 8–16:30). Školení 14.08.: „SWAP migrace = řešit primárně přes **storno linku**“. Který postup platí? |
+| F | **ZAK pro jiné situace** | R-280-244 | Norma zná ZAK jen jako „Zákazník – nedostupný“ a PEP po 5 KD objednávku zamítne. Když se ZAK použije pro jinou situaci pro T-Mobile, hrozí, že PEP zakázku zamítne. Opravdu takto parkovat? |
+
+### 9.5 Doplnit do aplikace
+
+- **Zamítnutí (storno)** – jen hodnoty z normy: *Storno – zákazník*, *Nesprávně založená objednávka*,
+  *N-Technické překážky realizace SAT TV*, *N-Technické překážky realizace PIV – kapacita / kvalita*,
+  *N-legislatívní/technická překážka – Optický internet / Optická TV*. Nesouhlasí-li jméno nebo
+  adresa se zakázkou → storno (Nesprávně založená objednávka) a nová zakázka.
+- **Kombinované objednávky (SAT + PIV)** – „všechno, nebo nic“; před instalací ověřit obě služby.
+- **Checklist hovoru podle call scriptu** – shoda jména a adresy (100 %), ověření adresy na
+  mapy.com, infrastruktura (TMCZ / CETIN / VDF), existující zásuvka + QR + aktivní služba a
+  operátor, patro a byt, volný přístup do pater, souhlas s vrtáním (NE → dotaz na PEP),
+  elektrická zásuvka u KZ, router/bridge (+ STB), instalační předpis. Vyplněná pole se rovnou
+  použijí v události GCal.
+- **Šablona události v GCal** (podle call scriptu) – aplikace ji vyplní sama:
+
+```
+Název:  Technik - FTTH (CETIN/VDF) ID-S7, zákazník, SLA xx
+TEL:
+Nová instalace/existující - číslo nebo foto zásuvky
+INSTALACE: Optický internet / IPTV
+ČÍSLO PATRA A BYTU: xx / xx
+PATRA VOLNĚ PŘÍSTUPNÁ: ANO/NE
+STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran): ANO/NE/NEVÍM
+VZDÁLENOST OD STOUPAČKY (řádově): xx metrů
+STÁVAJÍCÍ LIŠTY/OMEZENÍ V LIŠTOVÁNÍ OD SVJ: ANO/NE/NEVÍM
+SOUHLAS S VRTÁNÍM: ANO/NE = dotaz na PEP
+KONCOVÉ ZAŘÍZENÍ UMÍSTÍME V: předsíň / obývací pokoj / jinde – EL. ZÁSUVKA: ANO/NE
+KZ: typ KZ / ROUTE/BRIDGE + ev. STB
+PŘEDPOJEN: ANO/NE
+PODB (adresa):            (pro T-Mobile instalace)
+INSTALAČNÍ PŘEDPIS:       (celý zkopírovat z ticketu)
+CASEID:                   (SWAP / FIS MOP)
+```
+
+- **Zápis MV od technika** (call script) – formát `ID / popis stavu / kam hlášeno / další postup /
+  komentář`; podle typu PRB (zákazník / operátor / aplikace) se zakázka přesune na profil podle
+  routingu (kap. 9.1).
+- **Pracovní doba** – norma připouští volání technika na poruchy 8:00–21:00 a SMS 8:00–22:00.
+  Pokud by koordinace volala i po 17:00, odpadne omezení „první pokus do 13:00“ (kap. 2).
