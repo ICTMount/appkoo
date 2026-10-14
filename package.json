@@ -1,0 +1,39 @@
+{
+  "name": "appkoo",
+  "version": "1.0.0",
+  "description": "Plánovací aplikace koordinace FTTH/PIV/SAT (Vegacom / TMCZ)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "import": "tsx src/cli/import.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ICTMount/appkoo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ICTMount/appkoo/issues"
+  },
+  "homepage": "https://github.com/ICTMount/appkoo#readme",
+  "type": "module",
+  "private": "true",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.134.0",
+    "iconv-lite": "^0.7.3",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
+  }
+}
