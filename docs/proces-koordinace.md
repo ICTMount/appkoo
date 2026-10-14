@@ -89,8 +89,8 @@ povinné – bez něj chybí další krok.
 | Překážka TMCZ / po marném výjezdu | volný text | r_3 / mv_1 / mv_2 | Legislatívně problémy (DOD) | mv_2 nabídne jen tam, kde v historii už je mv_1 |
 | Počasí (záfuky, PIV) | volný text | viz kap. 8, bod 5 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
 | 3 pracovní dny nedovoláno | viz kap. 8, bod 6 | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
-| Nefunkční aplikace | volný text | r_0 | viz kap. 8, bod 3 | – |
-| Kapacita Vegacom | volný text | r_4 | viz kap. 8, bod 3 | – |
+| Nefunkční aplikace | volný text | r_0 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
+| Kapacita Vegacom | volný text | r_4 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
 
 ## 4. Kódy důvodů
 
@@ -115,7 +115,7 @@ rozdělené do dvou skupin: DOD (parkuje dodavatel – Vegacom) a ZAK (zákazní
 | Parkování v MWF | Skupina | Kdy | Následný krok |
 |---|---|---|---|
 | Zákazník - odklad termínu | DOD | zákazníkovi jsme se dovolali a žádá o kontaktování později | kontaktuji následně, dle požadavku zákazníka |
-| Legislatívně problémy | DOD | po MV technika | po MV, nebo instalace před, kde je překážka k naplánování termínu ze strany TMCZ (nesedí předpis, není přístup atp.) |
+| Legislatívně problémy | DOD | po MV technika; také při nefunkční aplikaci (r_0) a nedostatečné kapacitě Vegacom (r_4) | po MV, nebo instalace před, kde je překážka k naplánování termínu ze strany TMCZ (nesedí předpis, není přístup atp.) |
 | Počasie | DOD | záfuky, PIV, etc. | čekáme na změnu podmínek a opět plánujeme |
 | Zákazník - nedostupný | ZAK | zákazník je nedostupný, byl kontaktován dle pravidel, tj. 3 (pracovní) dny po sobě | řeší PEP |
 
@@ -152,7 +152,7 @@ a zobrazí upozornění.
 |---|---|---|
 | 1 | 3 dny po sobě = pracovní dny? | **ano, pracovní dny** |
 | 2 | SMS po každém pokusu, nebo jednou denně? | **podle situace, typicky jednou denně** |
-| 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | otevřené – v tabulce parkování nejsou; parkuje se u nich vůbec? |
+| 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | **Legislatívně problémy (DOD)** |
 | 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | otevřené |
 | 5 | Počasie a Legislatívně problémy: je kód vždy r_3, nebo podle situace? | otevřené |
 | 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | otevřené |
