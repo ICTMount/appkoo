@@ -14,10 +14,13 @@ dělá koordinátorka.
 ## 1. Stavy zakázky
 
 ```
-NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTALACE OK
+NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTALACE OK (uzavřeno)
            │    ▲                    │
-           │    │                    └─► marný výjezd ──► mv_1 ──► zpět do DOJEDNÁVÁNÍ
-           │    │                                   └──► mv_2 (jen po mv_1) ──► viz kap. 8, bod 4
+           │    │                    └─► marný výjezd ──► mv_N ──► PARKOVÁNO (DOD) Legislatívně problémy
+           │    │                        (mv_1, mv_2, mv_3 … se číslují      └─► opětovné dojednání termínu
+           │    │                         po sobě až do uzavření)
+           │    │
+           │    │   Uzavřít lze jen dvěma způsoby: INSTALACE OK, nebo STORNO.
            │    │
            │    └── v den příštího kontaktu ◄── PARKOVÁNO (DOD)
            │                                    ├ Zákazník - odklad termínu
@@ -86,7 +89,7 @@ povinné – bez něj chybí další krok.
 | Odklad na přání zákazníka | `na přání/na žádost kontaktovat DD.MM.RRRR` | r_1 | Zákazník - odklad termínu (DOD) | vrátí zakázku do fronty v daný den |
 | Smlouva s jiným poskytovatelem | `zkz. má smlouvu s JP, ověřuje si výpovědní dobu, přeje si kontaktovat DD.MM.RRRR` | r_2 | Zákazník - odklad termínu (DOD) | do daného data **zablokuje plánování termínu** |
 | Pozdější termín na přání zákazníka | `na přání zákazníka instalace dne DD.MM.RRRR r_1` | r_1 | – (je to termín) | zapíše termín, překročení SLA zdůvodní kódem r_1 |
-| Překážka TMCZ / po marném výjezdu | volný text | r_3 / mv_1 / mv_2 | Legislatívně problémy (DOD) | mv_2 nabídne jen tam, kde v historii už je mv_1 |
+| Překážka TMCZ / po marném výjezdu | volný text | r_3 / mv_N | Legislatívně problémy (DOD) | po MV nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …) a vrátí zakázku k opětovnému dojednání |
 | Počasí (záfuky, PIV) | volný text | viz kap. 8, bod 5 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
 | 3 pracovní dny nedovoláno | viz kap. 8, bod 6 | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
 | Nefunkční aplikace | volný text | r_0 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
@@ -103,6 +106,10 @@ povinné – bez něj chybí další krok.
 | r_4 | kapacita Vegacom |
 | mv_1 | první marný výjezd u zákazníka |
 | mv_2 | druhý marný výjezd u stejného zákazníka (musí mu předcházet mv_1) |
+| mv_N | další marné výjezdy; číslují se po sobě, dokud se zakázka neuzavře (instalace, nebo storno) |
+
+Po každém marném výjezdu (mv_N) následuje parkování *Legislatívně problémy (DOD)* a opětovné
+dojednání termínu. Řada mv pokračuje, dokud zakázka neskončí instalací, nebo stornem.
 
 > Pozor: dashboard v4.3 (`mvEval`) má mv_1 / mv_2 jako „marný výjezd kvůli zákazníkovi /
 > kvůli infrastruktuře“ a nezná r_0. Platí tato tabulka.
@@ -128,7 +135,8 @@ výstupu (pevné schéma), výsledek je vždy návrh, který potvrzuje koordiná
 |---|---|---|
 | `stav` | NOVÁ / DOJEDNÁVÁNÍ / TERMÍN / PARKOVÁNO_DOD / PARKOVÁNO_ZAK | odhad stavu z poznámek |
 | `parkovani` | odklad / legislativa / pocasi / nedostupny / null | druh parkování |
-| `kod` | r_0 … r_4 / mv_1 / mv_2 / null | poslední použitý kód |
+| `kod` | r_0 … r_4 / mv_N / null | poslední použitý kód |
+| `pocet_mv` | číslo | kolik marných výjezdů už zakázka měla (podle mv_N v poznámkách) |
 | `pokusy` | seznam {datum, čas, výsledek, sms} | pokusy o kontakt z poznámek |
 | `dalsi_kontakt` | datum / null | datum dalšího kontaktu |
 | `konec_JP` | datum / null | konec smlouvy s jiným poskytovatelem |
@@ -140,7 +148,8 @@ a zobrazí upozornění.
 
 ## 7. Kontroly v aplikaci
 
-- mv_2 nelze zvolit bez předchozího mv_1 u stejné zakázky.
+- Číslo marného výjezdu dopočítá aplikace: mv_N lze zvolit jen tehdy, když už zakázka má mv_(N-1).
+- Od mv_2 výš aplikace zakázku zvýrazní (opakovaný marný výjezd) a pomůže koordinátorce rozhodnout, jestli pokračovat, nebo navrhnout storno.
 - r_2 (smlouva s JP) blokuje plánování termínu do data dalšího kontaktu.
 - Parkování DOD bez data dalšího kontaktu nelze uložit.
 - Parkování ZAK lze navrhnout až po 6 neúspěšných pokusech ve 3 pracovních dnech;
@@ -153,7 +162,7 @@ a zobrazí upozornění.
 | 1 | 3 dny po sobě = pracovní dny? | **ano, pracovní dny** |
 | 2 | SMS po každém pokusu, nebo jednou denně? | **podle situace, typicky jednou denně** |
 | 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | **Legislatívně problémy (DOD)** |
-| 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | otevřené |
+| 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | **parkování a opětovné dojednání; mv_N pokračují po sobě až do uzavření (instalace, nebo storno)** |
 | 5 | Počasie a Legislatívně problémy: je kód vždy r_3, nebo podle situace? | otevřené |
 | 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | otevřené |
 | 7 | Počítají se státní svátky jako nepracovní dny? | předpoklad: ano |
