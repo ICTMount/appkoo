@@ -303,3 +303,36 @@ CASEID:                   (SWAP / FIS MOP)
 - **Doba pro volání** – koordinace volá zákazníkům **8:00–19:00** (rozhodnuto 14.10.2026), což je
   v rámci normy (technik na poruchy 8:00–21:00, SMS 8:00–22:00). Kroky, které potřebují PEP,
   je nutné stihnout do 17:00 (PEP 8:00–17:00) – aplikace je po 17:00 přesune na další pracovní den.
+
+## 10. Číselníky a role (14.10.2026)
+
+Číselníky, které spravuje vedoucí koordinace (změny se ukládají s datem a autorem):
+
+| Číselník | Obsah | Použití |
+|---|---|---|
+| **Technici** | jméno, typy akcí (FTTH / PIV / SAT), regiony, **adresa výjezdu** (u Píši rozpis podle dne), propojený kalendář, stav aktivní / ex | plánovač: kdo smí na zakázku a jak daleko to má |
+| **Typy akcí** | hodnoty „Typ aktivity“ z MWF, název v aplikaci, skupina, **délka práce**, routing nedokončených | skládání dne technika, routing MV |
+| **Koordinátorky** | jméno, iniciály, **role**, regiony, routing nedokončených | kdo vidí kterou frontu |
+| **Regiony** | kód okresu, název, subregion MWF (CZ_V_…), koordinátorky, technici | zařazení zakázky podle subregionu / PSČ |
+| Kódy, fráze, blokované lokality, kontakty, pravidla kontaktování | viz kap. 3–5 a 9 | |
+
+Z MWF a normy TMCZ (jen ke čtení): parkování, výsledek dojednávání, důvody zamítnutí.
+
+### Role
+
+| Oprávnění | Vedoucí | Operátorka |
+|---|---|---|
+| Vidí fronty | všechny regiony | své regiony + zástup |
+| Zapisuje výsledek hovoru, fráze do MWF | ano | ano |
+| Plánuje termín a zapisuje do kalendáře technika | ano | ano, techniky svých regionů |
+| Potvrzuje / opravuje návrh Claude | ano | ano |
+| Parkuje ZAK, navrhuje storno | ano | ano |
+| Přeřazuje zakázky mezi koordinátorkami | ano | ne |
+| Přesouvá termíny jiných koordinátorek | ano | ne |
+| Hlídání (lhůty PEP, rozpory MWF ↔ GCal) | všechny regiony | své regiony |
+| Přehled výkonu koordinátorek | ano | jen svůj |
+| Upravuje číselníky | ano | ne (čte) |
+| Spravuje uživatele a role | ano | ne |
+
+K doplnění: přesné adresy výjezdu techniků (zatím jen obec), délky práce podle typu akce,
+zařazení Taišla / Schwarze (Olomoucko) a přiřazení regionů koordinátorkám ke kontrole.
