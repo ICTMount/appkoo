@@ -21,7 +21,7 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
            │    │
            │    └── v den příštího kontaktu ◄── PARKOVÁNO (DOD)
            │                                    ├ Zákazník - odklad termínu
-           │                                    ├ Legislatívne problémy
+           │                                    ├ Legislatívně problémy (po MV technika)
            │                                    └ Počasie
            │
            └─ 6 neúspěšných pokusů (3 pracovní dny × 2) ──► PARKOVÁNO (ZAK) Zákazník - nedostupný
@@ -86,7 +86,7 @@ povinné – bez něj chybí další krok.
 | Odklad na přání zákazníka | `na přání/na žádost kontaktovat DD.MM.RRRR` | r_1 | Zákazník - odklad termínu (DOD) | vrátí zakázku do fronty v daný den |
 | Smlouva s jiným poskytovatelem | `zkz. má smlouvu s JP, ověřuje si výpovědní dobu, přeje si kontaktovat DD.MM.RRRR` | r_2 | Zákazník - odklad termínu (DOD) | do daného data **zablokuje plánování termínu** |
 | Pozdější termín na přání zákazníka | `na přání zákazníka instalace dne DD.MM.RRRR r_1` | r_1 | – (je to termín) | zapíše termín, překročení SLA zdůvodní kódem r_1 |
-| Překážka TMCZ / po marném výjezdu | volný text | r_3 / mv_1 / mv_2 | Legislatívne problémy (DOD) | mv_2 nabídne jen tam, kde v historii už je mv_1 |
+| Překážka TMCZ / po marném výjezdu | volný text | r_3 / mv_1 / mv_2 | Legislatívně problémy (DOD) | mv_2 nabídne jen tam, kde v historii už je mv_1 |
 | Počasí (záfuky, PIV) | volný text | viz kap. 8, bod 5 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
 | 3 pracovní dny nedovoláno | viz kap. 8, bod 6 | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
 | Nefunkční aplikace | volný text | r_0 | viz kap. 8, bod 3 | – |
@@ -109,12 +109,15 @@ povinné – bez něj chybí další krok.
 
 ## 5. Parkování v MWF
 
-| Parkování v MWF | Strana | Kdy | Následný krok |
+Podle tabulky koordinace (14.10.2026). V MWF existují jen tyto čtyři druhy parkování,
+rozdělené do dvou skupin: DOD (parkuje dodavatel – Vegacom) a ZAK (zákazník, řeší PEP).
+
+| Parkování v MWF | Skupina | Kdy | Následný krok |
 |---|---|---|---|
-| Zákazník - odklad termínu | DOD | zákazníkovi jsme se dovolali a žádá o kontaktování později | kontaktovat podle požadavku zákazníka |
-| Legislatívne problémy | DOD | po marném výjezdu technika, nebo před instalací, kde je překážka k naplánování termínu ze strany TMCZ (nesedí předpis, není přístup apod.) | podle odstranění překážky |
-| Počasie | DOD | záfuky, PIV apod. | čekáme na změnu podmínek a znovu plánujeme |
-| Zákazník - nedostupný | ZAK | zákazník byl kontaktován podle pravidel (3 pracovní dny po sobě) a je nedostupný | řeší PEP, odpověď přijde novou poznámkou |
+| Zákazník - odklad termínu | DOD | zákazníkovi jsme se dovolali a žádá o kontaktování později | kontaktuji následně, dle požadavku zákazníka |
+| Legislatívně problémy | DOD | po MV technika | po MV, nebo instalace před, kde je překážka k naplánování termínu ze strany TMCZ (nesedí předpis, není přístup atp.) |
+| Počasie | DOD | záfuky, PIV, etc. | čekáme na změnu podmínek a opět plánujeme |
+| Zákazník - nedostupný | ZAK | zákazník je nedostupný, byl kontaktován dle pravidel, tj. 3 (pracovní) dny po sobě | řeší PEP |
 
 ## 6. Co z poznámek vytěžuje Claude
 
@@ -149,9 +152,9 @@ a zobrazí upozornění.
 |---|---|---|
 | 1 | 3 dny po sobě = pracovní dny? | **ano, pracovní dny** |
 | 2 | SMS po každém pokusu, nebo jednou denně? | **podle situace, typicky jednou denně** |
-| 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | otevřené |
+| 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | otevřené – v tabulce parkování nejsou; parkuje se u nich vůbec? |
 | 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | otevřené |
-| 5 | Počasie a Legislatívne problémy: je kód vždy r_3, nebo podle situace? | otevřené |
+| 5 | Počasie a Legislatívně problémy: je kód vždy r_3, nebo podle situace? | otevřené |
 | 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | otevřené |
 | 7 | Počítají se státní svátky jako nepracovní dny? | předpoklad: ano |
 | 8 | Pracovní doba pro volání (od–do)? | předpoklad: 8:00–17:00 (jako v dashboardu) |
