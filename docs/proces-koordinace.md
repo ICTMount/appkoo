@@ -125,8 +125,10 @@ dojednání termínu. Řada mv pokračuje, dokud zakázka neskončí instalací,
 
 ## 5. Parkování v MWF
 
-Podle tabulky koordinace (14.10.2026). V MWF existují jen tyto čtyři druhy parkování,
+Podle tabulky koordinace (14.10.2026). Vegacom používá jen tyto čtyři druhy parkování,
 rozdělené do dvou skupin: DOD (parkuje dodavatel – Vegacom) a ZAK (zákazník, řeší PEP).
+MWF umožňuje i *Materiál*, *Zákazník - termín - rieši dodávateľ* a *Zákazník - termín - rieši BO* –
+ty se nepoužívají; aplikace je nenabízí, jen je při importu rozpozná a označí (kap. 9.4 C).
 
 | Parkování v MWF | Skupina | Kdy | Následný krok |
 |---|---|---|---|
@@ -236,7 +238,7 @@ Norma R-280-244 říká, že poznámka k parkování ZAK se uvádí právě do z
 |---|---|---|---|
 | A | **Po MV vždy r_3** (vaše odpověď) × praxe | MWF export | V exportu je u zakázek po MV nejčastěji **bez kódu r_x** (94×), pak r_1 (9×), r_3 jen 2×. Call script navíc rozlišuje MV podle příčiny: PRB zákazník / PRB operátor / PRB aplikace. Má aplikace vynucovat r_3, nebo kód podle příčiny (zákazník → r_1, operátor → r_3, aplikace → r_0)? |
 | B | **Parkování po MV** | MWF export | Tabulka říká *Legislatívne problémy*, ale 21 zakázek s výsledkem *Márny výjazd* je zaparkováno jako *Zákazník - odklad termínu*. Má aplikace po MV povolit obojí (podle příčiny), nebo jen Legislatívne problémy? |
-| C | **Další parkovací důvody** | R-280-244, MWF export | Norma povoluje i **Materiál** a **Zákazník – termín – rieši dodávateľ**; v exportu jsou i *Zákazník - termín - rieši dodávateľ* (1×) a *rieši BO* (1×). Interní tabulka je nezná. Zakázat, nebo doplnit? |
+| C | **Další parkovací důvody** | R-280-244, MWF export | **Rozhodnuto 14.10.2026: nepoužíváme, ale MWF je umožňuje.** Aplikace *Materiál*, *Zákazník - termín - rieši dodávateľ* ani *Zákazník - termín - rieši BO* nenabízí. Při importu je ale rozpozná (v exportu 1× a 1×), zakázku zařadí podle významu a označí upozorněním „nestandardní parkování – zkontrolovat“. |
 | D | **Kanál hlášení MV** | call script × dashboard | **Rozhodnuto 14.10.2026: platí Google Chat**, skupina „ICTM - TMCZ / NEDOKONCENE - NESTANDARDNI ZAKAZKY“. Zmínka o Telegramu v call scriptu 202602 je zastaralá – doporučeno opravit v manuálu. |
 | E | **SWAP migrace** | call script × školení 14.08.2026 | Call script: CASEID přes Hnízdilovou (603 602 634, 8–16:30). Školení 14.08.: „SWAP migrace = řešit primárně přes **storno linku**“. Který postup platí? |
 | F | **ZAK pro jiné situace** | R-280-244 | Norma zná ZAK jen jako „Zákazník – nedostupný“ a PEP po 5 KD objednávku zamítne. Když se ZAK použije pro jinou situaci pro T-Mobile, hrozí, že PEP zakázku zamítne. Opravdu takto parkovat? |
