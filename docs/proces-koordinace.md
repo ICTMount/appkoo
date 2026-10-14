@@ -1,6 +1,6 @@
 # Cesta zakázky koordinací – specifikace pro plánovací aplikaci
 
-Verze: 0.1 · 14.10.2026 · stav: body 1–6 a 9.4 A–D, F rozhodnuté; 9.4 E rozhodnuté; k potvrzení 7–8
+Verze: 0.1 · 14.10.2026 · stav: body 1–6 a 9.4 A–D, F rozhodnuté; 9.4 E rozhodnuté; 8 rozhodnuté; k potvrzení 7
 
 Tento dokument popisuje, jak koordinátorka vede zakázku od příchodu z MWF po termín
 nebo zaparkování. Je to podklad pro frontu k volání, počítadlo pokusů o kontakt,
@@ -73,7 +73,7 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
 3. Ve frontě je u zakázky vidět stav, např. `den 2/3 · pokus 1/2 · další pokus 14:10`.
    Fronta se řadí podle toho, kdy je pokus na řadě.
 4. Aby se 2 pokusy denně stihly, musí první pokus proběhnout nejpozději
-   **4 hodiny před koncem pracovní doby** (při konci v 17:00 tedy do 13:00).
+   **4 hodiny před koncem doby pro volání** (volá se 8:00–19:00, první pokus tedy do 15:00).
    Aplikace u zakázek, které na to nestihnou, zobrazí upozornění.
 5. Po **6. neúspěšném pokusu** aplikace navrhne parkování *Zákazník - nedostupný (ZAK)*
    a připraví zápis. Zakázka se přesune do skupiny „čeká na PEP – nevolat“.
@@ -207,7 +207,7 @@ a zobrazí upozornění.
 | 5 | Počasie a Legislatívne problémy: je kód vždy r_3, nebo podle situace? | **ano – Počasie vždy r_3; Legislatívne problémy po marném výjezdu vždy r_3 (spolu s mv_N); r_0 a r_4 zůstávají pro nefunkční app a kapacitu** |
 | 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | **pevná fráze není – popisuje se důvod parkování (situace, kterou nevyřešíme a potřebuje zásah T-Mobile)** |
 | 7 | Počítají se státní svátky jako nepracovní dny? | předpoklad: ano |
-| 8 | Pracovní doba pro volání (od–do)? | předpoklad: 8:00–17:00 (jako v dashboardu) |
+| 8 | Pracovní doba pro volání (od–do)? | **8:00–19:00** |
 
 ## 9. Ověření proti manuálům a MWF exportu (14.10.2026)
 
@@ -300,5 +300,6 @@ CASEID:                   (SWAP / FIS MOP)
 - **Zápis MV od technika** (call script) – technik hlásí do **Google Chatu** (skupina NEDOKONCENE - NESTANDARDNI ZAKAZKY), aplikace zprávy čte a páruje podle ID O- / S7; formát `ID / popis stavu / kam hlášeno / další postup /
   komentář`; podle typu PRB (zákazník / operátor / aplikace) se zakázka přesune na profil podle
   routingu (kap. 9.1).
-- **Pracovní doba** – norma připouští volání technika na poruchy 8:00–21:00 a SMS 8:00–22:00.
-  Pokud by koordinace volala i po 17:00, odpadne omezení „první pokus do 13:00“ (kap. 2).
+- **Doba pro volání** – koordinace volá zákazníkům **8:00–19:00** (rozhodnuto 14.10.2026), což je
+  v rámci normy (technik na poruchy 8:00–21:00, SMS 8:00–22:00). Kroky, které potřebují PEP,
+  je nutné stihnout do 17:00 (PEP 8:00–17:00) – aplikace je po 17:00 přesune na další pracovní den.
