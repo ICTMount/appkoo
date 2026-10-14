@@ -16,9 +16,10 @@ dělá koordinátorka.
 ```
 NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTALACE OK (uzavřeno)
            │    ▲                    │
-           │    │                    └─► marný výjezd ──► mv_N ──► PARKOVÁNO (DOD) Legislatívne problémy
-           │    │                        (mv_1, mv_2, mv_3 … se číslují      └─► opětovné dojednání termínu
-           │    │                         po sobě až do uzavření)
+           │    │                    └─► marný výjezd ──► mv_N ──► PARKOVÁNO (DOD) podle příčiny:
+           │    │                        (mv_1, mv_2, mv_3 …          ├ strana TMCZ → Legislatívne problémy
+           │    │                         se číslují po sobě         └ strana zákazníka → Zákazník - odklad termínu
+           │    │                         až do uzavření)              └─► opětovné dojednání termínu
            │    │
            │    │   Uzavřít lze jen dvěma způsoby: INSTALACE OK, nebo STORNO.
            │    │
@@ -97,7 +98,8 @@ povinné – bez něj chybí další krok.
 | Odklad na přání zákazníka | `na přání/na žádost kontaktovat DD.MM.RRRR` | r_1 | Zákazník - odklad termínu (DOD) | vrátí zakázku do fronty v daný den |
 | Smlouva s jiným poskytovatelem | `zkz. má smlouvu s JP, ověřuje si výpovědní dobu, přeje si kontaktovat DD.MM.RRRR` | r_2 | Zákazník - odklad termínu (DOD) | do daného data **zablokuje plánování termínu** |
 | Pozdější termín na přání zákazníka | `na přání zákazníka instalace dne DD.MM.RRRR r_1` | r_1 | – (je to termín) | zapíše termín, překročení SLA zdůvodní kódem r_1 |
-| Překážka TMCZ / po marném výjezdu | volný text | mv_N + r_3 (po MV vždy r_3) | Legislatívne problémy (DOD) | po MV nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …), doplní r_3 a vrátí zakázku k opětovnému dojednání |
+| Marný výjezd – příčina na straně TMCZ (operátor, infrastruktura, předpis, přístup) | volný text | mv_N + r_3 | Legislatívne problémy (DOD) | nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …), doplní r_3 a vrátí zakázku k opětovnému dojednání |
+| Marný výjezd – příčina na straně zákazníka (nepřipravená trasa, zásuvka, polička…) | volný text + `kontaktovat DD.MM.RRRR` | mv_N + r_1 (k potvrzení, kap. 9.4 A) | Zákazník - odklad termínu (DOD) | nabídne další číslo v řadě, vrátí zakázku do fronty v den dalšího kontaktu |
 | Počasí (záfuky, PIV) | volný text | r_3 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
 | 3 pracovní dny nedovoláno | popis důvodu – návrh: `zkz. nedostupný, kontaktován dle pravidel 3 prac. dny (DD.MM.–DD.MM.RRRR), 6× tlf., sms – prosíme o součinnost PEP` | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
 | Jiná situace, kterou nevyřešíme bez T-Mobile | volný popis důvodu (co se stalo, co jsme zkusili, co potřebujeme od TMCZ) | podle situace | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
@@ -117,7 +119,8 @@ povinné – bez něj chybí další krok.
 | mv_2 | druhý marný výjezd u stejného zákazníka (musí mu předcházet mv_1) |
 | mv_N | další marné výjezdy; číslují se po sobě, dokud se zakázka neuzavře (instalace, nebo storno) |
 
-Po každém marném výjezdu (mv_N) následuje parkování *Legislatívne problémy (DOD)* a opětovné
+Po každém marném výjezdu (mv_N) následuje parkování podle příčiny – strana TMCZ →
+*Legislatívne problémy (DOD)*, strana zákazníka → *Zákazník - odklad termínu (DOD)* – a opětovné
 dojednání termínu. Řada mv pokračuje, dokud zakázka neskončí instalací, nebo stornem.
 
 > Pozor: dashboard v4.3 (`mvEval`) má mv_1 / mv_2 jako „marný výjezd kvůli zákazníkovi /
@@ -237,7 +240,7 @@ Norma R-280-244 říká, že poznámka k parkování ZAK se uvádí právě do z
 | # | Rozdíl | Zdroje | Otázka |
 |---|---|---|---|
 | A | **Po MV vždy r_3** (vaše odpověď) × praxe | MWF export | V exportu je u zakázek po MV nejčastěji **bez kódu r_x** (94×), pak r_1 (9×), r_3 jen 2×. Call script navíc rozlišuje MV podle příčiny: PRB zákazník / PRB operátor / PRB aplikace. Má aplikace vynucovat r_3, nebo kód podle příčiny (zákazník → r_1, operátor → r_3, aplikace → r_0)? |
-| B | **Parkování po MV** | MWF export | Tabulka říká *Legislatívne problémy*, ale 21 zakázek s výsledkem *Márny výjazd* je zaparkováno jako *Zákazník - odklad termínu*. Má aplikace po MV povolit obojí (podle příčiny), nebo jen Legislatívne problémy? |
+| B | **Parkování po MV** | MWF export | **Rozhodnuto 14.10.2026: obojí podle příčiny.** Příčina na straně TMCZ → *Legislatívne problémy*; příčina na straně zákazníka → *Zákazník - odklad termínu*. Aplikace se při zápisu MV zeptá na stranu příčiny a podle ní zvolí parkování. |
 | C | **Další parkovací důvody** | R-280-244, MWF export | **Rozhodnuto 14.10.2026: nepoužíváme, ale MWF je umožňuje.** Aplikace *Materiál*, *Zákazník - termín - rieši dodávateľ* ani *Zákazník - termín - rieši BO* nenabízí. Při importu je ale rozpozná (v exportu 1× a 1×), zakázku zařadí podle významu a označí upozorněním „nestandardní parkování – zkontrolovat“. |
 | D | **Kanál hlášení MV** | call script × dashboard | **Rozhodnuto 14.10.2026: platí Google Chat**, skupina „ICTM - TMCZ / NEDOKONCENE - NESTANDARDNI ZAKAZKY“. Zmínka o Telegramu v call scriptu 202602 je zastaralá – doporučeno opravit v manuálu. |
 | E | **SWAP migrace** | call script × školení 14.08.2026 | Call script: CASEID přes Hnízdilovou (603 602 634, 8–16:30). Školení 14.08.: „SWAP migrace = řešit primárně přes **storno linku**“. Který postup platí? |
