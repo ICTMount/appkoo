@@ -1,6 +1,6 @@
 # Cesta zakázky koordinací – specifikace pro plánovací aplikaci
 
-Verze: 0.1 · 14.10.2026 · stav: rozpracováno (otevřené body v kap. 8)
+Verze: 0.1 · 14.10.2026 · stav: body 1–6 vyjasněné, předpoklady 7–8 k potvrzení
 
 Tento dokument popisuje, jak koordinátorka vede zakázku od příchodu z MWF po termín
 nebo zaparkování. Je to podklad pro frontu k volání, počítadlo pokusů o kontakt,
@@ -39,7 +39,7 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
 | DOJEDNÁVÁNÍ | probíhají pokusy o kontakt | ano, když je pokus na řadě |
 | TERMÍN | dohodnutý termín instalace | ne (hlídá se shoda MWF ↔ GCal) |
 | PARKOVÁNO DOD | parkuje Vegacom (dodavatel), datum dalšího kontaktu je známé | až v den dalšího kontaktu |
-| PARKOVÁNO ZAK | zákazník nedostupný, řeší PEP | ne – čeká na novou poznámku od PEP |
+| PARKOVÁNO ZAK | situace, kterou Vegacom nevyřeší a potřebuje zásah zadavatele (T-Mobile); typicky nedostupný zákazník. Řeší PEP | ne – čeká na novou poznámku od PEP |
 
 ## 2. Pravidlo kontaktování (dojednání termínu)
 
@@ -91,7 +91,8 @@ povinné – bez něj chybí další krok.
 | Pozdější termín na přání zákazníka | `na přání zákazníka instalace dne DD.MM.RRRR r_1` | r_1 | – (je to termín) | zapíše termín, překročení SLA zdůvodní kódem r_1 |
 | Překážka TMCZ / po marném výjezdu | volný text | mv_N + r_3 (po MV vždy r_3) | Legislatívně problémy (DOD) | po MV nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …), doplní r_3 a vrátí zakázku k opětovnému dojednání |
 | Počasí (záfuky, PIV) | volný text | r_3 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
-| 3 pracovní dny nedovoláno | viz kap. 8, bod 6 | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
+| 3 pracovní dny nedovoláno | popis důvodu – návrh: `zkz. nedostupný, kontaktován dle pravidel 3 prac. dny (DD.MM.–DD.MM.RRRR), 6× tlf., sms – prosíme o součinnost PEP` | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
+| Jiná situace, kterou nevyřešíme bez T-Mobile | volný popis důvodu (co se stalo, co jsme zkusili, co potřebujeme od TMCZ) | podle situace | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
 | Nefunkční aplikace | volný text | r_0 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
 | Kapacita Vegacom | volný text | r_4 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
 
@@ -124,7 +125,12 @@ rozdělené do dvou skupin: DOD (parkuje dodavatel – Vegacom) a ZAK (zákazní
 | Zákazník - odklad termínu | DOD | zákazníkovi jsme se dovolali a žádá o kontaktování později | kontaktuji následně, dle požadavku zákazníka |
 | Legislatívně problémy | DOD | po MV technika; také při nefunkční aplikaci (r_0) a nedostatečné kapacitě Vegacom (r_4) | po MV, nebo instalace před, kde je překážka k naplánování termínu ze strany TMCZ (nesedí předpis, není přístup atp.) |
 | Počasie | DOD | záfuky, PIV, etc. | čekáme na změnu podmínek a opět plánujeme |
-| Zákazník - nedostupný | ZAK | zákazník je nedostupný, byl kontaktován dle pravidel, tj. 3 (pracovní) dny po sobě | řeší PEP |
+| Zákazník - nedostupný | ZAK | zákazník je nedostupný, byl kontaktován dle pravidel, tj. 3 (pracovní) dny po sobě; obecně každá situace, kterou nejsme schopni vyřešit a potřebuje zásah zadavatele (T-Mobile) | řeší PEP |
+
+U parkování ZAK se nepoužívá pevná fráze. Do zápisu se popíše důvod parkování: co se stalo,
+co Vegacom zkusil a co potřebuje od T-Mobile. Aplikace pro nedostupného zákazníka předvyplní
+návrh z historie pokusů (data a počet) a u jiných situací může návrh popisu připravit Claude
+z poznámek zakázky. Text vždy potvrdí koordinátorka.
 
 ## 6. Co z poznámek vytěžuje Claude
 
@@ -152,8 +158,9 @@ a zobrazí upozornění.
 - Od mv_2 výš aplikace zakázku zvýrazní (opakovaný marný výjezd) a pomůže koordinátorce rozhodnout, jestli pokračovat, nebo navrhnout storno.
 - r_2 (smlouva s JP) blokuje plánování termínu do data dalšího kontaktu.
 - Parkování DOD bez data dalšího kontaktu nelze uložit.
-- Parkování ZAK lze navrhnout až po 6 neúspěšných pokusech ve 3 pracovních dnech;
-  dřív jen s ručním potvrzením a důvodem.
+- Parkování ZAK bez popisu důvodu nelze uložit.
+- Aplikace sama navrhne ZAK po 6 neúspěšných pokusech ve 3 pracovních dnech. Z jiného důvodu
+  (situace pro T-Mobile) ho koordinátorka zvolí ručně a popíše důvod.
 
 ## 8. Otevřené body
 
@@ -164,6 +171,6 @@ a zobrazí upozornění.
 | 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | **Legislatívně problémy (DOD)** |
 | 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | **parkování a opětovné dojednání; mv_N pokračují po sobě až do uzavření (instalace, nebo storno)** |
 | 5 | Počasie a Legislatívně problémy: je kód vždy r_3, nebo podle situace? | **ano – Počasie vždy r_3; Legislatívně problémy po marném výjezdu vždy r_3 (spolu s mv_N); r_0 a r_4 zůstávají pro nefunkční app a kapacitu** |
-| 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | otevřené |
+| 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | **pevná fráze není – popisuje se důvod parkování (situace, kterou nevyřešíme a potřebuje zásah T-Mobile)** |
 | 7 | Počítají se státní svátky jako nepracovní dny? | předpoklad: ano |
 | 8 | Pracovní doba pro volání (od–do)? | předpoklad: 8:00–17:00 (jako v dashboardu) |
