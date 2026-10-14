@@ -89,8 +89,8 @@ povinné – bez něj chybí další krok.
 | Odklad na přání zákazníka | `na přání/na žádost kontaktovat DD.MM.RRRR` | r_1 | Zákazník - odklad termínu (DOD) | vrátí zakázku do fronty v daný den |
 | Smlouva s jiným poskytovatelem | `zkz. má smlouvu s JP, ověřuje si výpovědní dobu, přeje si kontaktovat DD.MM.RRRR` | r_2 | Zákazník - odklad termínu (DOD) | do daného data **zablokuje plánování termínu** |
 | Pozdější termín na přání zákazníka | `na přání zákazníka instalace dne DD.MM.RRRR r_1` | r_1 | – (je to termín) | zapíše termín, překročení SLA zdůvodní kódem r_1 |
-| Překážka TMCZ / po marném výjezdu | volný text | r_3 / mv_N | Legislatívně problémy (DOD) | po MV nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …) a vrátí zakázku k opětovnému dojednání |
-| Počasí (záfuky, PIV) | volný text | viz kap. 8, bod 5 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
+| Překážka TMCZ / po marném výjezdu | volný text | mv_N + r_3 (po MV vždy r_3) | Legislatívně problémy (DOD) | po MV nabídne další číslo v řadě (mv_1 → mv_2 → mv_3 …), doplní r_3 a vrátí zakázku k opětovnému dojednání |
+| Počasí (záfuky, PIV) | volný text | r_3 | Počasie (DOD) | vrátí zakázku do fronty v daný den |
 | 3 pracovní dny nedovoláno | viz kap. 8, bod 6 | r_1 | Zákazník - nedostupný (ZAK) | přesun do „čeká na PEP“ |
 | Nefunkční aplikace | volný text | r_0 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
 | Kapacita Vegacom | volný text | r_4 | Legislatívně problémy (DOD) | vrátí zakázku do fronty v den dalšího kontaktu |
@@ -163,7 +163,7 @@ a zobrazí upozornění.
 | 2 | SMS po každém pokusu, nebo jednou denně? | **podle situace, typicky jednou denně** |
 | 3 | Pod jaké parkování v MWF patří r_0 (nefunkční app) a r_4 (kapacita)? | **Legislatívně problémy (DOD)** |
 | 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | **parkování a opětovné dojednání; mv_N pokračují po sobě až do uzavření (instalace, nebo storno)** |
-| 5 | Počasie a Legislatívně problémy: je kód vždy r_3, nebo podle situace? | otevřené |
+| 5 | Počasie a Legislatívně problémy: je kód vždy r_3, nebo podle situace? | **ano – Počasie vždy r_3; Legislatívně problémy po marném výjezdu vždy r_3 (spolu s mv_N); r_0 a r_4 zůstávají pro nefunkční app a kapacitu** |
 | 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | otevřené |
 | 7 | Počítají se státní svátky jako nepracovní dny? | předpoklad: ano |
 | 8 | Pracovní doba pro volání (od–do)? | předpoklad: 8:00–17:00 (jako v dashboardu) |
