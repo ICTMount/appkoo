@@ -85,6 +85,19 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
 8. Při **Dovoláno** koordinátorka vybere výsledek: termín, odklad, smlouva s JP,
    nebo jiná překážka (kap. 3).
 
+### 2.1 SWAP migrace a FIS MOP – součást dojednávání
+
+Koordinátorka je řeší **ještě před dohodnutím termínu se zákazníkem**. Aplikace proto u zakázky
+se zásuvkou USED nenabídne termín, dokud nejsou splněné podmínky:
+
+| Typ | Kdy | Postup koordinátorky před termínem | Podmínka pro termín |
+|---|---|---|---|
+| **SWAP migrace** | v bytě optika CETIN a na ní DSL T-Mobile | 1. ověřit v ticketu Servisní požadavek (SP); 2. SP je → zavolat Hnízdilovou (603 602 634, 8–16:30) a vyžádat **CASEID**; 3. SP chybí → objednávku upravit / založit novou přes **storno linku** (8–18) a nové O- číslo hned řešit s PEP (8–17) k přidělení; 4. CASEID zapsat do MWF a do události v GCal | instalace **nejpozději do 7 dní od vygenerování CASEID** – jinak se stará služba zruší a zákazník zůstane bez internetu |
+| **FIS MOP** | v bytě optika CETIN a na ní služba O2 (nebo spřízněný dodavatel) | CASEID a datum portace jsou v ticketu; zapsat do MWF a GCal | termín **až po datu portace** |
+
+Aplikace u SWAP odpočítává 7 dní od CASEID a v plánovači nabídne jen sloty v tomto okně.
+U FIS MOP nabídne jen sloty po datu portace.
+
 ## 3. Fráze do MWF
 
 Datum se zapisuje jako `DD.MM.RRRR`. Koordinátorka ho vybere v kalendáři, nebo ho
@@ -243,7 +256,7 @@ Norma R-280-244 říká, že poznámka k parkování ZAK se uvádí právě do z
 | B | **Parkování po MV** | MWF export | **Rozhodnuto 14.10.2026: obojí podle příčiny.** Příčina na straně TMCZ → *Legislatívne problémy*; příčina na straně zákazníka → *Zákazník - odklad termínu*. Aplikace se při zápisu MV zeptá na stranu příčiny a podle ní zvolí parkování. |
 | C | **Další parkovací důvody** | R-280-244, MWF export | **Rozhodnuto 14.10.2026: nepoužíváme, ale MWF je umožňuje.** Aplikace *Materiál*, *Zákazník - termín - rieši dodávateľ* ani *Zákazník - termín - rieši BO* nenabízí. Při importu je ale rozpozná (v exportu 1× a 1×), zakázku zařadí podle významu a označí upozorněním „nestandardní parkování – zkontrolovat“. |
 | D | **Kanál hlášení MV** | call script × dashboard | **Rozhodnuto 14.10.2026: platí Google Chat**, skupina „ICTM - TMCZ / NEDOKONCENE - NESTANDARDNI ZAKAZKY“. Zmínka o Telegramu v call scriptu 202602 je zastaralá – doporučeno opravit v manuálu. |
-| E | **SWAP migrace** | call script × školení 14.08.2026 | Call script: CASEID přes Hnízdilovou (603 602 634, 8–16:30). Školení 14.08.: „SWAP migrace = řešit primárně přes **storno linku**“. Který postup platí? |
+| E | **SWAP migrace** | call script × školení 14.08.2026 × STORNO LINKA 20260826 | **Rozhodnuto 14.10.2026:** řeší koordinátorka ještě před dohodnutím termínu, je součástí dojednávání (kap. 2.1). Výklad: CASEID přes Hnízdilovou; storno linka tam, kde je potřeba objednávku upravit nebo založit novou (chybí Servisní požadavek). *K potvrzení.* |
 | F | **ZAK pro jiné situace** | R-280-244 | Norma zná ZAK jen jako „Zákazník – nedostupný“ a PEP po 5 KD objednávku zamítne. Když se ZAK použije pro jinou situaci pro T-Mobile, hrozí, že PEP zakázku zamítne. Opravdu takto parkovat? |
 
 ### 9.5 Doplnit do aplikace
