@@ -1,6 +1,6 @@
 # Cesta zakázky koordinací – specifikace pro plánovací aplikaci
 
-Verze: 0.1 · 14.10.2026 · stav: body 1–6 a 9.4 A–D, F rozhodnuté; 9.4 E rozhodnuté; 8 rozhodnuté; k potvrzení 7
+Verze: 0.2 · 14.10.2026 · stav: všechny otevřené body rozhodnuté
 
 Tento dokument popisuje, jak koordinátorka vede zakázku od příchodu z MWF po termín
 nebo zaparkování. Je to podklad pro frontu k volání, počítadlo pokusů o kontakt,
@@ -46,7 +46,7 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
 
 - **2 pokusy denně** s odstupem **minimálně 4 hodin**.
 - **3 po sobě jdoucí pracovní dny** (Po–Pá). Víkend se nepočítá a nepřerušuje řadu.
-  Státní svátky se berou jako nepracovní dny (předpoklad, viz kap. 8).
+  Státní svátky se do pracovních dnů nepočítají (jako víkend).
 - **SMS** se posílá podle situace, **typicky jednou denně**, po prvním nedovolaném pokusu dne.
 - Závazné minimum podle normy TMCZ R-280-244 (kap. 9): **min. 3 pokusy během 3 PD s rozestupem 4 h**
   a **min. 2 SMS během 3 PD s odstupem min. 18 h, jen v čase 8:00–22:00**. Interní pravidlo
@@ -206,7 +206,7 @@ a zobrazí upozornění.
 | 4 | Co následuje po mv_2 (eskalace na PEP, storno, jiné)? | **parkování a opětovné dojednání; mv_N pokračují po sobě až do uzavření (instalace, nebo storno)** |
 | 5 | Počasie a Legislatívne problémy: je kód vždy r_3, nebo podle situace? | **ano – Počasie vždy r_3; Legislatívne problémy po marném výjezdu vždy r_3 (spolu s mv_N); r_0 a r_4 zůstávají pro nefunkční app a kapacitu** |
 | 6 | Přesná fráze pro parkování ZAK (Zákazník - nedostupný)? | **pevná fráze není – popisuje se důvod parkování (situace, kterou nevyřešíme a potřebuje zásah T-Mobile)** |
-| 7 | Počítají se státní svátky jako nepracovní dny? | předpoklad: ano |
+| 7 | Počítají se státní svátky jako nepracovní dny? | **ano – svátky se do pracovních dnů nepočítají** (lhůta PEP 5 KD je v kalendářních dnech, tam se svátky počítají) |
 | 8 | Pracovní doba pro volání (od–do)? | **8:00–19:00** |
 
 ## 9. Ověření proti manuálům a MWF exportu (14.10.2026)
