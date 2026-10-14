@@ -32,7 +32,7 @@ function fakeClient(odpoved: () => unknown) {
   const client = {
     beta: { messages: { parse: async (req: unknown) => (zadosti.push(req), odpoved()) } },
   } as unknown as Anthropic;
-  return { client, zadosti };
+  return { client: { client, fallbacks: true }, zadosti };
 }
 
 describe("vytěžení poznámek přes Claude", () => {
@@ -47,6 +47,13 @@ describe("vytěžení poznámek přes Claude", () => {
     expect(JSON.stringify(req.messages)).not.toMatch(/Nováková|777/);
     expect(r.zdroj).toBe("claude");
     expect(r.vytezeni!.dalsi_krok).toBe("Zavolat znovu na 777 123 456 po 13:01.");
+  });
+
+  it("na Vertex AI neposílá fallbacks (tam nejsou)", async () => {
+    const { client, zadosti } = fakeClient(() => ({ stop_reason: "end_turn", parsed_output: vytezeni }));
+    await vytezPoznamky(zakazka, local(2026, 10, 14, 18, 0), { ...client, fallbacks: false });
+    expect(zadosti[0].fallbacks).toBeUndefined();
+    expect(zadosti[0].betas).toBeUndefined();
   });
 
   it("při odmítnutí vrací nedostupné (použije se vyhodnocení podle klíčových slov)", async () => {

@@ -26,6 +26,7 @@
   "private": "true",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.134.0",
+    "@anthropic-ai/vertex-sdk": "^0.21.0",
     "iconv-lite": "^0.7.3",
     "zod": "^4.6.7"
   },

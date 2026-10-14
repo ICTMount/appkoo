@@ -5,6 +5,7 @@ v exportech z MWF: importuje zakázky, hlídá pravidla kontaktování, připrav
 a události do kalendáře techniků a pomocí Claude vytěžuje poznámky.
 
 Proces, ze kterého aplikace vychází: [`docs/proces-koordinace.md`](docs/proces-koordinace.md).
+Provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
 
 ## Stav – fáze F0 (jádro)
 
@@ -40,7 +41,9 @@ MWF exporty obsahují osobní údaje zákazníků – do repozitáře se necommi
 ## Claude
 
 - Model `claude-opus-5-5`, strukturovaný výstup podle schématu `VytezeniSchema`, nízké `effort`.
+- Poskytovatel: `CLAUDE_PROVIDER=vertex` (Vertex AI, proměnné `GOOGLE_CLOUD_PROJECT`, `CLAUDE_VERTEX_REGION`,
+  výchozí `eu`), jinak Claude API s `ANTHROPIC_API_KEY`.
 - Před odesláním se z poznámek odstraní jméno zákazníka, telefony a e-maily (`src/ai/pseudonym.ts`).
-- Zapnutý server-side fallback (`fallbacks: "default"`) pro případ odmítnutí.
+- Na Claude API je zapnutý server-side fallback (`fallbacks: "default"`); na Vertex AI není dostupný.
 - Výsledek je vždy návrh. Když Claude neodpoví, použije se deterministické vyhodnocení
   (`pokusyZPoznamky`) a import pokračuje.

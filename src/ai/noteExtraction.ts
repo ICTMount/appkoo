@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { Zakazka } from "../import/mwfExport.js";
 import { fmtDate } from "../domain/time.js";
 import { pseudonymizuj } from "./pseudonym.js";
+import { vytvorKlienta, type ClaudeKlient } from "./client.js";
 
 export const MODEL = "claude-opus-5-5";
 /** Verze promptu – ukládá se k výsledku, aby šlo poznat, čím byl vyhodnocen */
@@ -91,7 +92,7 @@ export interface VysledekVytezeni {
 export async function vytezPoznamky(
   zakazka: Zakazka,
   dnes: Date,
-  client: Anthropic = new Anthropic(),
+  { client, fallbacks }: ClaudeKlient = vytvorKlienta(),
 ): Promise<VysledekVytezeni> {
   const p = pseudonymizuj(zakazka.poznamka, zakazka.zakaznik);
   const kontext = [
@@ -106,8 +107,7 @@ export async function vytezPoznamky(
     const response = await client.beta.messages.parse({
       model: MODEL,
       max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      ...(fallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
       system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       output_config: { effort: "low", format: betaZodOutputFormat(VytezeniSchema) },
       messages: [{ role: "user", content: `${kontext}\n\nPoznámky z MWF:\n"""\n${p.text}\n"""` }],
