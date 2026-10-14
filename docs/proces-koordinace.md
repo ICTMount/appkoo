@@ -237,7 +237,7 @@ Norma R-280-244 říká, že poznámka k parkování ZAK se uvádí právě do z
 | A | **Po MV vždy r_3** (vaše odpověď) × praxe | MWF export | V exportu je u zakázek po MV nejčastěji **bez kódu r_x** (94×), pak r_1 (9×), r_3 jen 2×. Call script navíc rozlišuje MV podle příčiny: PRB zákazník / PRB operátor / PRB aplikace. Má aplikace vynucovat r_3, nebo kód podle příčiny (zákazník → r_1, operátor → r_3, aplikace → r_0)? |
 | B | **Parkování po MV** | MWF export | Tabulka říká *Legislatívne problémy*, ale 21 zakázek s výsledkem *Márny výjazd* je zaparkováno jako *Zákazník - odklad termínu*. Má aplikace po MV povolit obojí (podle příčiny), nebo jen Legislatívne problémy? |
 | C | **Další parkovací důvody** | R-280-244, MWF export | Norma povoluje i **Materiál** a **Zákazník – termín – rieši dodávateľ**; v exportu jsou i *Zákazník - termín - rieši dodávateľ* (1×) a *rieši BO* (1×). Interní tabulka je nezná. Zakázat, nebo doplnit? |
-| D | **Kanál hlášení MV** | call script × dashboard | Call script uvádí skupinu v **Telegramu**, dashboard čte stejnojmennou skupinu v **Google Chatu**. Který kanál platí? |
+| D | **Kanál hlášení MV** | call script × dashboard | **Rozhodnuto 14.10.2026: platí Google Chat**, skupina „ICTM - TMCZ / NEDOKONCENE - NESTANDARDNI ZAKAZKY“. Zmínka o Telegramu v call scriptu 202602 je zastaralá – doporučeno opravit v manuálu. |
 | E | **SWAP migrace** | call script × školení 14.08.2026 | Call script: CASEID přes Hnízdilovou (603 602 634, 8–16:30). Školení 14.08.: „SWAP migrace = řešit primárně přes **storno linku**“. Který postup platí? |
 | F | **ZAK pro jiné situace** | R-280-244 | Norma zná ZAK jen jako „Zákazník – nedostupný“ a PEP po 5 KD objednávku zamítne. Když se ZAK použije pro jinou situaci pro T-Mobile, hrozí, že PEP zakázku zamítne. Opravdu takto parkovat? |
 
@@ -274,7 +274,7 @@ INSTALAČNÍ PŘEDPIS:       (celý zkopírovat z ticketu)
 CASEID:                   (SWAP / FIS MOP)
 ```
 
-- **Zápis MV od technika** (call script) – formát `ID / popis stavu / kam hlášeno / další postup /
+- **Zápis MV od technika** (call script) – technik hlásí do **Google Chatu** (skupina NEDOKONCENE - NESTANDARDNI ZAKAZKY), aplikace zprávy čte a páruje podle ID O- / S7; formát `ID / popis stavu / kam hlášeno / další postup /
   komentář`; podle typu PRB (zákazník / operátor / aplikace) se zakázka přesune na profil podle
   routingu (kap. 9.1).
 - **Pracovní doba** – norma připouští volání technika na poruchy 8:00–21:00 a SMS 8:00–22:00.
