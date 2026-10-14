@@ -1,6 +1,6 @@
 # Cesta zakázky koordinací – specifikace pro plánovací aplikaci
 
-Verze: 0.1 · 14.10.2026 · stav: body 1–6 vyjasněné, předpoklady 7–8 k potvrzení
+Verze: 0.1 · 14.10.2026 · stav: body 1–6 a 9.4 A–D, F rozhodnuté; k potvrzení 7–8 a výklad 9.4 E
 
 Tento dokument popisuje, jak koordinátorka vede zakázku od příchodu z MWF po termín
 nebo zaparkování. Je to podklad pro frontu k volání, počítadlo pokusů o kontakt,
@@ -187,7 +187,8 @@ a zobrazí upozornění.
 - Parkování DOD bez data dalšího kontaktu nelze uložit.
 - Parkování ZAK bez popisu důvodu nelze uložit.
 - U ZAK aplikace počítá **5 kalendářních dní** od zaparkování: pokud do té doby nepřijde
-  reakce, PEP podle normy objednávku finálně zamítne (kap. 9).
+  reakce, PEP podle normy objednávku finálně zamítne (kap. 9). Den před koncem lhůty
+  aplikace upozorní, aby koordinátorka mohla urgovat PEP (platí i pro ZAK z jiných důvodů než nedostupnost).
 - Aplikace sama navrhne ZAK po 6 neúspěšných pokusech ve 3 pracovních dnech. Z jiného důvodu
   (situace pro T-Mobile) ho koordinátorka zvolí ručně a popíše důvod.
 
@@ -257,7 +258,7 @@ Norma R-280-244 říká, že poznámka k parkování ZAK se uvádí právě do z
 | C | **Další parkovací důvody** | R-280-244, MWF export | **Rozhodnuto 14.10.2026: nepoužíváme, ale MWF je umožňuje.** Aplikace *Materiál*, *Zákazník - termín - rieši dodávateľ* ani *Zákazník - termín - rieši BO* nenabízí. Při importu je ale rozpozná (v exportu 1× a 1×), zakázku zařadí podle významu a označí upozorněním „nestandardní parkování – zkontrolovat“. |
 | D | **Kanál hlášení MV** | call script × dashboard | **Rozhodnuto 14.10.2026: platí Google Chat**, skupina „ICTM - TMCZ / NEDOKONCENE - NESTANDARDNI ZAKAZKY“. Zmínka o Telegramu v call scriptu 202602 je zastaralá – doporučeno opravit v manuálu. |
 | E | **SWAP migrace** | call script × školení 14.08.2026 × STORNO LINKA 20260826 | **Rozhodnuto 14.10.2026:** řeší koordinátorka ještě před dohodnutím termínu, je součástí dojednávání (kap. 2.1). Výklad: CASEID přes Hnízdilovou; storno linka tam, kde je potřeba objednávku upravit nebo založit novou (chybí Servisní požadavek). *K potvrzení.* |
-| F | **ZAK pro jiné situace** | R-280-244 | Norma zná ZAK jen jako „Zákazník – nedostupný“ a PEP po 5 KD objednávku zamítne. Když se ZAK použije pro jinou situaci pro T-Mobile, hrozí, že PEP zakázku zamítne. Opravdu takto parkovat? |
+| F | **ZAK pro jiné situace** | R-280-244 | **Rozhodnuto 14.10.2026: ano, i tato varianta je možná.** ZAK se použije i pro jiné situace, které potřebují zásah T-Mobile. Riziko finálního zamítnutí PEP po 5 KD je přijaté; aplikace u každé ZAK zobrazí odpočet 5 KD a upozorní 1 den před koncem lhůty, aby koordinátorka mohla urgovat PEP. |
 
 ### 9.5 Doplnit do aplikace
 
