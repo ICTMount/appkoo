@@ -9,6 +9,7 @@ import {
   type Parkovani,
   type Vysledek,
 } from "../domain/mwf.js";
+import { zakladniCisloObjednavky } from "../domain/slovnik.js";
 import { isoDate, parseCzDateTime, type IsoDate } from "../domain/time.js";
 import { decodeExport, parseCsv } from "./csv.js";
 import { rozlozPoznamku, type Zaznam } from "./notes.js";
@@ -21,6 +22,8 @@ export interface Zakazka {
   idObjednavky: string;
   /** interní číslo objednávky v MWF (sloupec „ID objednávky“) */
   idObjednavkyMwf: string;
+  /** O-číslo bez přípon (":1", "-13075814") – pro párování s kalendářem a chatem */
+  idObjednavkyZaklad: string;
   idS7: string;
   technik: string; // Pracovný zdroj
   stavMwf: string;
@@ -137,6 +140,7 @@ export function importExport(buf: Buffer, exportAt: Date): VysledekImportu {
       idAktivity: get(COL.idAktivity),
       idObjednavky: get(COL.idExt),
       idObjednavkyMwf: get(COL.idObjednavky),
+      idObjednavkyZaklad: zakladniCisloObjednavky(get(COL.idExt)),
       idS7: get(COL.idS7),
       technik: get(COL.technik),
       stavMwf: get(COL.stav),

@@ -45,7 +45,7 @@ const BUF = export_([
     "Do splnění": "-1t,2d,3h,4m",
   },
   {
-    "ID aktivity": "A2", "ID objednávky": "22000002", "ID obj. v ext. systéme": "O-2222222222", Stav: "Zaparkovaná", "Typ aktivity": "Inst_Pristupu_FTTH",
+    "ID aktivity": "A2", "ID objednávky": "22000002", "ID obj. v ext. systéme": "O-2222222222:1", Stav: "Zaparkovaná", "Typ aktivity": "Inst_Pristupu_FTTH",
     Zákazník: "Dvořák Petr", "P17: Vlastník siete": "TMCZ", Poznámka: POZNAMKA_2,
     "Dôvod parkovania": "Zákazník - nedostupný", "Výsledok dojednávania": "Márny výjazd",
   },
@@ -83,6 +83,8 @@ describe("import MWF exportu", () => {
   });
 
   it("rozpozná parkování, skupinu a nestandardní parkování", () => {
+    expect(z2!.idObjednavky).toBe("O-2222222222:1");
+    expect(z2!.idObjednavkyZaklad).toBe("O-2222222222");
     expect(z2!.parkovani).toBe("Zákazník - nedostupný");
     expect(z2!.parkovaniSkupina).toBe("ZAK");
     expect(z2!.vysledek).toBe("Márny výjazd");
