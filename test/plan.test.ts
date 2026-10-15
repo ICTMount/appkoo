@@ -111,3 +111,26 @@ describe("KPI zakázek", () => {
     expect(slaKonec({ doSplneniMin: 60 }, exportAt)).toEqual(local(2026, 10, 15, 10, 0));
   });
 });
+
+describe("dny techniků z kalendáře", async () => {
+  const { sestavDny } = await import("../src/plan/dny.js");
+  const geo = { najdi: async (a: string) => ({ bod: a.includes("Krč") ? B.krc! : a.includes("Hloubětín") ? B.hloubetin! : null, presnost: "adresa" as const, zdroj: "test" }) };
+  const u = (o: Record<string, unknown>) => ({ kalendar: "c", technik: "Hristov", id: "e", summary: "", description: "", location: "", od: local(2026, 10, 16, 10, 0), do: local(2026, 10, 16, 12, 0), ...o }) as any;
+
+  it("zakázky z událostí, volná okna z VOLNY, chybějící polohy a základny nahlásí", async () => {
+    const r = await sestavDny(
+      [{ jmeno: "Hristov", vyjezd: "Praha-Hloubětín" }, { jmeno: "Novák", vyjezd: "" }],
+      [
+        u({ id: "e1", location: "Na Strži, Praha 4-Krč", appkoo: "A1" }),
+        u({ id: "e2", location: "neznámo", od: local(2026, 10, 16, 8, 0), do: local(2026, 10, 16, 9, 0) }),
+        u({ id: "e3", summary: "VOLNY", od: local(2026, 10, 16, 14, 0), do: local(2026, 10, 16, 16, 0) }),
+      ],
+      "2026-10-16",
+      geo,
+    );
+    expect(r.bezZakladny).toEqual(["Novák"]);
+    expect(r.bezPolohy.map((x) => x.id)).toEqual(["e2"]);
+    expect(r.dny[0]!.den.navstevy).toEqual([{ id: "A1", bod: B.krc, od: 600, do: 719, trvani: 110 }]);
+    expect(r.dny[0]!.volnaOkna).toEqual([{ od: 840, do: 959 }]);
+  });
+});
