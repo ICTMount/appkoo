@@ -5,7 +5,7 @@ v exportech z MWF: importuje zakázky, hlídá pravidla kontaktování, připrav
 a události do kalendáře techniků a pomocí Claude vytěžuje poznámky.
 
 Proces, ze kterého aplikace vychází: [`docs/proces-koordinace.md`](docs/proces-koordinace.md).
-Provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
+Architektura systému: [`docs/architektura.md`](docs/architektura.md) · provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
 
 ## Stav
 
