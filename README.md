@@ -28,7 +28,7 @@ Převzetí všech funkcí dashboardu není cíl.
 | Vytěžení poznámek přes Claude | `src/ai/` | hotovo, čeká na API / Vertex AI |
 | Nasazení v Google Cloudu: projekt `appkoo`, Cloud SQL, servisní účty, přístup k Drive a kalendářům | – | hotovo (15.10.2026) |
 | Spouštěcí skript importu pro Cloud Run job + Dockerfile | `src/jobs/run.ts`, `Dockerfile` | hotovo, čeká na nasazení |
-| Webové rozhraní | – | další krok |
+| Webové rozhraní v1: fronta k volání + detail zakázky (jen čtení, přihlášení Google přes IAP) | `src/web/` | hotovo, čeká na nasazení |
 
 ## Spuštění
 
@@ -62,6 +62,18 @@ npm run job:import       # lokálně; potřebuje DATABASE_URL a MWF_SLOZKA
 
 Job píše řádky JSON pro Cloud Logging. Výpadek zdroje = `severity: ERROR` a návratový kód 1
 (→ neúspěšné spuštění, upozornění z Monitoringu); starý export = `WARNING` s `stary_export: true`.
+
+## Webové rozhraní (Cloud Run služba `appkoo-web`)
+
+```bash
+DATABASE_URL=… DEV_USER=ja@ictmount.com npm run web   # lokálně na http://localhost:8080
+```
+
+- `/` fronta k volání: priorita P1–P0 podle pravidel z Konfigurace, filtr podle fronty / technika, subregionu a hledání.
+- `/zakazka/<ID aktivity>` detail: zákazník, stav, kontaktování, poznámka MWF po záznamech, historie mezi exporty.
+- `/hledat?q=O-…` přímý skok na zakázku podle O-ID, S7 nebo ID aktivity.
+- Jen čtení. Přístup hlídá IAP (role *IAP-secured Web App User*) a navíc seznam `POVOLENI_UZIVATELE`
+  (e-maily nebo `@doména`, čárkami). `IAP_AUDIENCE` zapne i ověření podpisu IAP.
 
 ## Claude
 

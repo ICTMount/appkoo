@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "import": "tsx src/cli/import.ts",
     "slovnik": "tsx src/cli/slovnik.ts",
-    "job:import": "tsx src/jobs/run.ts"
+    "job:import": "tsx src/jobs/run.ts",
+    "web": "tsx src/web/server.ts"
   },
   "repository": {
     "type": "git",
