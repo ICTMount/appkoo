@@ -101,6 +101,26 @@ describe("napojení na Google", () => {
     expect(soubory.map((s) => s.zdrojId)).toEqual(["f2"]);
   });
 
+  it("Drive: projde všechny stránky výpisu a znovu nestahuje už zpracované soubory", async () => {
+    const stazene: string[] = [];
+    const api = {
+      files: {
+        list: async (p: any) => ({
+          data: p.pageToken
+            ? { files: [{ id: "f3", name: "zakazky paw-grid-export-csv 20261015 11_00.csv", createdTime: "2026-10-15T09:01:00Z", mimeType: "text/csv" }] }
+            : { nextPageToken: "s2", files: [
+                { id: "f1", name: "zakazky paw-grid-export-csv 20261015 09_00.csv", createdTime: "2026-10-15T07:01:00Z", mimeType: "text/csv" },
+                { id: "f2", name: "zakazky paw-grid-export-csv 20261015 10_00.csv", createdTime: "2026-10-15T08:01:00Z", mimeType: "text/csv" },
+              ] },
+        }),
+        get: async (p: any) => (stazene.push(p.fileId), { data: EXPORT_A.buffer.slice(EXPORT_A.byteOffset, EXPORT_A.byteOffset + EXPORT_A.length) }),
+      },
+    } as any;
+    const soubory = await driveZdroj("SLOZKA", api).nacti(null, new Set(["f1"]));
+    expect(soubory.map((s) => s.zdrojId)).toEqual(["f2", "f3"]);
+    expect(stazene).toEqual(["f2", "f3"]);
+  });
+
   it("Gmail: vezme CSV přílohy nezpracovaných zpráv a označí je štítkem", async () => {
     const zmeny: any[] = [];
     const api = {

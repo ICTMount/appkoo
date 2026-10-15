@@ -35,10 +35,15 @@ export async function spustImport(db: Db, zdroje: ZdrojExportu[], povoleniOdesil
   // Hodina rezerva: soubor nahraný na Drive těsně před minulým během se nesmí ztratit (duplicity řeší otisk)
   const od = rows[0]?.posledni ? new Date(rows[0].posledni.getTime() - 60 * 60 * 1000) : null;
 
+  // Soubory, které už příjmem prošly (jakkoli) – zdroj je znovu nestahuje
+  const znama = new Set(
+    (await db.query<{ zdroj_id: string }>("SELECT DISTINCT zdroj_id FROM import_run WHERE zdroj_id IS NOT NULL")).rows.map((r) => r.zdroj_id),
+  );
+
   const dosle: { d: DoslyExport; z: ZdrojExportu }[] = [];
   for (const z of zdroje) {
     try {
-      for (const d of await z.nacti(od)) dosle.push({ d, z });
+      for (const d of await z.nacti(od, znama)) dosle.push({ d, z });
     } catch (e) {
       // Výpadek jednoho zdroje nesmí zastavit ostatní; chyba jde do logu (Cloud Logging → upozornění)
       console.error("Zdroj exportu nedostupný:", e instanceof Error ? e.message : e);

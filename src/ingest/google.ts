@@ -10,8 +10,11 @@ import { GoogleAuth } from "google-auth-library";
 import type { DoslyExport } from "./prijem.js";
 
 export interface ZdrojExportu {
-  /** nové soubory od daného okamžiku (nebo všechny nezpracované) */
-  nacti(od: Date | null): Promise<DoslyExport[]>;
+  /**
+   * Nové soubory od daného okamžiku (nebo všechny nezpracované).
+   * `znama` = ID souborů / zpráv, které už prošly příjmem – zdroj je nemusí znovu stahovat.
+   */
+  nacti(od: Date | null, znama?: Set<string>): Promise<DoslyExport[]>;
   /** označí soubor jako zpracovaný (u e-mailu štítek) */
   oznacZpracovano(d: DoslyExport): Promise<void>;
 }
@@ -23,14 +26,28 @@ function varovani(message: string, data: Record<string, unknown>) {
 
 // ---------- Google Drive ----------
 
+/** Kolik souborů stáhnout v jednom běhu (zbytek dožene další běh) */
+export const MAX_STAZENI = 60;
+
 export function driveZdroj(slozkaId: string, api: drive_v3.Drive = driveApi({ version: "v3", auth: new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/drive.readonly"] }) })): ZdrojExportu {
   return {
-    async nacti(od) {
+    async nacti(od, znama = new Set()) {
       const q = [`'${slozkaId}' in parents`, "trashed = false", "name contains 'paw-grid-export-csv'"];
       if (od) q.push(`createdTime > '${od.toISOString()}'`);
-      const { data } = await api.files.list({ q: q.join(" and "), orderBy: "createdTime", pageSize: 50, fields: "files(id,name,createdTime,mimeType)" });
+      // Všechny stránky výpisu: při dávkovém nahrání má mnoho souborů stejný čas vytvoření
+      // a jedna stránka by se pak opakovala pořád dokola.
+      const soubory: drive_v3.Schema$File[] = [];
+      let pageToken: string | undefined;
+      do {
+        const { data } = await api.files.list({ q: q.join(" and "), orderBy: "createdTime", pageSize: 100, pageToken, fields: "nextPageToken,files(id,name,createdTime,mimeType)" });
+        soubory.push(...(data.files ?? []));
+        pageToken = data.nextPageToken ?? undefined;
+      } while (pageToken);
+
       const vysledek: DoslyExport[] = [];
-      for (const f of data.files ?? []) {
+      for (const f of soubory) {
+        if (znama.has(f.id!)) continue; // už zpracovaný – nestahovat znovu
+        if (vysledek.length >= MAX_STAZENI) break; // zbytek v dalším běhu (limit doby běhu jobu)
         // Export otevřený a uložený jako Google tabulka už není CSV z MWF (nejde stáhnout, jiné kódování) – přeskočit
         if (f.mimeType?.startsWith("application/vnd.google-apps.")) {
           varovani(`Drive: „${f.name}“ je Google dokument (${f.mimeType}), ne CSV z MWF – přeskočeno.`, { soubor: f.name, zdrojId: f.id });

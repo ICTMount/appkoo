@@ -52,9 +52,9 @@ export function popisChyby(e: unknown): string {
 /** Obalí zdroj, aby šlo poznat jeho výpadek – spustImport chybu jen zaloguje a pokračuje dál. */
 export function sledovanyZdroj(nazev: string, z: ZdrojExportu, chyby: string[]): ZdrojExportu {
   return {
-    async nacti(od) {
+    async nacti(od, znama) {
       try {
-        return await z.nacti(od);
+        return await z.nacti(od, znama);
       } catch (e) {
         chyby.push(`${nazev}: ${popisChyby(e)}`);
         throw e;
