@@ -4,6 +4,9 @@
 // který vedoucí potvrdí.
 
 import { parseCsv } from "../import/csv.js";
+import { PRAVIDLA, type NastaveniKontaktu } from "../domain/contact.js";
+import { PODMINKY, PODMINKY_ID, PRIORITY, type PodminkaId, type Priorita, type PravidloPriority } from "../domain/priorita.js";
+import { HOUR } from "../domain/time.js";
 
 export type TypSloupce = "text" | "seznam" | "cislo" | "anoNe" | "vyber";
 
@@ -17,7 +20,9 @@ export interface Sloupec {
   odkaz?: CiselnikId;
 }
 
-export type CiselnikId = "technici" | "typyAkci" | "koordinatorky" | "regiony" | "blokovaneLokality" | "kontakty";
+export type CiselnikId =
+  | "technici" | "typyAkci" | "koordinatorky" | "regiony" | "blokovaneLokality" | "kontakty"
+  | "pravidlaPriority" | "nastaveniKontaktu";
 
 export interface Ciselnik {
   id: CiselnikId;
@@ -88,6 +93,30 @@ export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
       { klic: "infrastruktura", nazev: "Infrastruktura", typ: "vyber", hodnoty: ["", "TMCZ", "CETIN", "VDF"] },
       { klic: "duvod", nazev: "Důvod", typ: "text", povinny: true },
       { klic: "od", nazev: "Od", typ: "text" },
+    ],
+  },
+  pravidlaPriority: {
+    id: "pravidlaPriority",
+    nazev: "Pravidla priority",
+    klic: "poradi",
+    sloupce: [
+      { klic: "poradi", nazev: "Pořadí", typ: "cislo", povinny: true },
+      { klic: "podminka", nazev: "Podmínka", typ: "vyber", hodnoty: PODMINKY_ID, povinny: true },
+      { klic: "parametr", nazev: "Parametr", typ: "cislo" },
+      { klic: "priorita", nazev: "Priorita", typ: "vyber", hodnoty: PRIORITY, povinny: true },
+      { klic: "poznamka", nazev: "Poznámka", typ: "text" },
+    ],
+  },
+  nastaveniKontaktu: {
+    id: "nastaveniKontaktu",
+    nazev: "Nastavení kontaktování",
+    klic: "parametr",
+    sloupce: [
+      { klic: "parametr", nazev: "Parametr", typ: "vyber", hodnoty: [
+        "pokusuDenne", "prahObjemu", "odstupPokusuHodin", "dnu", "volaniOd", "volaniDo", "odstupSmsHodin", "minSms", "lhutaZakDni",
+      ], povinny: true },
+      { klic: "hodnota", nazev: "Hodnota", typ: "text", povinny: true },
+      { klic: "poznamka", nazev: "Poznámka", typ: "text" },
     ],
   },
   kontakty: {
@@ -246,4 +275,80 @@ export function exportCsv(id: CiselnikId, polozky: Polozka[]): string {
   };
   const radky = [def.sloupce.map((s) => s.nazev).join(";"), ...polozky.map((p) => def.sloupce.map((s) => pole(p[s.klic])).join(";"))];
   return "﻿" + radky.join("\r\n") + "\r\n";
+}
+
+// ---------- převod číselníků na nastavení pro výpočty ----------
+
+export function pravidlaPriority(polozky: Polozka[]): PravidloPriority[] {
+  return polozky
+    .filter((p) => (p.podminka as string) in PODMINKY)
+    .map((p) => ({
+      poradi: Number(p.poradi),
+      podminka: p.podminka as PodminkaId,
+      parametr: typeof p.parametr === "number" ? p.parametr : null,
+      priorita: p.priorita as Priorita,
+      poznamka: (p.poznamka as string | null) ?? null,
+    }));
+}
+
+export const PARAMETRY_KONTAKTU = {
+  pokusuDenne: "Pokusů denně: 1, 2 nebo „auto“ (podle objemu práce)",
+  prahObjemu: "Auto: nad kolik zakázek k volání na koordinátorku volat jen 1× denně",
+  odstupPokusuHodin: "Odstup pokusů v hodinách (norma TMCZ min. 4)",
+  dnu: "Počet pracovních dní kontaktování před ZAK (norma TMCZ min. 3)",
+  volaniOd: "Volat od (HH:MM)",
+  volaniDo: "Volat do (HH:MM)",
+  odstupSmsHodin: "Odstup SMS v hodinách (norma TMCZ min. 18)",
+  minSms: "Min. počet SMS za 3 PD (norma TMCZ min. 2)",
+  lhutaZakDni: "Lhůta PEP u ZAK v kalendářních dnech",
+} as const;
+
+export const VYCHOZI_NASTAVENI_KONTAKTU: Polozka[] = [
+  { parametr: "pokusuDenne", hodnota: "auto", poznamka: PARAMETRY_KONTAKTU.pokusuDenne },
+  { parametr: "prahObjemu", hodnota: "40", poznamka: PARAMETRY_KONTAKTU.prahObjemu },
+  { parametr: "odstupPokusuHodin", hodnota: "4", poznamka: PARAMETRY_KONTAKTU.odstupPokusuHodin },
+  { parametr: "dnu", hodnota: "3", poznamka: PARAMETRY_KONTAKTU.dnu },
+  { parametr: "volaniOd", hodnota: "08:00", poznamka: PARAMETRY_KONTAKTU.volaniOd },
+  { parametr: "volaniDo", hodnota: "19:00", poznamka: PARAMETRY_KONTAKTU.volaniDo },
+  { parametr: "odstupSmsHodin", hodnota: "18", poznamka: PARAMETRY_KONTAKTU.odstupSmsHodin },
+  { parametr: "minSms", hodnota: "2", poznamka: PARAMETRY_KONTAKTU.minSms },
+  { parametr: "lhutaZakDni", hodnota: "5", poznamka: PARAMETRY_KONTAKTU.lhutaZakDni },
+];
+
+/**
+ * Nastavení kontaktování z číselníku. Minimum normy TMCZ nejde snížit – nižší hodnota se
+ * nahradí minimem a vrátí se upozornění. `kVolaniNaKoordinatorku` slouží pro režim „auto“.
+ */
+export function nastaveniKontaktu(polozky: Polozka[], kVolaniNaKoordinatorku = 0): { nastaveni: NastaveniKontaktu; lhutaZakDni: number; upozorneni: string[] } {
+  const v = new Map(polozky.map((p) => [String(p.parametr), String(p.hodnota ?? "").trim()]));
+  const upozorneni: string[] = [];
+  const cislo = (k: string, vychozi: number, min?: number) => {
+    const n = Number((v.get(k) ?? "").replace(",", "."));
+    if (!v.has(k) || !Number.isFinite(n) || v.get(k) === "") return vychozi;
+    if (min !== undefined && n < min) {
+      upozorneni.push(`${k} = ${n} je pod minimem normy TMCZ (${min}) – použito ${min}.`);
+      return min;
+    }
+    return n;
+  };
+  const cas = (k: string, vychozi: number) => {
+    const m = (v.get(k) ?? "").match(/^(\d{1,2})[:.](\d{2})$/);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : vychozi;
+  };
+  const pd = v.get("pokusuDenne") ?? "auto";
+  const pokusuDenne = pd.toLowerCase() === "auto" ? (kVolaniNaKoordinatorku > cislo("prahObjemu", 40) ? 1 : 2) : Math.max(1, Math.min(2, cislo("pokusuDenne", 2)));
+  return {
+    nastaveni: {
+      ...PRAVIDLA,
+      pokusuDenne,
+      odstupPokusu: cislo("odstupPokusuHodin", 4, 4) * HOUR,
+      dnu: cislo("dnu", 3, 3),
+      volaniOd: cas("volaniOd", PRAVIDLA.volaniOd),
+      volaniDo: cas("volaniDo", PRAVIDLA.volaniDo),
+      odstupSms: cislo("odstupSmsHodin", 18, 18) * HOUR,
+      minSms: cislo("minSms", 2, 2),
+    },
+    lhutaZakDni: cislo("lhutaZakDni", 5),
+    upozorneni,
+  };
 }

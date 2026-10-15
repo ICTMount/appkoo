@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lhutaZak, planKontaktu, type Pokus } from "../src/domain/contact.js";
+import { lhutaZak, planKontaktu, pokusuDenneDleObjemu, type Pokus } from "../src/domain/contact.js";
 import { dalsiMv, najdiKody, parkovaniPoMv, pocetMv, PARKOVANI } from "../src/domain/mwf.js";
 import { fraze } from "../src/domain/phrases.js";
 import { fmtDate, fmtTime, local } from "../src/domain/time.js";
@@ -69,14 +69,28 @@ describe("plán kontaktu", () => {
     const pokusy = dny.flatMap((d) => [nedovolano(local(2026, 10, d, 9, 0), true), nedovolano(local(2026, 10, d, 14, 0))]);
     const p = planKontaktu(pokusy, local(2026, 10, 16, 14, 5));
     expect(p.stav).toBe("navrh_zak");
-    expect(p.kompletniDny).toBe(3);
+    expect(p.navolaneDny).toBe(3);
     expect(p.splnujeNormu).toBe(true);
     expect(p.dalsiPokus).toBeNull();
   });
 
-  it("dva pokusy blíž než 4 h nejsou kompletní den", () => {
-    const pokusy = [nedovolano(local(2026, 10, 14, 9, 0)), nedovolano(local(2026, 10, 14, 11, 0))];
-    expect(planKontaktu(pokusy, local(2026, 10, 14, 11, 5)).kompletniDny).toBe(0);
+  it("den je navolaný už s 1 pokusem – 3 dny po 1 pokusu → návrh ZAK", () => {
+    const pokusy = [14, 15, 16].map((d, i) => nedovolano(local(2026, 10, d, 10, 0), i !== 1));
+    const p = planKontaktu(pokusy, local(2026, 10, 16, 10, 5), { pokusuDenne: 1 });
+    expect(p.stav).toBe("navrh_zak");
+    expect(p.navolaneDny).toBe(3);
+    expect(p.splnujeNormu).toBe(true); // 3 pokusy s odstupem 4 h + 2 SMS s odstupem 18 h
+  });
+
+  it("1 pokus denně (velký objem): po pokusu je další až příští pracovní den", () => {
+    const p = planKontaktu([nedovolano(local(2026, 10, 14, 9, 0))], local(2026, 10, 14, 9, 5), { pokusuDenne: 1 });
+    expect(fmtDate(p.dalsiPokus!)).toBe("15.10.2026");
+    expect(p.varovani).toEqual([]);
+  });
+
+  it("pokusů denně podle objemu práce", () => {
+    expect(pokusuDenneDleObjemu(60, 40)).toBe(1);
+    expect(pokusuDenneDleObjemu(25, 40)).toBe(2);
   });
 
   it("upozorní na vynechaný pracovní den", () => {
@@ -97,7 +111,7 @@ describe("plán kontaktu", () => {
       nedovolano(local(2026, 10, 20, 9, 0)),
     ];
     const p = planKontaktu(pokusy, local(2026, 10, 20, 9, 5));
-    expect(p.kompletniDny).toBe(0);
+    expect(p.navolaneDny).toBe(1);
     expect(p.denRady).toBe(1);
     expect(p.varovani).toEqual([]);
   });

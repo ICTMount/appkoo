@@ -108,7 +108,7 @@ describe("import MWF exportu", () => {
     const pokusy = pokusyZPoznamky(z1!.zaznamy);
     expect(pokusy.map((p) => p.sms)).toEqual([true, false, true]);
     const plan = planKontaktu(pokusy, EXPORT_AT);
-    expect(plan.kompletniDny).toBe(1);
+    expect(plan.navolaneDny).toBe(2);
     expect(plan.denRady).toBe(2);
   });
 

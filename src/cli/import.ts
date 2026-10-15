@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { lhutaZak, planKontaktu } from "../domain/contact.js";
 import { fmtDate, fmtTime, tedPraha } from "../domain/time.js";
 import { casExportu } from "../ingest/prijem.js";
+import { faktaZakazky, urciPrioritu } from "../domain/priorita.js";
 import { importExport } from "../import/mwfExport.js";
 import { pokusyZPoznamky } from "../import/notes.js";
 import { vytezPoznamky } from "../ai/noteExtraction.js";
@@ -34,8 +35,12 @@ async function main() {
   console.log(`\nK dojednání (bez termínu a parkování): ${kDojednani.length}`);
   console.log("Stav kontaktu:", count(plany.map((p) => p.plan.stav)));
   for (const { z, plan } of plany.filter((p) => p.plan.stav === "navrh_zak")) {
-    console.log(`→ návrh ZAK ${z.idObjednavky} (${plan.kompletniDny} dny × 2 pokusy, SMS ${plan.sms.odeslano})`);
+    console.log(`→ návrh ZAK ${z.idObjednavky} (${plan.navolaneDny} navolané dny, SMS ${plan.sms.odeslano})`);
   }
+
+  const priority = zakazky.map((z) => ({ z, ...urciPrioritu(faktaZakazky(z, now)) }));
+  console.log("\nPriorita (výchozí pravidla):", count(priority.map((p) => p.priorita)));
+  console.log("Podle pravidla:", count(priority.map((p) => `${p.priorita} ${p.pravidlo?.podminka ?? "–"}`)));
 
   const zak = zakazky.filter((z) => z.parkovaniSkupina === "ZAK");
   for (const z of zak) {

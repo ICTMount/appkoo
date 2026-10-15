@@ -28,7 +28,9 @@ flowchart LR
 | Převod řádku na zakázku | `importExport` | KÓD |
 | Rozklad poznámky na záznamy `[Typ] datum, autor: text` | `rozlozPoznamku` | KÓD |
 | Vytěžení poznámek přes Claude (bez jmen a telefonů) | `vytezPoznamky` | KÓD, spouští se ručně (`--ai`), výsledek se zatím neukládá |
-| Automatický import z Drive, ukládání do databáze | – | PLÁN |
+| Příjem exportu: e-mail, nahrání v aplikaci, Google Drive (kontrola, duplicity, starší export) | `src/ingest/` | KÓD, bez spouštění v cloudu |
+| Priorita P1–P0 podle pravidel z Konfigurace | `urciPrioritu` | KÓD |
+| Ukládání do databáze, plánované spouštění | – | PLÁN |
 | Fronty, plánovač, zápis do kalendáře | – | NÁVRH |
 
 ## 2. Zařazení zakázky po importu
@@ -68,14 +70,14 @@ Pokusy se berou z poznámek (`pokusyZPoznamky`):
 flowchart TD
   S[Pokusy od poslední reakce PEP<br/>a od posledního dovolání] --> D{Poslední pokus<br/>dovoláno?}
   D -->|ano| OK[Dovoláno – řada končí]
-  D -->|ne| K{3 kompletní dny?<br/>den = 2 pokusy s odstupem ≥ 4 h}
+  D -->|ne| K{3 navolané dny?<br/>den = aspoň 1 pokus}
   K -->|ano| ZAK[Návrh parkování ZAK<br/>+ kontrola minima normy]
   K -->|ne| W{Dnes pracovní den?}
   W -->|ne| N1[Další pokus: příští PD 8:00]
   W -->|ano| C{Pokusů dnes}
   C -->|0| N2[Volat hned<br/>v čase 8:00–19:00]
-  C -->|1| N3[Další pokus za 4 h<br/>když vyjde před 19:00,<br/>jinak příští PD 8:00]
-  C -->|2 a víc| N1
+  C -->|méně než cíl dne| N3[Další pokus za 4 h<br/>když vyjde před 19:00,<br/>jinak příští PD 8:00]
+  C -->|cíl splněn<br/>1 nebo 2 podle objemu| N1
 ```
 
 SMS: aplikace doporučí SMS, když byl dnes nedovolaný pokus, dnes ještě žádná SMS neodešla a od
@@ -144,10 +146,10 @@ Sloupce, které v CSV nejsou, se u existujících řádků nemění. Řádky chy
 
 1. **Slova v poznámkách.** Pozná kód pokus správně podle výrazů v kap. 3? Chybí nějaký, který koordinátorky běžně píšou?
 2. **Reset počítadla.** Nuluje ho každý zápis autora bez „(Vegacom)“. Jsou v poznámkách i jiní autoři než PEP (BO, systém MWF), u kterých by se nulovat nemělo?
-3. **Dva pokusy dnes blíž než 4 h.** Den se nepočítá jako kompletní a další pokus je až příští PD. Správně, nebo nabídnout třetí pokus týž den?
+3. ~~Dva pokusy dnes blíž než 4 h.~~ **Vyřešeno 15.10.:** den je navolaný už s 1 pokusem, počet pokusů denně (1/2/auto podle objemu) je v Konfiguraci.
 4. **Tři dny po sobě.** Kód vyžaduje 3 kompletní dny, ale přerušenou řadu jen hlásí. Má se po vynechaném dni začít znovu od dne 1?
-5. **Předobjednávky.** Kód je z fronty vynechá úplně. Po datu RFS by do fronty měly přijít – zatím nedodělané.
-6. **Termín v minulosti.** Zakázka s termínem, který už proběhl a není uzavřená, se zatím bere jako „má termín“. Patří do nedokončených.
+5. **Předobjednávky.** Pravidlo priority `predobjednavka_po_rfs` je dává od data RFS do P1 – ověřit, zda je volat už pár dní před RFS (parametr).
+6. **Termín v minulosti.** Pravidlo `termin_probehl` ji dá do P1 – ověřit, že tak má být.
 7. **Lhůta ZAK.** Počítá se od posledního záznamu `[Parkovanie]`. Zapisuje MWF tento záznam při každém zaparkování?
-8. **Priorita P1–P0.** Zatím ji určuje jen Claude, pevné pravidlo v kódu chybí.
+8. ~~Priorita P1–P0.~~ **Vyřešeno 15.10.:** pravidla priority jsou číselník v Konfiguraci (i CSV), výpočet `urciPrioritu`.
 9. **Blokované lokality.** Zatím je hlídá jen Claude podle textu, kontrola adresy proti číselníku chybí.

@@ -44,14 +44,17 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
 
 ## 2. Pravidlo kontaktování (dojednání termínu)
 
-- **2 pokusy denně** s odstupem **minimálně 4 hodin**.
+- **Pokusy denně podle objemu práce** (rozhodnuto 15.10.2026): hodně zakázek → **1 pokus denně**,
+  málo zakázek → **2 pokusy** s odstupem **min. 4 hodin** (vyšší šance naplánovat). Den se počítá
+  jako navolaný **už s 1 pokusem**. Nastavení „auto“ přepíná podle počtu zakázek k volání na
+  koordinátorku (výchozí práh 40) – parametr v Konfiguraci.
 - **3 po sobě jdoucí pracovní dny** (Po–Pá). Víkend se nepočítá a nepřerušuje řadu.
   Státní svátky se do pracovních dnů nepočítají (jako víkend).
 - **SMS** se posílá podle situace, **typicky jednou denně**, po prvním nedovolaném pokusu dne.
 - Závazné minimum podle normy TMCZ R-280-244 (kap. 9): **min. 3 pokusy během 3 PD s rozestupem 4 h**
   a **min. 2 SMS během 3 PD s odstupem min. 18 h, jen v čase 8:00–22:00**. Interní pravidlo
   (6 pokusů) je přísnější, aplikace ale musí hlídat hlavně odstup SMS 18 h.
-- **Nepodaří se kontaktovat** (6 neúspěšných pokusů) → **parkujeme** jako
+- **Nepodaří se kontaktovat** (3 navolané pracovní dny) → **parkujeme** jako
   *Zákazník - nedostupný (ZAK)*. Ticket řeší PEP T-Mobile a odpověď (další postup)
   vrátí formou nové poznámky v MWF.
 
@@ -75,7 +78,7 @@ NOVÁ ──► DOJEDNÁVÁNÍ ──dovoláno──► TERMÍN ──► INSTAL
 4. Aby se 2 pokusy denně stihly, musí první pokus proběhnout nejpozději
    **4 hodiny před koncem doby pro volání** (volá se 8:00–19:00, první pokus tedy do 15:00).
    Aplikace u zakázek, které na to nestihnou, zobrazí upozornění.
-5. Po **6. neúspěšném pokusu** aplikace navrhne parkování *Zákazník - nedostupný (ZAK)*
+5. Po **3 navolaných pracovních dnech** aplikace navrhne parkování *Zákazník - nedostupný (ZAK)*
    a připraví zápis. Zakázka se přesune do skupiny „čeká na PEP – nevolat“.
 6. Pokusy zapsané do MWF mimo aplikaci se po importu dopočítají z poznámek
    (Claude spočítá zápisy „nezvedá“ podle data). Počítadlo tak sedí, i když
@@ -336,3 +339,19 @@ Z MWF a normy TMCZ (jen ke čtení): parkování, výsledek dojednávání, dův
 
 K doplnění: přesné adresy výjezdu techniků (zatím jen obec), délky práce podle typu akce,
 zařazení Taišla / Schwarze (Olomoucko) a přiřazení regionů koordinátorkám ke kontrole.
+
+## 11. Priorita a nastavení v Konfiguraci (15.10.2026)
+
+**Priorita P1–P0** se počítá v aplikaci podle číselníku **Pravidla priority** (upravitelný v aplikaci
+i přes CSV). Pravidla se projdou podle pořadí a platí první, jehož podmínka je splněná. Podmínky
+jsou pevně dané (`src/domain/priorita.ts`), vedoucí volí pořadí, parametr a prioritu. Návrh od
+Claude je jen doplňující informace.
+
+**Nastavení kontaktování** (také číselník s CSV): pokusů denně (1 / 2 / auto), práh objemu pro
+„auto“, odstup pokusů, počet dní, doba volání, odstup a minimum SMS, lhůta PEP u ZAK.
+Hodnoty pod minimem normy TMCZ aplikace nepřijme a použije minimum.
+
+**Příjem MWF exportu** třemi cestami – e-mail na definovanou adresu, nahrání v aplikaci, složka na
+Google Drive. Každý soubor projde stejnou kontrolou: CSV do 20 MB, klíčové sloupce, duplicita
+(stejný obsah jinou cestou), starší export než poslední importovaný se nepoužije, e-mail jen od
+povolených odesílatelů (výchozí `@ictmount.com`). Každý příjem se zapíše do historie importů.
