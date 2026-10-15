@@ -76,3 +76,10 @@ describe("nastavení kontaktování", () => {
     expect(r.upozorneni).toHaveLength(2);
   });
 });
+
+describe("důvod priority", () => {
+  it("dosadí parametr za samostatné N, ne za písmeno ve slově", async () => {
+    const { PODMINKY } = await import("../src/domain/priorita.js");
+    expect(PODMINKY.nedovolano_dni.popis.replace(/\bN\b/, "3")).toBe("Nedovoláno 3 a více pracovních dní");
+  });
+});

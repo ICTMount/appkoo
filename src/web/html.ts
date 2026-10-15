@@ -10,6 +10,9 @@ export function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
+/** MWF dává před čísla „=“ (ochrana proti Excelu) – pro zobrazení pryč */
+export const bezRovna = (s: string | null | undefined) => (s ?? "").replace(/^=+/, "").trim();
+
 const dt = (d: Date | null | undefined) => (d ? `${fmtDate(d)} ${fmtTime(d)}` : "");
 const den = (d: Date | null | undefined) => (d ? fmtDate(d) : "");
 const denIso = (d: string | null) => (d ? fmtDate(d) : "");
@@ -31,7 +34,9 @@ function stavKontaktu(p: PolozkaFronty, now: Date): string {
       ? `další ${fmtTime(plan.dalsiPokus)}`
       : `další ${den(plan.dalsiPokus)}`
     : "";
-  return [`${STAV_KONTAKTU[plan.stav]} · den ${plan.denRady}/3`, dalsi, plan.sms.odeslano ? `SMS ${plan.sms.odeslano}×` : ""]
+  // nad 3 dny je řada pokusů za námi (typicky zaparkovaná zakázka se staršími pokusy)
+  const rada = plan.denRady <= 3 ? `den ${plan.denRady}/3` : `${plan.navolaneDny} navolané dny (řada ukončena)`;
+  return [`${STAV_KONTAKTU[plan.stav]} · ${rada}`, dalsi, plan.sms.odeslano ? `SMS ${plan.sms.odeslano}×` : ""]
     .filter(Boolean)
     .join(" · ");
 }
@@ -107,8 +112,8 @@ export function strankaFronty(fronta: Fronta, filtr: Filtr, stav: StavImportu, u
     const tel = z.telefony[0];
     return `<tr>
 <td><span class="prio ${p.priorita}">${p.priorita}</span></td>
-<td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${z.idS7 ? `<br><small>${esc(z.idS7)}</small>` : ""}</td>
-<td>${esc(z.zakaznik)}${z.adresa ? `<br><small>${esc(z.adresa)}${z.psc ? `, ${esc(z.psc)}` : ""}</small>` : ""}</td>
+<td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
+<td>${esc(z.zakaznik)}${z.adresa ? `<br><small>${esc(z.adresa)}${bezRovna(z.psc) ? `, ${esc(bezRovna(z.psc))}` : ""}</small>` : ""}</td>
 <td class="nowrap">${tel ? `<a href="tel:${esc(tel.replace(/\s/g, ""))}">${esc(tel)}</a>` : ""}</td>
 <td>${esc(z.typAktivity)}<br><small>${esc(z.infrastruktura)}</small></td>
 <td>${esc(z.subregion)}<br><small>${esc(z.technik)}</small></td>
@@ -153,13 +158,13 @@ export function strankaDetailu(d: Detail, stav: StavImportu, uzivatel: string, n
     .join("");
 
   const telo = `<p><a href="/">← Fronta</a></p>
-<h1>${esc(z.idObjednavky || z.idAktivity)} <small>${esc(z.zakaznik)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""} · aktivita ${esc(z.idAktivity)}</small></h1>
+<h1>${esc(z.idObjednavky || z.idAktivity)} <small>${esc(z.zakaznik)}${bezRovna(z.idS7) ? ` · S7 ${esc(bezRovna(z.idS7))}` : ""} · aktivita ${esc(z.idAktivity)}</small></h1>
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
 <div class="card"><h2>Zákazník</h2><dl>
 ${radek("Jméno", esc(z.zakaznik))}
 ${radek("Telefon", z.telefony.map((t) => `<a href="tel:${esc(t.replace(/\s/g, ""))}">${esc(t)}</a>`).join(", "))}
-${radek("Adresa", esc([z.adresa, z.psc].filter(Boolean).join(", ")))}
+${radek("Adresa", esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ")))}
 ${radek("Subregión", esc(z.subregion))}
 ${radek("Balík / produkt", esc([z.balik, z.produkt].filter(Boolean).join(" · ")))}
 </dl></div>

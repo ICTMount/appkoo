@@ -130,7 +130,7 @@ export function hodiSe(z: Zakazka, hledat: string): boolean {
   const q = norm(hledat.trim());
   if (!q) return true;
   const qCisla = q.replace(/\D/g, "");
-  const pole = [z.idObjednavky, z.idS7, z.idAktivity, z.zakaznik, z.adresa, z.psc].map(norm);
+  const pole = [z.idObjednavky, z.idS7, z.idAktivity, z.zakaznik, z.adresa, z.psc].map((x) => norm(x.replace(/^=+/, "")));
   if (pole.some((p) => p.includes(q))) return true;
   return qCisla.length >= 6 && z.telefony.some((t) => t.replace(/\D/g, "").includes(qCisla));
 }
@@ -220,7 +220,7 @@ export async function najdiAktivitu(db: Dotaz, dotaz: string): Promise<string[]>
   if (!q) return [];
   const { rows } = await db.query<{ id_aktivity: string }>(
     `SELECT id_aktivity FROM zakazka
-      WHERE id_aktivity = $1 OR id_objednavky = $1 OR id_objednavky_zaklad = $1 OR id_s7 = $1
+      WHERE id_aktivity = $1 OR id_objednavky = $1 OR id_objednavky_zaklad = $1 OR id_s7 = $1 OR id_s7 = '=' || $1
       ORDER BY uzavreno NULLS FIRST LIMIT 20`,
     [q],
   );

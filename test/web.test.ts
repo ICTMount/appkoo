@@ -8,7 +8,7 @@ import type { Db } from "../src/db/db.js";
 import { local } from "../src/domain/time.js";
 import { prijmiSoubory } from "../src/jobs/importJob.js";
 import { hodiSe, nactiDetail, nactiFrontu, zRadku } from "../src/web/data.js";
-import { esc } from "../src/web/html.js";
+import { bezRovna, esc } from "../src/web/html.js";
 import { povolenUzivatel, vytvorHandler } from "../src/web/server.js";
 
 function pgliteDb(pg: PGlite): Db {
@@ -148,5 +148,11 @@ describe("webový server", () => {
     expect(povolenUzivatel("Davidh@ICTMOUNT.com", ["@ictmount.com"])).toBe(true);
     expect(povolenUzivatel("x@ictmount.com.evil.cz", ["@ictmount.com"])).toBe(false);
     expect(povolenUzivatel("a@ictmount.com", ["b@ictmount.com"])).toBe(false);
+  });
+
+  it("odstraní „=“ z čísel MWF", () => {
+    expect(bezRovna("=14900")).toBe("14900");
+    expect(bezRovna("1-D4O3JTD")).toBe("1-D4O3JTD");
+    expect(bezRovna(null)).toBe("");
   });
 });

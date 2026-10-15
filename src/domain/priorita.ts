@@ -126,7 +126,7 @@ export function urciPrioritu(f: Fakta, pravidla: PravidloPriority[] = VYCHOZI_PR
   for (const r of [...pravidla].sort((a, b) => a.poradi - b.poradi)) {
     const podm = PODMINKY[r.podminka] as Podminka | undefined;
     if (podm && podm.test(f, r.parametr ?? 0)) {
-      return { priorita: r.priorita, pravidlo: r, duvod: podm.popis.replace("N", String(r.parametr ?? "")) };
+      return { priorita: r.priorita, pravidlo: r, duvod: podm.popis.replace(/\bN\b/, String(r.parametr ?? "")) };
     }
   }
   return { priorita: "P3", pravidlo: null, duvod: "žádné pravidlo neplatí" };
