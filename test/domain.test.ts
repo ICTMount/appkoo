@@ -90,6 +90,18 @@ describe("plán kontaktu", () => {
     expect(planKontaktu(pokusy, local(2026, 10, 14, 13, 5)).stav).toBe("dovolano");
   });
 
+  it("po dovolání začíná nová řada – staré pokusy se nepočítají", () => {
+    const pokusy = [
+      nedovolano(local(2026, 10, 12, 9, 0)), nedovolano(local(2026, 10, 12, 14, 0)),
+      { at: local(2026, 10, 12, 16, 0), dovolano: true, sms: false }, // odklad na přání
+      nedovolano(local(2026, 10, 20, 9, 0)),
+    ];
+    const p = planKontaktu(pokusy, local(2026, 10, 20, 9, 5));
+    expect(p.kompletniDny).toBe(0);
+    expect(p.denRady).toBe(1);
+    expect(p.varovani).toEqual([]);
+  });
+
   it("lhůta ZAK 5 kalendářních dní, urgovat poslední den", () => {
     const zaparkovano = local(2026, 10, 9, 10, 0);
     expect(lhutaZak(zaparkovano, local(2026, 10, 12, 10, 0)).urgovat).toBe(false);

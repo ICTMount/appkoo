@@ -33,6 +33,8 @@ export function rozlozPoznamku(poznamka: string): { uvod: string; zaznamy: Zazna
 }
 
 const NEDOVOLANO = /nezved|nedovol|nezasti|nebere|nedostupn|mimo provoz|vytípnut|bez reakce/i;
+/** Zápis o parkování ZAK („kontaktován dle pravidel … součinnost PEP“) není další pokus */
+const SOUHRN_ZAK = /dle pravidel|součinnost PEP/i;
 const DOVOLANO = /spojeno|dovoláno|domluven|dohodnut|na přání|na žádost|potvrzuje|souhlasí|^Zákazník: .+\(\d/i;
 
 /**
@@ -46,6 +48,7 @@ export function pokusyZPoznamky(zaznamy: Zaznam[]): Pokus[] {
     .slice(posledniCizi + 1)
     .filter((z) => z.typ === "Dojednávania" || z.typ === "Editácia")
     .flatMap((z): Pokus[] => {
+      if (SOUHRN_ZAK.test(z.text)) return [];
       if (NEDOVOLANO.test(z.text)) return [{ at: z.at, dovolano: false, sms: /\bsms\b/i.test(z.text) }];
       if (DOVOLANO.test(z.text)) return [{ at: z.at, dovolano: true, sms: false }];
       return [];

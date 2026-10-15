@@ -96,7 +96,9 @@ export function planKontaktu(pokusy: Pokus[], now: Date): PlanKontaktu {
     };
   }
 
-  const neuspesne = serazene.filter((p) => !p.dovolano);
+  // Řada pokusů začíná po posledním dovolání (např. odklad na přání → v den kontaktu nová řada)
+  const odDovolani = serazene.slice(serazene.findLastIndex((p) => p.dovolano) + 1);
+  const neuspesne = odDovolani.filter((p) => !p.dovolano);
   const poDnech = new Map<IsoDate, Date[]>();
   for (const p of neuspesne) {
     const d = isoDate(p.at);

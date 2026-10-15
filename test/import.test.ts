@@ -112,6 +112,13 @@ describe("import MWF exportu", () => {
     expect(plan.denRady).toBe(2);
   });
 
+  it("souhrnný zápis při parkování ZAK není další pokus", () => {
+    const { zaznamy } = rozlozPoznamku(
+      "[Parkovanie] 10.10.2026 10:00, A (Vegacom): x\n[Editácia] 10.10.2026 10:01, A (Vegacom): zkz. nedostupný, kontaktován dle pravidel 3 prac. dny, 6× tlf. – prosíme o součinnost PEP",
+    );
+    expect(pokusyZPoznamky(zaznamy)).toEqual([]);
+  });
+
   it("zápis PEP nuluje počítadlo pokusů", () => {
     expect(pokusyZPoznamky(z2!.zaznamy)).toEqual([]);
   });
