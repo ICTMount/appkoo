@@ -7,24 +7,26 @@ a události do kalendáře techniků a pomocí Claude vytěžuje poznámky.
 Proces, ze kterého aplikace vychází: [`docs/proces-koordinace.md`](docs/proces-koordinace.md).
 Provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
 
-## Stav – fáze F0 (jádro)
+## Stav
+
+Priority (15.10.2026): **automatický import MWF exportu**, **propojení s kalendáři techniků**
+(méně chyb při přepisu) a **optimalizace plánování** (trasy s časovými okny, KPI zakázky).
+Převzetí všech funkcí dashboardu není cíl.
 
 | Část | Soubor | Stav |
 |---|---|---|
-| Import MWF exportu (windows-1250, `;`) | `src/import/mwfExport.ts`, `src/import/csv.ts` | hotovo |
-| Rozklad poznámek na záznamy, pokusy o kontakt | `src/import/notes.ts` | hotovo |
-| Číselníky MWF (parkování, výsledek dojednávání, kódy r/mv) | `src/domain/mwf.ts` | hotovo |
-| Pracovní dny vč. svátků ČR | `src/domain/workdays.ts` | hotovo |
-| Pravidla kontaktování (2×/den, 4 h, 3 PD, SMS 18 h, ZAK, lhůta PEP) | `src/domain/contact.ts` | hotovo |
-| Fráze do MWF | `src/domain/phrases.ts` | hotovo |
-| Vytěžení poznámek přes Claude + pseudonymizace | `src/ai/` | hotovo, čeká na API klíč |
-| Číselníky – definice, kontrola, import / export CSV s náhledem změn | `src/config/ciselniky.ts` | hotovo, bez obrazovky |
-| Příjem exportu: e-mail / nahrání / Google Drive | `src/ingest/` | hotovo, bez nasazení |
-| Priorita podle pravidel, nastavení kontaktování (číselníky, CSV) | `src/domain/priorita.ts`, `src/config/ciselniky.ts` | hotovo |
-| Slovník MWF (SK) ↔ aplikace (CZ) | `src/domain/slovnik.ts`, `docs/slovnik-mwf.md` | hotovo |
-| Schéma databáze (PostgreSQL) | `db/schema.sql` | hotovo, zatím bez zápisu |
-| Ukládání importu do DB, automatický import z Drive | – | další krok |
-| Webové rozhraní (fronty, plánovač) | – | F1 |
+| Příjem exportu: e-mail / nahrání / Google Drive, kontrola, duplicity, starší export | `src/ingest/` | hotovo |
+| Automatický import do databáze (zakázky, historie, uzavřené zakázky, log) | `src/jobs/importJob.ts`, `src/db/` | hotovo, čeká na nasazení |
+| Kalendář: šablona události, zápis s ID zakázky, obsazení okna VOLNY | `src/gcal/udalost.ts`, `src/gcal/kalendar.ts` | hotovo, ověřeno na formátu skutečných událostí |
+| Kontrola MWF ↔ kalendář (technik, den, čas, telefon, adresa) | `src/gcal/kontrola.ts` | hotovo, ověřeno na skutečných datech |
+| Trasa dne technika – TSP s časovými okny | `src/plan/trasa.ts` | hotovo |
+| Nabídka termínů a návrh plánu podle km, SLA a priority | `src/plan/sloty.ts` | hotovo |
+| Dny techniků z kalendáře, geokódování adres s cache | `src/plan/dny.ts`, `src/plan/geokod.ts` | hotovo, geokódování čeká na klíč |
+| KPI zakázek a plánu | `src/plan/kpi.ts` | hotovo |
+| Import CSV (windows-1250), rozklad poznámek, pokusy o kontakt | `src/import/` | hotovo |
+| Pravidla kontaktování, priorita, číselníky s CSV | `src/domain/`, `src/config/` | hotovo |
+| Vytěžení poznámek přes Claude | `src/ai/` | hotovo, čeká na API / Vertex AI |
+| Nasazení v Google Cloudu, webové rozhraní | – | další krok |
 
 ## Spuštění
 

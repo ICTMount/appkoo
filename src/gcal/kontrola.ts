@@ -40,14 +40,20 @@ const BLOK = /neplanovat|nedostupn|dovolen|skoleni/i;
 export const jeVolneOkno = (u: Pick<UdalostTechnika, "summary">) => VOLNO.test(norm(u.summary)) && !/dohod/i.test(u.summary);
 export const jeBlok = (u: Pick<UdalostTechnika, "summary">) => BLOK.test(norm(u.summary));
 
-/** Podobnost adres podle shodných slov a čísel (0–1) */
-export function podobnostAdres(a: string, b: string): number {
-  const slova = (s: string) => new Set(norm(s).split(/[^\p{L}\d/]+/u).filter((x) => x.length > 1));
-  const A = slova(a);
-  const B = slova(b);
-  if (!A.size || !B.size) return 0;
-  const spolecna = [...A].filter((x) => B.has(x)).length;
-  return spolecna / Math.min(A.size, B.size);
+/**
+ * Shoda adresy z MWF s textem události (0–1): číslo popisné + název ulice.
+ * MWF píše „Praha, Podolská 348/88“, kalendář často jen „Podolská 348/88“ – obec se neporovnává.
+ */
+export function podobnostAdres(mwf: string, kalendar: string): number {
+  const a = norm(mwf);
+  const b = norm(kalendar);
+  const cisla = a.match(/\d+(?:\/\d+\w?)?/g) ?? [];
+  const cisloPopisne = cisla.find((c) => c.includes("/")) ?? cisla.at(-1);
+  const obce = new Set(["praha", "brno", "ostrava", "plzen"]);
+  const ulice = (a.match(/\p{L}{4,}/gu) ?? []).filter((w) => !obce.has(w));
+  const cisloSedi = !!cisloPopisne && new RegExp(`(^|[^\\d])${cisloPopisne.replace("/", "\\/")}($|[^\\d])`).test(b);
+  const uliceSedi = ulice.some((w) => b.includes(w));
+  return (cisloSedi ? 0.5 : 0) + (uliceSedi ? 0.5 : 0);
 }
 
 /** Patří událost technikovi z MWF? MWF má „Příjmení Jméno (Vegacom)“, kalendář jméno technika. */
@@ -85,7 +91,8 @@ export function zkontroluj(zakazky: Zakazka[], udalosti: UdalostTechnika[]): { v
       else if (Math.abs(minutesOfDay(u.od) - minutesOfDay(z.termin!.od)) > 30) rozpor("Jiný čas začátku (rozdíl víc než 30 min).");
       const tel = (u.description.match(/TEL:([^\n]*)/i)?.[1] ?? "").replace(/\s/g, "");
       if (!tel) admin("V události chybí telefon (TEL:).");
-      else if (z.telefony.length && !z.telefony.some((t) => tel.includes(t))) rozpor("Jiný telefon než v MWF.");
+      // jiné číslo bývá kontaktní osoba (rodina, správce) – upozornit, ne blokovat
+      else if (z.telefony.length && !z.telefony.some((t) => tel.includes(t))) admin("Telefon v kalendáři se liší od MWF (jiná kontaktní osoba?).");
       if (z.adresa && podobnostAdres(z.adresa, `${u.location} ${u.summary}`) < 0.8) admin("Adresa v kalendáři se liší od MWF (shoda pod 80 %).");
     }
     vysledky.push({ zakazka: z.idAktivity, objednavka: z.idObjednavkyZaklad, udalost: u, zavaznost, problemy });

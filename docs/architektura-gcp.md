@@ -76,3 +76,17 @@ Delegace v rámci domény je potřeba jen pro Chat – Drive a kalendáře stač
 3. **Claude** – Vertex AI, nebo Claude API s vlastním klíčem?
 4. **Správce Google Workspace** – kvůli delegaci pro čtení Google Chatu.
 5. **Skupina uživatelů** – kdo smí aplikaci používat (např. Google skupina `koordinace@ictmount.com`).
+
+## Kalendáře techniků – navázání na dnešní stav (15.10.2026)
+
+Ověřeno na kalendáři technika: události zakázek mají název
+`Hristov - FTTH CETIN O-8553361721 Zákazník SLA 17.10.2026 14:51 (AP)`, volná okna jsou události
+`Hristov - VOLNY` po 2 hodinách vytvořené skriptem **SHEET2CAL** z tabulky, blokovaný čas
+`Hristov - NEPLANOVAT`. Aplikace:
+
+- čte volná okna z událostí VOLNY (vstup pro nabídku termínů a optimalizaci tras),
+- při dohodnutí termínu **přepíše událost VOLNY** na událost zakázky (stejný tvar názvu + šablona
+  z call scriptu + skryté ID zakázky) – nevznikají překryvy ani dvojí zápis,
+- po každém importu porovná termíny MWF s kalendáři a hlásí rozpory.
+
+SHEET2CAL může dál generovat volná okna; zápis zakázek do kalendáře převezme aplikace.

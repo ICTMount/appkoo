@@ -43,7 +43,8 @@ describe("kontrola MWF ↔ kalendář", () => {
     expect(zkontroluj([zak()], []).vysledky[0]!.zavaznost).toBe("rozpor");
     expect(zkontroluj([zak()], [ud({ od: local(2026, 10, 16, 12, 0) })]).vysledky[0]!.problemy.join()).toMatch(/čas/);
     expect(zkontroluj([zak()], [ud({ technik: "Vajc" })]).vysledky[0]!.problemy.join()).toMatch(/technik/);
-    expect(zkontroluj([zak()], [ud({ description: "TEL: 777000111 O-8532577900" })]).vysledky[0]!.problemy.join()).toMatch(/telefon/);
+    const jinyTel = zkontroluj([zak()], [ud({ description: "TEL: 777000111 O-8532577900" })]).vysledky[0]!;
+    expect(jinyTel).toMatchObject({ zavaznost: "admin", problemy: [expect.stringMatching(/Telefon/)] });
   });
 
   it("chybějící telefon a jiná adresa jsou jen administrativní", () => {
@@ -73,7 +74,9 @@ describe("kontrola MWF ↔ kalendář", () => {
   });
 
   it("podobnost adres", () => {
-    expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Na Strzi 1702/65 Praha")).toBeGreaterThanOrEqual(0.8);
+    expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Na Strzi 1702/65 Praha")).toBe(1);
+    expect(podobnostAdres("Praha, Podolská 348/88", "Podolská 348/88")).toBe(1); // skutečný případ z kalendáře
+    expect(podobnostAdres("Praha, Podolská 348/88", "Podolská 34")).toBe(0.5);
     expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Tyršova 1840, Benešov")).toBe(0);
   });
 });
