@@ -25,7 +25,7 @@ const csv = (radky: Record<string, string>[]) => iconv.encode([SLOUPCE.join(";")
 // „Teď“ = 15.10.2026 10:00 Praha (čas v aplikaci = Praha uložená jako UTC)
 const TED = local(2026, 10, 15, 10, 0);
 
-const ZAKAZKY = [
+const ZAKAZKY: Record<string, string>[] = [
   // nová, bez zápisu koordinace → P1
   { "ID aktivity": "A1", "ID objednávky": "1", "ID obj. v ext. systéme": "O-8550000001", "ID S7 obj.": "1-D111", "Pracovný zdroj": "Jana Hadravová", "Stav": "Riešená dodávateľom - odovzdaná", "Typ aktivity": "Inst_Pristupu_FTTH", "Zákazník": "Novák, Jan", "Kontakt": "+420 603 111 222", "Adresa": "Pravá 1, Praha", "Subregión": "CZ_P_PH_2002" },
   // má termín v budoucnu → P0
