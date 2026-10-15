@@ -63,6 +63,8 @@ describe("kontrola MWF ↔ kalendář", () => {
     const u = [ud({ summary: "VOLNY", description: "", od: local(2026, 10, 16, 14, 0), do: local(2026, 10, 16, 16, 0) }), ud()];
     expect(volnaOkna(u, "Hristov", "2026-10-16")).toEqual([{ od: 14 * 60, do: 16 * 60 - 1 }]);
     expect(zkontroluj([], u).jenVKalendari.map((x) => x.summary)).not.toContain("VOLNY");
+    // zelená událost bez čísla zakázky je volný slot i bez slova VOLNY
+    expect(volnaOkna([ud({ summary: "Hristov", barva: "10", od: local(2026, 10, 16, 8, 0), do: local(2026, 10, 16, 10, 0) })], "Hristov", "2026-10-16")).toEqual([{ od: 480, do: 599 }]);
   });
 
   it("skutečné události: VOLNY a NEPLANOVAT nejsou zakázky, HTML popis se přečte", async () => {
@@ -92,21 +94,34 @@ describe("Google Calendar API", () => {
     expect(u[0]!.od).toEqual(local(2026, 10, 16, 10, 0)); // 08:00 UTC = 10:00 v Praze (letní čas)
   });
 
-  it("zapíše novou událost, existující upraví, při změně technika smaže starou", async () => {
+  it("zápis: nová událost, úprava, obsazení okna VOLNY a vrácení slotu při přesunu", async () => {
     const volani: string[] = [];
     const existujici: Record<string, string | undefined> = { c2: "e-stara" };
     const api = { events: {
       list: async (p: any) => ({ data: { items: existujici[p.calendarId] ? [{ id: existujici[p.calendarId] }] : [] } }),
       insert: async (p: any) => (volani.push(`insert ${p.calendarId}`), { data: { id: "e-nova" } }),
-      patch: async (p: any) => (volani.push(`patch ${p.calendarId} ${p.eventId}`), { data: {} }),
-      delete: async (p: any) => (volani.push(`delete ${p.calendarId} ${p.eventId}`), { data: {} }),
+      patch: async (p: any) => (volani.push(`patch ${p.calendarId} ${p.eventId} ${p.requestBody.summary}`), { data: {} }),
     } } as any;
     const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59));
+    const s = u.summary;
+
+    // mimo sloty, zakázka v kalendáři ještě není → nová událost
     expect(await zapisUdalost(api, "c1", u)).toEqual({ eventId: "e-nova", akce: "vytvořeno" });
+    // zakázka už v kalendáři je → úprava, žádná druhá událost
     expect(await zapisUdalost(api, "c2", u)).toEqual({ eventId: "e-stara", akce: "upraveno" });
-    await zapisUdalost(api, "c1", u, { kalendar: "c2", eventId: "e-stara" });
-    expect(volani).toEqual(["insert c1", "patch c2 e-stara", "delete c2 e-stara", "insert c1"]);
-    expect(await zapisUdalost(api, "c1", u, undefined, "e-volny")).toEqual({ eventId: "e-volny", akce: "obsazeno okno" });
-    expect(volani.at(-1)).toBe("patch c1 e-volny");
+    // přesun do volného okna: okno se obsadí, původní událost se vrátí na VOLNY
+    expect(await zapisUdalost(api, "c2", u, undefined, "e-volny")).toEqual({ eventId: "e-volny", akce: "obsazeno okno", uvolneno: "e-stara" });
+    // přesun k jinému technikovi mimo sloty: nová událost + původní slot zpět na VOLNY
+    expect(await zapisUdalost(api, "c1", u, { kalendar: "c3", eventId: "e-vajc", technik: "Vajc" })).toMatchObject({ akce: "vytvořeno", uvolneno: "e-vajc" });
+
+    expect(volani).toEqual([
+      "insert c1",
+      `patch c2 e-stara ${s}`,
+      `patch c2 e-volny ${s}`,
+      "patch c2 e-stara Hristov - VOLNY",
+      "insert c1",
+      "patch c3 e-vajc Vajc - VOLNY",
+    ]);
   });
+
 });

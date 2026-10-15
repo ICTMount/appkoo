@@ -89,4 +89,7 @@ Ověřeno na kalendáři technika: události zakázek mají název
   z call scriptu + skryté ID zakázky) – nevznikají překryvy ani dvojí zápis,
 - po každém importu porovná termíny MWF s kalendáři a hlásí rozpory.
 
-SHEET2CAL může dál generovat volná okna; zápis zakázek do kalendáře převezme aplikace.
+**Rozhodnuto 15.10.2026: volná okna (směny techniků) zůstávají zatím mimo aplikaci** – generuje je
+SHEET2CAL z tabulky (1–2× měsíčně, zelená barva = colorId 10). Aplikace okna jen čte a obsazuje.
+Při přesunu zakázky vrátí původní událost zpět na „VOLNY“ (zelená), aby se slot neztratil
+(SKILLS v5, část 22). Zápis zakázek do kalendáře převezme aplikace.

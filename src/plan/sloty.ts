@@ -38,12 +38,20 @@ export interface NastaveniPlanu {
   penalizacePoSlaKm: number;
   /** penalizace za každý den odkladu podle priority (v km) */
   penalizaceDneKm: Record<Priorita, number>;
+  /** preferované okno pro termíny (SKILLS v5: primárně 10:00–14:00), mimo něj penalizace */
+  preferovaneOkno: Okno;
+  penalizaceMimoPreferovaneKm: number;
+  /** vyrovnané vytížení techniků: penalizace za každou zakázku, kterou už technik ten den má */
+  penalizaceZakazkyVeDniKm: number;
 }
 
 export const NASTAVENI_PLANU: NastaveniPlanu = {
-  maxZajizdkaKm: 60,
+  maxZajizdkaKm: 75, // SKILLS v5, část 22: „max 75 km za férové“
   penalizacePoSlaKm: 80,
   penalizaceDneKm: { P1: 15, P2: 8, P3: 3, P0: 0 },
+  preferovaneOkno: { od: 10 * 60, do: 14 * 60 },
+  penalizaceMimoPreferovaneKm: 8,
+  penalizaceZakazkyVeDniKm: 4,
 };
 
 export interface Moznost {
@@ -84,7 +92,13 @@ export function nabidniTerminy(
       const zacatek = new Date(den0(den.datum) + okno.od * 60_000);
       const poSla = !!z.slaKonec && zacatek > z.slaKonec;
       const dniOdkladu = Math.max(0, Math.round((den0(den.datum) - den0(dnes)) / 86_400_000));
-      const skore = kmNavic + (poSla ? nast.penalizacePoSlaKm : 0) + dniOdkladu * nast.penalizaceDneKm[z.priorita];
+      const mimoPreferovane = okno.od < nast.preferovaneOkno.od || okno.od >= nast.preferovaneOkno.do;
+      const skore =
+        kmNavic +
+        (poSla ? nast.penalizacePoSlaKm : 0) +
+        dniOdkladu * nast.penalizaceDneKm[z.priorita] +
+        (mimoPreferovane ? nast.penalizaceMimoPreferovaneKm : 0) +
+        den.navstevy.length * nast.penalizaceZakazkyVeDniKm;
       moznosti.push({ technik: den.technik, datum: den.datum, okno, kmNavic, kmDne: t.km, poSla, skore, trasa: t });
     }
   }

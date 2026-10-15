@@ -20,6 +20,8 @@ export interface UdalostTechnika {
   od: Date;
   do: Date;
   appkoo?: string; // skryté ID zakázky
+  /** colorId události; 10 (zelená) = volný slot ze SHEET2CAL */
+  barva?: string;
 }
 
 export type Zavaznost = "shoda" | "admin" | "rozpor";
@@ -37,7 +39,8 @@ const VOLNO = /\bvoln[yáé]\b|\bvolno\b/i;
 /** Blokovaný čas technika („Hristov - NEPLANOVAT“) – není zakázka ani volné okno */
 const BLOK = /neplanovat|nedostupn|dovolen|skoleni/i;
 
-export const jeVolneOkno = (u: Pick<UdalostTechnika, "summary">) => VOLNO.test(norm(u.summary)) && !/dohod/i.test(u.summary);
+export const jeVolneOkno = (u: Pick<UdalostTechnika, "summary"> & { barva?: string }) =>
+  (VOLNO.test(norm(u.summary)) || (u.barva === "10" && !/O-\d{6,}/.test(u.summary))) && !/dohod/i.test(u.summary);
 export const jeBlok = (u: Pick<UdalostTechnika, "summary">) => BLOK.test(norm(u.summary));
 
 /**

@@ -75,7 +75,7 @@ describe("nabídka termínů a návrh plánu", () => {
   it("nabídne nejdřív technika, kterému zakázka leží na trase", () => {
     const m = nabidniTerminy({ id: "N", bod: B.strasnice!, trvani: 90, priorita: "P2", slaKonec: null }, dny(), v, "2026-10-15");
     expect(m[0]).toMatchObject({ technik: "Hristov", okno: { od: h(10) } });
-    expect(m.every((x) => x.technik !== "Lipka")).toBe(true); // zajížďka nad 60 km
+    expect(m.every((x) => x.technik !== "Lipka")).toBe(true); // zajížďka nad 75 km
   });
 
   it("okno po termínu SLA má horší pořadí", () => {
@@ -109,6 +109,15 @@ describe("KPI zakázek", () => {
     ], exportAt);
     expect(k).toMatchObject({ aktivni: 3, poSla: 1, slaDo24h: 1, sTerminem: 2, terminVSla: 1, bezTerminu: 1, prumerneStariDni: 5 });
     expect(slaKonec({ doSplneniMin: 60 }, exportAt)).toEqual(local(2026, 10, 15, 10, 0));
+  });
+});
+
+describe("pravidla plánování ze SKILLS v5", () => {
+  it("při stejné vzdálenosti dá přednost oknu 10–14 a méně vytíženému technikovi", () => {
+    const tech = (jmeno: string, navstevy: Navsteva[]): DenSOkny => ({ den: den(jmeno, B.hloubetin!, navstevy), volnaOkna: [{ od: h(8), do: h(9, 59) }, { od: h(10), do: h(11, 59) }] });
+    const z = { id: "N", bod: B.strasnice!, trvani: 90, priorita: "P2" as const, slaKonec: null };
+    const m = nabidniTerminy(z, [tech("Plny", [nv("A", B.hloubetin!, h(14), h(15, 59)), nv("B", B.hloubetin!, h(16), h(17))]), tech("Volny", [])], v, "2026-10-15", {}, 4);
+    expect(m[0]).toMatchObject({ technik: "Volny", okno: { od: h(10) } });
   });
 });
 

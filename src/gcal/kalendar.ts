@@ -60,7 +60,8 @@ export async function nactiUdalosti(
           location: e.location ?? "",
           od: zacatek,
           do: konec,
-          appkoo: e.extendedProperties?.private?.appkoo ?? undefined,
+          appkoo: e.extendedProperties?.private?.appkoo || undefined,
+          barva: e.colorId ?? undefined,
         });
       }
       pageToken = data.nextPageToken ?? undefined;
@@ -69,38 +70,71 @@ export async function nactiUdalosti(
   return vysledek;
 }
 
+/** Volný slot tak, jak ho vytváří SHEET2CAL: „Hristov - VOLNY“, zelená barva (colorId 10) */
+export function volnySlot(technik: string): calendar_v3.Schema$Event {
+  return {
+    summary: `${technik} - VOLNY`,
+    colorId: "10",
+    description: "",
+    location: "",
+    extendedProperties: { private: { appkoo: "", objednavka: "", s7: "" } },
+  };
+}
+
+export interface PuvodniUdalost {
+  kalendar: string;
+  eventId: string;
+  technik: string;
+}
+
 /**
- * Zapíše událost zakázky do kalendáře technika. Pokud tam už událost této zakázky je
- * (podle skrytého ID), upraví ji – nikdy nevzniknou dvě události pro jednu zakázku.
- * Při přeplánování k jinému technikovi smaže starou událost v jeho kalendáři.
- * Když se termín zapisuje do volného okna, přepíše událost „VOLNY“ – v kalendáři tak
- * nevzniknou dvě překrývající se události.
+ * Zapíše termín zakázky do kalendáře technika.
+ * - Do volného okna: přepíše událost „VOLNY“ na zakázku (bez překryvu).
+ * - Přesun zakázky: původní událost se vrátí na „VOLNY“, aby se volný slot neztratil
+ *   (SKILLS v5, část 22: „Při přesunu zakázky zajistit, aby původní volný slot nebyl ztracen“).
+ * - Stejný slot, jen úprava údajů: upraví existující událost (podle skrytého ID zakázky).
+ * - Jinak (mimo sloty): vytvoří novou událost.
+ * Nikdy nevzniknou dvě události pro jednu zakázku.
  */
 export async function zapisUdalost(
   api: calendar_v3.Calendar,
   kalendar: string,
   u: UdalostKalendare,
-  puvodni?: { kalendar: string; eventId: string },
+  puvodni?: PuvodniUdalost,
   volneOknoEventId?: string,
-): Promise<{ eventId: string; akce: "vytvořeno" | "upraveno" | "obsazeno okno" }> {
-  if (puvodni && puvodni.kalendar !== kalendar) {
-    await api.events.delete({ calendarId: puvodni.kalendar, eventId: puvodni.eventId }).catch(() => undefined);
+): Promise<{ eventId: string; akce: "vytvořeno" | "upraveno" | "obsazeno okno"; uvolneno?: string }> {
+  // existující událost zakázky: zadaná, nebo dohledaná podle skrytého ID v cílovém kalendáři
+  let stara = puvodni;
+  if (!stara) {
+    const { data } = await api.events.list({
+      calendarId: kalendar,
+      privateExtendedProperty: [`appkoo=${u.extendedProperties.private.appkoo}`],
+      singleEvents: true,
+      maxResults: 5,
+    });
+    const e = data.items?.find((x) => x.status !== "cancelled");
+    if (e?.id) stara = { kalendar, eventId: e.id, technik: "" };
   }
-  const { data } = await api.events.list({
-    calendarId: kalendar,
-    privateExtendedProperty: [`appkoo=${u.extendedProperties.private.appkoo}`],
-    singleEvents: true,
-    maxResults: 5,
-  });
-  const existujici = data.items?.find((e) => e.status !== "cancelled");
-  if (existujici?.id) {
-    await api.events.patch({ calendarId: kalendar, eventId: existujici.id, requestBody: u });
-    return { eventId: existujici.id, akce: "upraveno" };
-  }
-  if (volneOknoEventId) {
+
+  if (volneOknoEventId && !(stara && stara.kalendar === kalendar && stara.eventId === volneOknoEventId)) {
     await api.events.patch({ calendarId: kalendar, eventId: volneOknoEventId, requestBody: { ...u, colorId: null } as never });
-    return { eventId: volneOknoEventId, akce: "obsazeno okno" };
+    let uvolneno: string | undefined;
+    if (stara) {
+      await api.events.patch({ calendarId: stara.kalendar, eventId: stara.eventId, requestBody: volnySlot(stara.technik || u.summary.split(" - ")[0]!.replace(/^Bridge /, "")) });
+      uvolneno = stara.eventId;
+    }
+    return { eventId: volneOknoEventId, akce: "obsazeno okno", ...(uvolneno ? { uvolneno } : {}) };
   }
+
+  if (stara && stara.kalendar === kalendar) {
+    await api.events.patch({ calendarId: kalendar, eventId: stara.eventId, requestBody: u });
+    return { eventId: stara.eventId, akce: "upraveno" };
+  }
+
   const vytvorena = await api.events.insert({ calendarId: kalendar, requestBody: u });
+  if (stara) {
+    await api.events.patch({ calendarId: stara.kalendar, eventId: stara.eventId, requestBody: volnySlot(stara.technik) });
+    return { eventId: vytvorena.data.id!, akce: "vytvořeno", uvolneno: stara.eventId };
+  }
   return { eventId: vytvorena.data.id!, akce: "vytvořeno" };
 }
