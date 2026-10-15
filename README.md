@@ -26,7 +26,9 @@ Převzetí všech funkcí dashboardu není cíl.
 | Import CSV (windows-1250), rozklad poznámek, pokusy o kontakt | `src/import/` | hotovo |
 | Pravidla kontaktování, priorita, číselníky s CSV | `src/domain/`, `src/config/` | hotovo |
 | Vytěžení poznámek přes Claude | `src/ai/` | hotovo, čeká na API / Vertex AI |
-| Nasazení v Google Cloudu, webové rozhraní | – | další krok |
+| Nasazení v Google Cloudu: projekt `appkoo`, Cloud SQL, servisní účty, přístup k Drive a kalendářům | – | hotovo (15.10.2026) |
+| Spouštěcí skript importu pro Cloud Run job + Dockerfile | `src/jobs/run.ts`, `Dockerfile` | hotovo, čeká na nasazení |
+| Webové rozhraní | – | další krok |
 
 ## Spuštění
 
@@ -43,6 +45,23 @@ ANTHROPIC_API_KEY=… npm run import -- "zakazky paw-grid-export-csv 20261014 18
 ```
 
 MWF exporty obsahují osobní údaje zákazníků – do repozitáře se necommitují (`*.csv` je v `.gitignore`).
+
+## Import v Google Cloudu (Cloud Run job)
+
+```bash
+npm run job:import       # lokálně; potřebuje DATABASE_URL a MWF_SLOZKA
+```
+
+| Proměnná | Povinná | Význam |
+|---|---|---|
+| `DATABASE_URL` | ano | připojení k Cloud SQL (secret) |
+| `MWF_SLOZKA` | ano | ID složky s MWF exporty na Drive (nasdílená servisnímu účtu) |
+| `GMAIL_SCHRANKA` | ne | schránka s exporty v příloze (delegace v rámci domény) |
+| `POVOLENI_ODESILATELE` | ne | povolení odesílatelé, čárkami (výchozí `@ictmount.com`) |
+| `STARY_EXPORT_HODIN` | ne | varování, když nový export nepřišel déle (výchozí 6 h) |
+
+Job píše řádky JSON pro Cloud Logging. Výpadek zdroje = `severity: ERROR` a návratový kód 1
+(→ neúspěšné spuštění, upozornění z Monitoringu); starý export = `WARNING` s `stary_export: true`.
 
 ## Claude
 
