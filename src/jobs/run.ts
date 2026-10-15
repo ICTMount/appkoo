@@ -24,6 +24,31 @@ export const jsonLog: Logger = (severity, message, data = {}) => {
   console.log(JSON.stringify({ severity, message, ...data }));
 };
 
+/**
+ * Čitelný popis chyby. U chyb Google API (gaxios) přidá důvod z odpovědi a volanou adresu,
+ * protože samotné „Request failed with status code 403“ neřekne, co je špatně.
+ */
+export function popisChyby(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const g = e as Error & {
+    response?: { status?: number; data?: unknown };
+    config?: { url?: unknown };
+  };
+  const casti = [e.message];
+  const data = g.response?.data;
+  let detail: unknown = data;
+  if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) detail = Buffer.from(data as ArrayBuffer).toString("utf8");
+  if (typeof detail === "string") {
+    try { detail = JSON.parse(detail); } catch { /* text ponechat */ }
+  }
+  const err = (detail as { error?: { message?: string; errors?: { reason?: string }[] } } | undefined)?.error;
+  if (err?.message) casti.push(`důvod: ${err.message}${err.errors?.[0]?.reason ? ` (${err.errors[0].reason})` : ""}`);
+  else if (typeof detail === "string" && detail.trim()) casti.push(`odpověď: ${detail.trim().slice(0, 300)}`);
+  const url = g.config?.url ? String(g.config.url).split("?")[0] : undefined;
+  if (url) casti.push(`adresa: ${url}`);
+  return casti.join(" | ");
+}
+
 /** Obalí zdroj, aby šlo poznat jeho výpadek – spustImport chybu jen zaloguje a pokračuje dál. */
 export function sledovanyZdroj(nazev: string, z: ZdrojExportu, chyby: string[]): ZdrojExportu {
   return {
@@ -31,7 +56,7 @@ export function sledovanyZdroj(nazev: string, z: ZdrojExportu, chyby: string[]):
       try {
         return await z.nacti(od);
       } catch (e) {
-        chyby.push(`${nazev}: ${e instanceof Error ? e.message : String(e)}`);
+        chyby.push(`${nazev}: ${popisChyby(e)}`);
         throw e;
       }
     },

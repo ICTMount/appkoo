@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/db.js";
 import type { ZdrojExportu } from "../src/ingest/google.js";
 import type { DoslyExport } from "../src/ingest/prijem.js";
-import { behImportu, type Logger } from "../src/jobs/run.js";
+import { behImportu, popisChyby, type Logger } from "../src/jobs/run.js";
 
 function pgliteDb(pg: PGlite): Db {
   return {
@@ -63,5 +63,14 @@ describe("spouštěcí skript importu (Cloud Run job)", () => {
     expect(r.kod).toBe(0);
     expect(r.stariExportuHodin).toBe(7.5);
     expect(logy.some((l) => l.severity === "WARNING" && l.data?.stary_export === true)).toBe(true);
+  });
+
+  it("u chyby Google API vypíše důvod z odpovědi a adresu", () => {
+    const e = Object.assign(new Error("Request failed with status code 403"), {
+      response: { status: 403, data: new TextEncoder().encode(JSON.stringify({ error: { message: "The user has not granted the app access", errors: [{ reason: "appNotAuthorizedToFile" }] } })).buffer },
+      config: { url: "https://www.googleapis.com/drive/v3/files/abc?alt=media" },
+    });
+    expect(popisChyby(e)).toBe("Request failed with status code 403 | důvod: The user has not granted the app access (appNotAuthorizedToFile) | adresa: https://www.googleapis.com/drive/v3/files/abc");
+    expect(popisChyby("x")).toBe("x");
   });
 });
