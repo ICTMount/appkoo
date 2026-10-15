@@ -9,7 +9,9 @@ describe("schéma databáze", () => {
     const { rows } = await db.query<{ tablename: string }>(
       "select tablename from pg_tables where schemaname = 'public' order by 1",
     );
-    expect(rows.map((r) => r.tablename)).toEqual(["import_run", "note_eval", "pokus", "zakazka", "zakazka_historie"]);
+    expect(rows.map((r) => r.tablename)).toEqual([
+      "ciselnik_polozka", "ciselnik_zmena", "import_run", "note_eval", "pokus", "zakazka", "zakazka_historie",
+    ]);
     await db.close();
   }, 60_000); // první start PGlite (WASM) trvá několik sekund
 });

@@ -86,3 +86,28 @@ CREATE TABLE note_eval (
   opravila      text,
   UNIQUE (id_aktivity, poznamka_hash, prompt_verze)
 );
+
+-- Číselníky v sekci Konfigurace (technici, typy akcí, koordinátorky, regiony, blokované lokality, kontakty)
+CREATE TABLE ciselnik_polozka (
+  ciselnik   text NOT NULL,
+  klic       text NOT NULL,
+  data       jsonb NOT NULL,
+  aktivni    boolean NOT NULL DEFAULT true,
+  zmeneno    timestamptz NOT NULL DEFAULT now(),
+  zmenil     text NOT NULL,
+  PRIMARY KEY (ciselnik, klic)
+);
+
+-- Historie změn číselníků – kdo, kdy, co a odkud (formulář / CSV)
+CREATE TABLE ciselnik_zmena (
+  id         bigserial PRIMARY KEY,
+  ciselnik   text NOT NULL,
+  klic       text NOT NULL,
+  akce       text NOT NULL CHECK (akce IN ('pridano', 'zmeneno', 'odebrano')),
+  pred       jsonb,
+  po         jsonb,
+  zdroj      text NOT NULL,              -- 'formulář' nebo 'csv: <název souboru>'
+  zmenil     text NOT NULL,
+  kdy        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ON ciselnik_zmena (ciselnik, kdy DESC);

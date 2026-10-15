@@ -18,6 +18,8 @@ Provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
 | Pravidla kontaktování (2×/den, 4 h, 3 PD, SMS 18 h, ZAK, lhůta PEP) | `src/domain/contact.ts` | hotovo |
 | Fráze do MWF | `src/domain/phrases.ts` | hotovo |
 | Vytěžení poznámek přes Claude + pseudonymizace | `src/ai/` | hotovo, čeká na API klíč |
+| Číselníky – definice, kontrola, import / export CSV s náhledem změn | `src/config/ciselniky.ts` | hotovo, bez obrazovky |
+| Slovník MWF (SK) ↔ aplikace (CZ) | `src/domain/slovnik.ts`, `docs/slovnik-mwf.md` | hotovo |
 | Schéma databáze (PostgreSQL) | `db/schema.sql` | hotovo, zatím bez zápisu |
 | Ukládání importu do DB, automatický import z Drive | – | další krok |
 | Webové rozhraní (fronty, plánovač) | – | F1 |
