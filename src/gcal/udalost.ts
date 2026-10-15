@@ -77,7 +77,7 @@ export function sestavUdalost(
   ];
   return {
     summary: `${bridge}${technik} - ${sluzba}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}${sla}${ini}`,
-    location: [z.adresa, z.psc].filter(Boolean).join(", "),
+    location: [z.adresa, z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
     description: radky.join("\n"),
     start: { dateTime: mistni(od), timeZone: "Europe/Prague" },
     end: { dateTime: mistni(do_), timeZone: "Europe/Prague" },

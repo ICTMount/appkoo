@@ -12,7 +12,8 @@
     "import": "tsx src/cli/import.ts",
     "slovnik": "tsx src/cli/slovnik.ts",
     "job:import": "tsx src/jobs/run.ts",
-    "web": "tsx src/web/server.ts"
+    "web": "tsx src/web/server.ts",
+    "ciselnik": "tsx src/cli/ciselnik.ts"
   },
   "repository": {
     "type": "git",

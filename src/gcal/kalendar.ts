@@ -4,7 +4,7 @@
 import { calendar as calendarApi, type calendar_v3 } from "@googleapis/calendar";
 import { GoogleAuth } from "google-auth-library";
 import { tedPraha } from "../domain/time.js";
-import type { UdalostTechnika } from "./kontrola.js";
+import { jeVolneOkno, type UdalostTechnika } from "./kontrola.js";
 import type { UdalostKalendare } from "./udalost.js";
 
 export function kalendarApi(): calendar_v3.Calendar {
@@ -137,4 +137,40 @@ export async function zapisUdalost(
     return { eventId: vytvorena.data.id!, akce: "vytvořeno", uvolneno: stara.eventId };
   }
   return { eventId: vytvorena.data.id!, akce: "vytvořeno" };
+}
+
+/** Patička, kterou SHEET2CAL píše do slotů („[SHEET2CAL] <ID kalendáře>“) – musí zůstat zachovaná */
+export function paticka(popis: string): string | null {
+  return popis.match(/^\[SHEET2CAL\].*$/m)?.[0] ?? null;
+}
+
+export class SlotObsazen extends Error {}
+
+/**
+ * Obsadí volný slot VOLNY zakázkou (přepíše událost, nevznikne nová ani překryv).
+ * Před zápisem znovu načte událost: když už není volná nebo se změnil čas, zápis odmítne
+ * (mezitím ji mohla obsadit jiná koordinátorka nebo SHEET2CAL). Patička SHEET2CAL zůstane.
+ */
+export async function obsadVolnySlot(
+  api: calendar_v3.Calendar,
+  kalendar: string,
+  eventId: string,
+  u: UdalostKalendare,
+  ocekavanyZacatek: Date,
+): Promise<{ eventId: string; htmlLink: string | null }> {
+  const { data: e } = await api.events.get({ calendarId: kalendar, eventId });
+  const zacatek = zApi(e.start);
+  if (e.status === "cancelled" || !jeVolneOkno({ summary: e.summary ?? "", barva: e.colorId ?? undefined })) {
+    throw new SlotObsazen("Slot už není volný – mezitím ho někdo obsadil. Načtěte nabídku termínů znovu.");
+  }
+  if (!zacatek || zacatek.getTime() !== ocekavanyZacatek.getTime()) {
+    throw new SlotObsazen("Čas slotu se v kalendáři změnil. Načtěte nabídku termínů znovu.");
+  }
+  const pat = paticka(zHtml(e.description ?? ""));
+  const { data } = await api.events.patch({
+    calendarId: kalendar,
+    eventId,
+    requestBody: { ...u, description: pat ? `${u.description}\n\n${pat}` : u.description, colorId: null } as never,
+  });
+  return { eventId: data.id ?? eventId, htmlLink: data.htmlLink ?? null };
 }

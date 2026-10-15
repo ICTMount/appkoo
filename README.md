@@ -28,7 +28,8 @@ Převzetí všech funkcí dashboardu není cíl.
 | Vytěžení poznámek přes Claude | `src/ai/` | hotovo, čeká na API / Vertex AI |
 | Nasazení v Google Cloudu: projekt `appkoo`, Cloud SQL, servisní účty, přístup k Drive a kalendářům | – | hotovo (15.10.2026) |
 | Spouštěcí skript importu pro Cloud Run job + Dockerfile | `src/jobs/run.ts`, `Dockerfile` | hotovo, čeká na nasazení |
-| Webové rozhraní v1: fronta k volání + detail zakázky (jen čtení, přihlášení Google přes IAP) | `src/web/` | hotovo, čeká na nasazení |
+| Webové rozhraní: fronta k volání + detail zakázky (přihlášení Google přes IAP) | `src/web/` | nasazeno (appkoo-web) |
+| Nabídka termínů a zápis do kalendáře technika z webu | `src/plan/planovac.ts`, `src/web/planovani.ts` | hotovo, čeká na nasazení (pilot) |
 
 ## Spuštění
 
@@ -72,7 +73,14 @@ DATABASE_URL=… DEV_USER=ja@ictmount.com npm run web   # lokálně na http://lo
 - `/` fronta k volání: priorita P1–P0 podle pravidel z Konfigurace, filtr podle fronty / technika, subregionu a hledání.
 - `/zakazka/<ID aktivity>` detail: zákazník, stav, kontaktování, poznámka MWF po záznamech, historie mezi exporty.
 - `/hledat?q=O-…` přímý skok na zakázku podle O-ID, S7 nebo ID aktivity.
-- Jen čtení. Přístup hlídá IAP (role *IAP-secured Web App User*) a navíc seznam `POVOLENI_UZIVATELE`
+- `/zakazka/<ID>/terminy` nabídka termínů: brány podle zlatých pravidel (ZAK, smlouva s JP, blokovaná lokalita,
+  už dohodnutý termín), kalendáře techniků s dovedností pro typ zakázky na 10 pracovních dní, nejlepší volné sloty VOLNY
+  podle trasy dne (km navíc, SLA, priorita, okno 10–14 h, vytížení).
+- `/zakazka/<ID>/zapis` formulář podle call scriptu → přepis slotu VOLNY na zakázku (patička SHEET2CAL zůstane,
+  obsazený slot se nepřepíše) → evidence v `gcal_udalost` → text „Zákazník: … (datum, čas)“ pro MWF.
+  Zápis zapíná `ZAPIS_KALENDARE=ano` a `ZAPIS_TECHNICI` (jména čárkami nebo `vsichni`).
+- Číselníky (technici, blokované lokality…) se nahrávají z CSV: `npm run ciselnik -- technici technici.csv --ulozit`.
+- Přístup hlídá IAP (role *IAP-secured Web App User*) a navíc seznam `POVOLENI_UZIVATELE`
   (e-maily nebo `@doména`, čárkami). `IAP_AUDIENCE` zapne i ověření podpisu IAP.
 
 ## Claude

@@ -5,6 +5,8 @@ import { fmtDate, fmtTime, isoDate } from "../domain/time.js";
 import { PRIORITY, type Priorita } from "../domain/priorita.js";
 import type { Detail, Filtr, Fronta, PolozkaFronty, StavImportu } from "./data.js";
 import { pokusyZakazky } from "./data.js";
+import type { Brany, MoznostSlotu, Nabidka } from "../plan/planovac.js";
+import { POVINNA_POTVRZENI } from "./planovani.js";
 
 export function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -73,9 +75,21 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
 .nowrap{white-space:nowrap}
+a.btn,button.btn{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:6px 12px;border:0;font-weight:600}
+a.btn:hover{text-decoration:none;opacity:.9}button[disabled]{opacity:.45;cursor:not-allowed}
+.ok{background:#e6f4ea;color:#1e5e2e;padding:10px 12px;border-radius:6px;margin-bottom:12px}
+@media (prefers-color-scheme:dark){.ok{background:#173322;color:#a5d6a7}}
+.err{background:#fde8e8;color:#8a1c1c;padding:10px 12px;border-radius:6px;margin-bottom:12px}
+@media (prefers-color-scheme:dark){.err{background:#3b1717;color:#ff9e9e}}
+fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:0 0 12px}legend{font-weight:600;padding:0 4px}
+.pole{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.pole label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
+.pole input,.pole select,textarea{color:var(--text)}textarea{width:100%;min-height:90px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.check{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+pre.mwf{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:15px;user-select:all;white-space:pre-wrap}
 `;
 
-function stranka(titulek: string, uzivatel: string, stav: StavImportu, telo: string): string {
+export function stranka(titulek: string, uzivatel: string, stav: StavImportu, telo: string): string {
   const stary = stav.stariHodin !== null && stav.stariHodin > 6;
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulek)} – AppKoo</title><style>${CSS}</style></head><body>
@@ -157,7 +171,7 @@ export function strankaDetailu(d: Detail, stav: StavImportu, uzivatel: string, n
     )
     .join("");
 
-  const telo = `<p><a href="/">← Fronta</a></p>
+  const telo = `<p><a href="/">← Fronta</a> · <a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/terminy">Navrhnout termín</a></p>
 <h1>${esc(z.idObjednavky || z.idAktivity)} <small>${esc(z.zakaznik)}${bezRovna(z.idS7) ? ` · S7 ${esc(bezRovna(z.idS7))}` : ""} · aktivita ${esc(z.idAktivity)}</small></h1>
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
@@ -214,4 +228,125 @@ export function strankaVysledkuHledani(dotaz: string, nalezene: { id: string }[]
 export function strankaChyby(kod: number, zprava: string): string {
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${kod} – AppKoo</title><style>${CSS}</style></head>
 <body><main><h1>${kod}</h1><p>${esc(zprava)}</p><p><a href="/">Zpět na frontu</a></p></main></body></html>`;
+}
+
+// ---------- Plánování termínu ----------
+
+
+const DNY = ["ne", "po", "út", "st", "čt", "pá", "so"];
+const denTydne = (d: Date) => DNY[d.getUTCDay()]!;
+const slot = (od: Date, do_: Date) => `${denTydne(od)} ${fmtDate(od)} ${fmtTime(od)}–${fmtTime(do_)}`;
+
+function hlavickaZakazky(d: Detail): string {
+  const z = d.z;
+  return `<p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← ${esc(z.idObjednavky || z.idAktivity)}</a></p>
+<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
+}
+
+export function strankaTerminu(
+  d: Detail,
+  brany: Brany,
+  nabidka: Nabidka | null,
+  zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean },
+  stav: StavImportu,
+  uzivatel: string,
+): string {
+  const z = d.z;
+  const blok = brany.blokace.length
+    ? `<div class="err"><b>Termín teď nelze naplánovat:</b><ul>${brany.blokace.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div>`
+    : "";
+  const upoz = brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join("<br>")}</div>` : "";
+
+  let obsah = "";
+  if (nabidka) {
+    const info = [
+      nabidka.nedostupne.length ? `Kalendář nejde přečíst (není nasdílený aplikaci): ${nabidka.nedostupne.join(", ")}.` : "",
+      nabidka.bezZakladny.length ? `Technik bez adresy výjezdu v číselníku: ${nabidka.bezZakladny.join(", ")}.` : "",
+      nabidka.bezPolohy ? `${nabidka.bezPolohy} zakázek v kalendářích nemá dohledatelnou adresu – v trasách chybí.` : "",
+    ].filter(Boolean);
+    const radky = nabidka.moznosti.map((m: MoznostSlotu, i) => {
+      const smi = zapis.zapnuty && zapis.smiTechnik(m.technik);
+      const q = new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() });
+      return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b></td><td>${esc(m.technik)}</td>
+<td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
+<td>${m.poSla ? `<span class="prio P1">po SLA</span>` : "v SLA"}</td>
+<td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
+    });
+    obsah = `${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
+${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
+<div class="tbl"><table><thead><tr><th>#</th><th>Slot</th><th>Technik</th><th>Km navíc</th><th>SLA</th><th></th></tr></thead>
+<tbody>${radky.join("") || `<tr><td colspan="6" class="muted">${nabidka.chyba ? "" : "Žádný volný slot v dosahu (max 75 km zajížďky) v příštích 10 pracovních dnech."}</td></tr>`}</tbody></table></div>
+<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: km navíc oproti trase dne, SLA, priorita, preferované okno 10–14 h, vytížení technika.</p>`;
+  }
+  return stranka("Termín", uzivatel, stav, `${hlavickaZakazky(d)}${blok}${upoz}${obsah}`);
+}
+
+const vyber = (name: string, moznosti: [string, string][], vybrano = "") =>
+  `<select name="${name}">${moznosti.map(([v, t]) => `<option value="${esc(v)}"${v === vybrano ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
+const ANO_NE: [string, string][] = [["", "?"], ["ano", "ANO"], ["ne", "NE"]];
+const ANO_NE_NEVIM: [string, string][] = [["NEVÍM", "NEVÍM"], ["ANO", "ANO"], ["NE", "NE"]];
+
+export function strankaZapisu(
+  d: Detail,
+  vyb: { k: string; e: string; t: string; od: Date; do: Date },
+  brany: Brany,
+  zapisPovolen: boolean,
+  stav: StavImportu,
+  uzivatel: string,
+  chyby: string[] = [],
+  hodnoty: URLSearchParams = new URLSearchParams(),
+): string {
+  const z = d.z;
+  const h = (n: string) => esc(hodnoty.get(n) ?? "");
+  const form = `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis">
+<input type="hidden" name="k" value="${esc(vyb.k)}"><input type="hidden" name="e" value="${esc(vyb.e)}"><input type="hidden" name="t" value="${esc(vyb.t)}">
+<input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">
+<fieldset><legend>Zásuvka a instalace</legend><div class="pole">
+<label>Instalace${vyber("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], hodnoty.get("instalace") ?? "nova")}</label>
+<label>Číslo zásuvky / foto<input name="zasuvka" value="${h("zasuvka")}"></label>
+<label>IPTV${vyber("iptv", [["ne", "ne"], ["ano", "ano"]], hodnoty.get("iptv") ?? "ne")}</label>
+<label>CASEID (SWAP / FIS MOP)<input name="caseid" value="${h("caseid")}"></label>
+</div></fieldset>
+<fieldset><legend>Byt a trasa</legend><div class="pole">
+<label>Patro<input name="patro" value="${h("patro")}"></label>
+<label>Byt<input name="byt" value="${h("byt")}"></label>
+<label>Patra volně přístupná${vyber("patraPristupna", ANO_NE, hodnoty.get("patraPristupna") ?? "")}</label>
+<label>Stoupačka zajištěna${vyber("stoupacka", ANO_NE_NEVIM, hodnoty.get("stoupacka") ?? "NEVÍM")}</label>
+<label>Vzdálenost od stoupačky (m)<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}"></label>
+<label>Lišty / omezení SVJ${vyber("listy", ANO_NE_NEVIM, hodnoty.get("listy") ?? "NEVÍM")}</label>
+<label>Souhlas s vrtáním${vyber("vrtani", ANO_NE, hodnoty.get("vrtani") ?? "")}</label>
+</div></fieldset>
+<fieldset><legend>Koncové zařízení</legend><div class="pole">
+<label>Umístění KZ<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}"></label>
+<label>El. zásuvka u KZ${vyber("elZasuvka", ANO_NE, hodnoty.get("elZasuvka") ?? "")}</label>
+<label>KZ${vyber("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]], hodnoty.get("kz") ?? "")}</label>
+<label>STB<input name="stb" value="${h("stb")}"></label>
+<label>Předpojen${vyber("predpojen", ANO_NE, hodnoty.get("predpojen") ?? "")}</label>
+<label>PODB (T-Mobile)<input name="podb" value="${h("podb")}"></label>
+</div>
+<label class="muted" style="display:block;margin-top:8px">Instalační předpis (zkopírovat z ticketu)<textarea name="predpis">${h("predpis")}</textarea></label>
+</fieldset>
+<fieldset><legend>Potvrzení</legend>
+${POVINNA_POTVRZENI.map((p) => `<label class="check"><input type="checkbox" name="${p.pole}" value="ano"${hodnoty.get(p.pole) === "ano" ? " checked" : ""}> ${esc(p.text)}</label>`).join("")}
+</fieldset>
+<button class="btn"${zapisPovolen ? "" : " disabled"}>Zapsat termín do kalendáře</button>
+${zapisPovolen ? "" : `<span class="muted"> Zápis do kalendáře je vypnutý (pilotní režim) – formulář slouží jen k náhledu.</span>`}
+</form>`;
+
+  const telo = `${hlavickaZakazky(d)}
+<div class="card" style="margin-bottom:12px"><b>${esc(slot(vyb.od, vyb.do))}</b> · technik <b>${esc(vyb.t)}</b> · slot VOLNY se přepíše na zakázku</div>
+${chyby.length ? `<div class="err">${chyby.map(esc).join("<br>")}</div>` : ""}
+${brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join("<br>")}</div>` : ""}
+${form}`;
+  return stranka("Zápis termínu", uzivatel, stav, telo);
+}
+
+export function strankaZapsano(d: Detail, technik: string, od: Date, do_: Date, mwf: string, odkaz: string | null, stav: StavImportu, uzivatel: string): string {
+  const z = d.z;
+  const telo = `${hlavickaZakazky(d)}
+<div class="ok"><b>Termín zapsán do kalendáře:</b> ${esc(technik)} · ${esc(slot(od, do_))}${odkaz ? ` · <a href="${esc(odkaz)}" target="_blank" rel="noopener">otevřít v kalendáři</a>` : ""}</div>
+<div class="card"><h2>Teď zapište do MWF (Dojednávania)</h2><p class="muted">MWF zůstává hlavní evidencí – zkopírujte řádek a uložte termín v MWF. Po dalším importu aplikace zkontroluje shodu MWF ↔ kalendář.</p>
+<pre class="mwf">${esc(mwf)}</pre></div>
+<p><a href="/">← Zpět na frontu</a></p>`;
+  return stranka("Termín zapsán", uzivatel, stav, telo);
 }
