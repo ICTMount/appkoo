@@ -82,6 +82,25 @@ describe("napojení na Google", () => {
     expect(soubory[0]!.obsah.equals(EXPORT_A)).toBe(true);
   });
 
+  it("Drive: přeskočí Google tabulku a nečitelný soubor, ostatní exporty stáhne", async () => {
+    const api = {
+      files: {
+        list: async () => ({ data: { files: [
+          { id: "g1", name: "zakazky paw-grid-export-csv 20261015 14_05", createdTime: "2026-10-15T12:06:00Z", mimeType: "application/vnd.google-apps.spreadsheet" },
+          { id: "x1", name: "zakazky paw-grid-export-csv 20261015 15_00.csv", createdTime: "2026-10-15T13:01:00Z", mimeType: "text/csv" },
+          { id: "f2", name: "zakazky paw-grid-export-csv 20261015 17_11.csv", createdTime: "2026-10-15T15:12:00Z", mimeType: "text/csv" },
+        ] } }),
+        get: async (p: any) => {
+          if (p.fileId === "g1") throw new Error("Google tabulka se nesmí stahovat");
+          if (p.fileId === "x1") throw new Error("Request failed with status code 403");
+          return { data: EXPORT_A.buffer.slice(EXPORT_A.byteOffset, EXPORT_A.byteOffset + EXPORT_A.length) };
+        },
+      },
+    } as any;
+    const soubory = await driveZdroj("SLOZKA", api).nacti(null);
+    expect(soubory.map((s) => s.zdrojId)).toEqual(["f2"]);
+  });
+
   it("Gmail: vezme CSV přílohy nezpracovaných zpráv a označí je štítkem", async () => {
     const zmeny: any[] = [];
     const api = {

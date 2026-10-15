@@ -16,6 +16,11 @@ export interface ZdrojExportu {
   oznacZpracovano(d: DoslyExport): Promise<void>;
 }
 
+/** Varování do logu (řádek JSON pro Cloud Logging) – soubor se přeskočí, běh pokračuje. */
+function varovani(message: string, data: Record<string, unknown>) {
+  console.log(JSON.stringify({ severity: "WARNING", message, ...data }));
+}
+
 // ---------- Google Drive ----------
 
 export function driveZdroj(slozkaId: string, api: drive_v3.Drive = driveApi({ version: "v3", auth: new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/drive.readonly"] }) })): ZdrojExportu {
@@ -23,11 +28,21 @@ export function driveZdroj(slozkaId: string, api: drive_v3.Drive = driveApi({ ve
     async nacti(od) {
       const q = [`'${slozkaId}' in parents`, "trashed = false", "name contains 'paw-grid-export-csv'"];
       if (od) q.push(`createdTime > '${od.toISOString()}'`);
-      const { data } = await api.files.list({ q: q.join(" and "), orderBy: "createdTime", pageSize: 50, fields: "files(id,name,createdTime)" });
+      const { data } = await api.files.list({ q: q.join(" and "), orderBy: "createdTime", pageSize: 50, fields: "files(id,name,createdTime,mimeType)" });
       const vysledek: DoslyExport[] = [];
       for (const f of data.files ?? []) {
-        const res = await api.files.get({ fileId: f.id!, alt: "media" }, { responseType: "arraybuffer" });
-        vysledek.push({ zdroj: "drive", nazev: f.name!, obsah: Buffer.from(res.data as ArrayBuffer), prijato: new Date(f.createdTime!), zdrojId: f.id! });
+        // Export otevřený a uložený jako Google tabulka už není CSV z MWF (nejde stáhnout, jiné kódování) – přeskočit
+        if (f.mimeType?.startsWith("application/vnd.google-apps.")) {
+          varovani(`Drive: „${f.name}“ je Google dokument (${f.mimeType}), ne CSV z MWF – přeskočeno.`, { soubor: f.name, zdrojId: f.id });
+          continue;
+        }
+        try {
+          const res = await api.files.get({ fileId: f.id!, alt: "media" }, { responseType: "arraybuffer" });
+          vysledek.push({ zdroj: "drive", nazev: f.name!, obsah: Buffer.from(res.data as ArrayBuffer), prijato: new Date(f.createdTime!), zdrojId: f.id! });
+        } catch (e) {
+          // Jeden nečitelný soubor nesmí zablokovat ostatní exporty
+          varovani(`Drive: „${f.name}“ nejde stáhnout – přeskočeno (${e instanceof Error ? e.message : String(e)}).`, { soubor: f.name, zdrojId: f.id });
+        }
       }
       return vysledek;
     },
