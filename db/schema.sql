@@ -23,6 +23,7 @@ CREATE TABLE zakazka (
   id_aktivity       text PRIMARY KEY,
   id_objednavky     text NOT NULL,           -- O-… (ID obj. v ext. systéme)
   id_objednavky_mwf text,                    -- interní ID objednávky v MWF
+  id_objednavky_zaklad text NOT NULL,        -- O- bez přípon (:1, -13075814) – párování s GCal a chatem
   id_s7             text,
   technik           text,                    -- Pracovný zdroj
   stav_mwf          text NOT NULL,
@@ -53,7 +54,7 @@ CREATE TABLE zakazka (
   posledni_import   bigint NOT NULL REFERENCES import_run(id),
   uzavreno          timestamp                -- zmizela z exportu (instalace / storno)
 );
-CREATE INDEX ON zakazka (id_objednavky);
+CREATE INDEX ON zakazka (id_objednavky_zaklad);
 CREATE INDEX ON zakazka (id_s7);
 
 -- Historie stavů (nahrazuje stav_zakazek_hist.json z dashboardu)
@@ -119,3 +120,26 @@ CREATE TABLE ciselnik_zmena (
   kdy        timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX ON ciselnik_zmena (ciselnik, kdy DESC);
+
+-- Souřadnice adres (geokódování se volá jen jednou na adresu)
+CREATE TABLE geokod (
+  adresa     text PRIMARY KEY,               -- normalizovaná adresa + PSČ
+  lat        double precision,
+  lon        double precision,
+  presnost   text NOT NULL,                  -- 'adresa' | 'ulice' | 'obec' | 'nenalezeno'
+  zdroj      text NOT NULL,                  -- 'google' | 'mapy.com' | 'rucne'
+  vytvoreno  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Události v kalendářích techniků, které vytvořila / spáruje aplikace
+CREATE TABLE gcal_udalost (
+  id_aktivity   text NOT NULL REFERENCES zakazka(id_aktivity),
+  kalendar      text NOT NULL,               -- ID kalendáře technika
+  event_id      text NOT NULL,
+  zacatek       timestamp NOT NULL,
+  konec         timestamp NOT NULL,
+  vytvorila_app boolean NOT NULL,            -- false = existující událost spárovaná podle ID
+  zmeneno       timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (kalendar, event_id)
+);
+CREATE INDEX ON gcal_udalost (id_aktivity);
