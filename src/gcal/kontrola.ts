@@ -34,8 +34,11 @@ export interface VysledekKontroly {
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
 const VOLNO = /\bvoln[yáé]\b|\bvolno\b/i;
+/** Blokovaný čas technika („Hristov - NEPLANOVAT“) – není zakázka ani volné okno */
+const BLOK = /neplanovat|nedostupn|dovolen|skoleni/i;
 
 export const jeVolneOkno = (u: Pick<UdalostTechnika, "summary">) => VOLNO.test(norm(u.summary)) && !/dohod/i.test(u.summary);
+export const jeBlok = (u: Pick<UdalostTechnika, "summary">) => BLOK.test(norm(u.summary));
 
 /** Podobnost adres podle shodných slov a čísel (0–1) */
 export function podobnostAdres(a: string, b: string): number {
@@ -61,7 +64,7 @@ function obsahujeId(u: UdalostTechnika, z: Zakazka): boolean {
 }
 
 export function zkontroluj(zakazky: Zakazka[], udalosti: UdalostTechnika[]): { vysledky: VysledekKontroly[]; jenVKalendari: UdalostTechnika[] } {
-  const zakazkoveUdalosti = udalosti.filter((u) => !jeVolneOkno(u));
+  const zakazkoveUdalosti = udalosti.filter((u) => !jeVolneOkno(u) && !jeBlok(u));
   const sparovane = new Set<UdalostTechnika>();
   const vysledky: VysledekKontroly[] = [];
 

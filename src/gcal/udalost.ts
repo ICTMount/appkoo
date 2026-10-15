@@ -3,7 +3,7 @@
 // Do skrytých vlastností události se uloží ID zakázky, takže párování s MWF nezávisí na textu.
 
 import type { Zakazka } from "../import/mwfExport.js";
-import { fmtDate } from "../domain/time.js";
+import { fmtDate, fmtTime } from "../domain/time.js";
 
 /** Údaje zjištěné při hovoru (kontrolní seznam call scriptu) */
 export interface UdajeHovoru {
@@ -39,10 +39,22 @@ const ano = (v: boolean | null | undefined) => (v === true ? "ANO" : v === false
 /** Date („Praha v UTC“) → "2026-10-16T10:00:00" pro pole s timeZone Europe/Prague */
 const mistni = (d: Date) => d.toISOString().slice(0, 19);
 
-export function sestavUdalost(z: Zakazka, technik: string, od: Date, do_: Date, h: UdajeHovoru = {}, slaKonec?: Date | null): UdalostKalendare {
+export function sestavUdalost(
+  z: Zakazka,
+  technik: string,
+  od: Date,
+  do_: Date,
+  h: UdajeHovoru = {},
+  slaKonec?: Date | null,
+  koordinatorka?: string, // iniciály, např. „AP“
+): UdalostKalendare {
   const sluzba = z.typAktivity.includes("PIV") ? "PIV" : "FTTH";
-  const infra = z.infrastruktura === "TMCZ" ? "" : ` (${z.infrastruktura})`;
-  const sla = slaKonec ? ` SLA ${fmtDate(slaKonec).slice(0, 5)}` : "";
+  // Stejný tvar jako dnešní události v kalendářích techniků:
+  // „Bridge Hristov - FTTH CETIN O-8553401092 Bažantová SLA 17.10.2026 17:42 (AP)“
+  const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
+  const sla = slaKonec ? ` SLA ${fmtDate(slaKonec)} ${fmtTime(slaKonec)}` : "";
+  const bridge = /bridge/i.test(h.kz ?? "") ? "Bridge " : "";
+  const ini = koordinatorka ? ` (${koordinatorka})` : "";
   const radky = [
     `ZAKÁZKA: ${z.idObjednavkyZaklad}${z.idS7 ? ` · S7 ${z.idS7}` : ""}`,
     `TEL: ${z.telefony.join(", ")}`,
@@ -64,7 +76,7 @@ export function sestavUdalost(z: Zakazka, technik: string, od: Date, do_: Date, 
     h.instalacniPredpis ?? "(zkopírovat z ticketu)",
   ];
   return {
-    summary: `${technik} - ${sluzba}${infra} ${z.idS7 || z.idObjednavkyZaklad}, ${z.zakaznik}${sla}`,
+    summary: `${bridge}${technik} - ${sluzba}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}${sla}${ini}`,
     location: [z.adresa, z.psc].filter(Boolean).join(", "),
     description: radky.join("\n"),
     start: { dateTime: mistni(od), timeZone: "Europe/Prague" },

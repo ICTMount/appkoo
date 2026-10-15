@@ -21,8 +21,9 @@ const ud = (o: Partial<UdalostTechnika> = {}): UdalostTechnika => ({
 
 describe("šablona události", () => {
   it("vyplní název, telefon, ID zakázky a skryté vlastnosti; čas v pražské zóně", () => {
-    const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { patro: "3", byt: "12", souhlasSVrtanim: false, caseid: "CZ-1" }, local(2026, 10, 20, 0, 0));
-    expect(u.summary).toBe("Hristov - FTTH (CETIN) 1-D79CTLE, Patera, Michal SLA 20.10");
+    const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { patro: "3", byt: "12", souhlasSVrtanim: false, caseid: "CZ-1", kz: "BRIDGE Sagemcom" }, local(2026, 10, 17, 14, 51), "AP");
+    // stejný tvar jako dnešní události v kalendářích techniků
+    expect(u.summary).toBe("Bridge Hristov - FTTH CETIN O-8532577900 Patera, Michal SLA 17.10.2026 14:51 (AP)");
     expect(u.start).toEqual({ dateTime: "2026-10-16T10:00:00", timeZone: "Europe/Prague" });
     expect(u.description).toContain("TEL: 603354035");
     expect(u.description).toContain("ČÍSLO PATRA A BYTU: 3 / 12");
@@ -63,6 +64,14 @@ describe("kontrola MWF ↔ kalendář", () => {
     expect(zkontroluj([], u).jenVKalendari.map((x) => x.summary)).not.toContain("VOLNY");
   });
 
+  it("skutečné události: VOLNY a NEPLANOVAT nejsou zakázky, HTML popis se přečte", async () => {
+    const { zHtml } = await import("../src/gcal/kalendar.js");
+    const html = ud({ description: zHtml("<u>pero</u><br><br>TEL: 603354035<br>O-8532577900"), summary: "Hristov - FTTH O-8532577900 Patera SLA 23.10.2026 10:18 (LH)" });
+    const r = zkontroluj([zak()], [html, ud({ id: "v", summary: "Hristov - VOLNY" }), ud({ id: "n", summary: "Hristov - NEPLANOVAT" })]);
+    expect(r.vysledky[0]).toMatchObject({ zavaznost: "shoda" });
+    expect(r.jenVKalendari).toEqual([]);
+  });
+
   it("podobnost adres", () => {
     expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Na Strzi 1702/65 Praha")).toBeGreaterThanOrEqual(0.8);
     expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Tyršova 1840, Benešov")).toBe(0);
@@ -94,5 +103,7 @@ describe("Google Calendar API", () => {
     expect(await zapisUdalost(api, "c2", u)).toEqual({ eventId: "e-stara", akce: "upraveno" });
     await zapisUdalost(api, "c1", u, { kalendar: "c2", eventId: "e-stara" });
     expect(volani).toEqual(["insert c1", "patch c2 e-stara", "delete c2 e-stara", "insert c1"]);
+    expect(await zapisUdalost(api, "c1", u, undefined, "e-volny")).toEqual({ eventId: "e-volny", akce: "obsazeno okno" });
+    expect(volani.at(-1)).toBe("patch c1 e-volny");
   });
 });

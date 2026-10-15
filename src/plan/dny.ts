@@ -3,7 +3,7 @@
 // start a konec dne = adresa výjezdu technika z číselníku Technici.
 
 import { isoDate, minutesOfDay } from "../domain/time.js";
-import { jeVolneOkno, volnaOkna, type UdalostTechnika } from "../gcal/kontrola.js";
+import { jeBlok, jeVolneOkno, volnaOkna, type UdalostTechnika } from "../gcal/kontrola.js";
 import type { Bod } from "./geo.js";
 import type { Geokoder } from "./geokod.js";
 import type { DenSOkny } from "./sloty.js";
@@ -30,6 +30,8 @@ export async function sestavDny(
   datum: string,
   geokoder: Geokoder,
   vychoziDelkaMin = 110,
+  /** úplná adresa z MWF (místo v kalendáři bývá bez obce: „Podolská 348/88“) */
+  adresaZMwf: (u: UdalostTechnika) => string | undefined = () => undefined,
 ): Promise<SestaveneDny> {
   const dny: DenSOkny[] = [];
   const bezPolohy: UdalostTechnika[] = [];
@@ -41,10 +43,11 @@ export async function sestavDny(
       bezZakladny.push(t.jmeno);
       continue;
     }
-    const jeho = udalosti.filter((u) => u.technik === t.jmeno && isoDate(u.od) === datum && !jeVolneOkno(u));
+    const jeho = udalosti.filter((u) => u.technik === t.jmeno && isoDate(u.od) === datum && !jeVolneOkno(u) && !jeBlok(u));
     const navstevy: Navsteva[] = [];
     for (const u of jeho) {
-      const bod: Bod | null = u.location ? (await geokoder.najdi(u.location)).bod : null;
+      const adresa = adresaZMwf(u) ?? u.location;
+      const bod: Bod | null = adresa ? (await geokoder.najdi(adresa)).bod : null;
       if (!bod) {
         bezPolohy.push(u);
         continue;

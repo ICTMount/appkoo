@@ -11,6 +11,17 @@ export function kalendarApi(): calendar_v3.Calendar {
   return calendarApi({ version: "v3", auth: new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/calendar.events"] }) });
 }
 
+/** Popis události bývá i v HTML (<br>, <u>) – pro kontrolu ho převedeme na prostý text */
+export function zHtml(s: string): string {
+  return s
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
 /** RFC 3339 čas z API → „Praha v UTC“ */
 function zApi(t: calendar_v3.Schema$EventDateTime | undefined): Date | null {
   if (t?.dateTime) return tedPraha(new Date(t.dateTime));
@@ -45,7 +56,7 @@ export async function nactiUdalosti(
           technik,
           id: e.id!,
           summary: e.summary ?? "",
-          description: e.description ?? "",
+          description: zHtml(e.description ?? ""),
           location: e.location ?? "",
           od: zacatek,
           do: konec,
@@ -62,13 +73,16 @@ export async function nactiUdalosti(
  * Zapíše událost zakázky do kalendáře technika. Pokud tam už událost této zakázky je
  * (podle skrytého ID), upraví ji – nikdy nevzniknou dvě události pro jednu zakázku.
  * Při přeplánování k jinému technikovi smaže starou událost v jeho kalendáři.
+ * Když se termín zapisuje do volného okna, přepíše událost „VOLNY“ – v kalendáři tak
+ * nevzniknou dvě překrývající se události.
  */
 export async function zapisUdalost(
   api: calendar_v3.Calendar,
   kalendar: string,
   u: UdalostKalendare,
   puvodni?: { kalendar: string; eventId: string },
-): Promise<{ eventId: string; akce: "vytvořeno" | "upraveno" }> {
+  volneOknoEventId?: string,
+): Promise<{ eventId: string; akce: "vytvořeno" | "upraveno" | "obsazeno okno" }> {
   if (puvodni && puvodni.kalendar !== kalendar) {
     await api.events.delete({ calendarId: puvodni.kalendar, eventId: puvodni.eventId }).catch(() => undefined);
   }
@@ -82,6 +96,10 @@ export async function zapisUdalost(
   if (existujici?.id) {
     await api.events.patch({ calendarId: kalendar, eventId: existujici.id, requestBody: u });
     return { eventId: existujici.id, akce: "upraveno" };
+  }
+  if (volneOknoEventId) {
+    await api.events.patch({ calendarId: kalendar, eventId: volneOknoEventId, requestBody: { ...u, colorId: null } as never });
+    return { eventId: volneOknoEventId, akce: "obsazeno okno" };
   }
   const vytvorena = await api.events.insert({ calendarId: kalendar, requestBody: u });
   return { eventId: vytvorena.data.id!, akce: "vytvořeno" };
