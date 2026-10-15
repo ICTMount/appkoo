@@ -1,0 +1,101 @@
+// Kontrola MWF ↔ Google Kalendář (zlaté pravidlo č. 1: musí být 100% shodné).
+// Každý dohodnutý termín z MWF se páruje s událostí v kalendáři technika – nejdřív podle
+// skrytého ID zakázky (události vytvořené aplikací), jinak podle čísla O- nebo S7 v textu.
+// Kontroluje se technik, den a čas (tolerance 30 min), adresa (shoda ≥ 80 %) a telefon.
+// Události „VOLNY“ nejsou zakázky – jsou to volná okna pro plánovač.
+
+import type { Zakazka } from "../import/mwfExport.js";
+import { isoDate, minutesOfDay } from "../domain/time.js";
+import { zakladniCisloObjednavky } from "../domain/slovnik.js";
+import type { Okno } from "../plan/sloty.js";
+
+export interface UdalostTechnika {
+  kalendar: string;
+  technik: string;
+  id: string;
+  summary: string;
+  description: string;
+  location: string;
+  /** „Praha v UTC“ */
+  od: Date;
+  do: Date;
+  appkoo?: string; // skryté ID zakázky
+}
+
+export type Zavaznost = "shoda" | "admin" | "rozpor";
+
+export interface VysledekKontroly {
+  zakazka: string;
+  objednavka: string;
+  udalost: UdalostTechnika | null;
+  zavaznost: Zavaznost;
+  problemy: string[];
+}
+
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/\p{M}/gu, "");
+const VOLNO = /\bvoln[yáé]\b|\bvolno\b/i;
+
+export const jeVolneOkno = (u: Pick<UdalostTechnika, "summary">) => VOLNO.test(norm(u.summary)) && !/dohod/i.test(u.summary);
+
+/** Podobnost adres podle shodných slov a čísel (0–1) */
+export function podobnostAdres(a: string, b: string): number {
+  const slova = (s: string) => new Set(norm(s).split(/[^\p{L}\d/]+/u).filter((x) => x.length > 1));
+  const A = slova(a);
+  const B = slova(b);
+  if (!A.size || !B.size) return 0;
+  const spolecna = [...A].filter((x) => B.has(x)).length;
+  return spolecna / Math.min(A.size, B.size);
+}
+
+/** Patří událost technikovi z MWF? MWF má „Příjmení Jméno (Vegacom)“, kalendář jméno technika. */
+export function stejnyTechnik(mwf: string, technik: string): boolean {
+  const t = norm(technik).split(/\s+/)[0] ?? "";
+  return !!t && norm(mwf).includes(t);
+}
+
+function obsahujeId(u: UdalostTechnika, z: Zakazka): boolean {
+  if (u.appkoo) return u.appkoo === z.idAktivity;
+  const text = `${u.summary}\n${u.description}`;
+  const oCisla = [...text.matchAll(/O-\d{6,}/gi)].map((m) => zakladniCisloObjednavky(m[0]));
+  return oCisla.includes(z.idObjednavkyZaklad) || (!!z.idS7 && text.includes(z.idS7));
+}
+
+export function zkontroluj(zakazky: Zakazka[], udalosti: UdalostTechnika[]): { vysledky: VysledekKontroly[]; jenVKalendari: UdalostTechnika[] } {
+  const zakazkoveUdalosti = udalosti.filter((u) => !jeVolneOkno(u));
+  const sparovane = new Set<UdalostTechnika>();
+  const vysledky: VysledekKontroly[] = [];
+
+  for (const z of zakazky.filter((x) => x.termin)) {
+    const kandidati = zakazkoveUdalosti.filter((u) => obsahujeId(u, z));
+    // přednost má událost ve stejný den jako termín v MWF
+    const u = kandidati.find((x) => isoDate(x.od) === isoDate(z.termin!.od)) ?? kandidati[0] ?? null;
+    const problemy: string[] = [];
+    let zavaznost: Zavaznost = "shoda";
+    const rozpor = (p: string) => (problemy.push(p), (zavaznost = "rozpor"));
+    const admin = (p: string) => (problemy.push(p), zavaznost === "shoda" && (zavaznost = "admin"));
+
+    if (!u) rozpor("Termín je v MWF, v kalendáři technika chybí.");
+    else {
+      sparovane.add(u);
+      if (z.technik && !stejnyTechnik(z.technik, u.technik)) rozpor(`Jiný technik: MWF ${z.technik}, kalendář ${u.technik}.`);
+      if (isoDate(u.od) !== isoDate(z.termin!.od)) rozpor(`Jiný den: MWF ${isoDate(z.termin!.od)}, kalendář ${isoDate(u.od)}.`);
+      else if (Math.abs(minutesOfDay(u.od) - minutesOfDay(z.termin!.od)) > 30) rozpor("Jiný čas začátku (rozdíl víc než 30 min).");
+      const tel = (u.description.match(/TEL:([^\n]*)/i)?.[1] ?? "").replace(/\s/g, "");
+      if (!tel) admin("V události chybí telefon (TEL:).");
+      else if (z.telefony.length && !z.telefony.some((t) => tel.includes(t))) rozpor("Jiný telefon než v MWF.");
+      if (z.adresa && podobnostAdres(z.adresa, `${u.location} ${u.summary}`) < 0.8) admin("Adresa v kalendáři se liší od MWF (shoda pod 80 %).");
+    }
+    vysledky.push({ zakazka: z.idAktivity, objednavka: z.idObjednavkyZaklad, udalost: u, zavaznost, problemy });
+  }
+
+  const jenVKalendari = zakazkoveUdalosti.filter((u) => !sparovane.has(u) && /O-\d{6,}|appkoo/i.test(`${u.summary} ${u.description} ${u.appkoo ?? ""}`));
+  return { vysledky, jenVKalendari };
+}
+
+/** Volná okna technika v daný den z událostí „VOLNY“ – vstup pro nabídku termínů */
+export function volnaOkna(udalosti: UdalostTechnika[], technik: string, den: string): Okno[] {
+  return udalosti
+    .filter((u) => u.technik === technik && isoDate(u.od) === den && jeVolneOkno(u))
+    .map((u) => ({ od: minutesOfDay(u.od), do: minutesOfDay(u.do) - 1 }))
+    .sort((a, b) => a.od - b.od);
+}

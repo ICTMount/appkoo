@@ -1,0 +1,98 @@
+import { describe, expect, it } from "vitest";
+import { nactiUdalosti, zapisUdalost } from "../src/gcal/kalendar.js";
+import { podobnostAdres, volnaOkna, zkontroluj, type UdalostTechnika } from "../src/gcal/kontrola.js";
+import { sestavUdalost } from "../src/gcal/udalost.js";
+import { local } from "../src/domain/time.js";
+import type { Zakazka } from "../src/import/mwfExport.js";
+
+const zak = (o: Partial<Zakazka> = {}): Zakazka => ({
+  idAktivity: "A1", idObjednavky: "O-8532577900:1", idObjednavkyZaklad: "O-8532577900", idS7: "1-D79CTLE",
+  technik: "Hristov Nikolaj (Vegacom)", typAktivity: "CETIN_Inst_Pristupu_FTTH", infrastruktura: "CETIN",
+  zakaznik: "Patera, Michal", telefony: ["603354035"], adresa: "Na Strži 1702/65, Praha 4", psc: "14000", balik: "Router",
+  termin: { od: local(2026, 10, 16, 10, 0), do: local(2026, 10, 16, 11, 59) },
+  ...o,
+}) as Zakazka;
+
+const ud = (o: Partial<UdalostTechnika> = {}): UdalostTechnika => ({
+  kalendar: "cal-hristov", technik: "Hristov", id: "e1",
+  summary: "Hristov - FTTH (CETIN) 1-D79CTLE, Patera, Michal", description: "TEL: 603 354 035\nZAKÁZKA: O-8532577900",
+  location: "Na Strži 1702/65, Praha 4", od: local(2026, 10, 16, 10, 0), do: local(2026, 10, 16, 11, 59), ...o,
+});
+
+describe("šablona události", () => {
+  it("vyplní název, telefon, ID zakázky a skryté vlastnosti; čas v pražské zóně", () => {
+    const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { patro: "3", byt: "12", souhlasSVrtanim: false, caseid: "CZ-1" }, local(2026, 10, 20, 0, 0));
+    expect(u.summary).toBe("Hristov - FTTH (CETIN) 1-D79CTLE, Patera, Michal SLA 20.10");
+    expect(u.start).toEqual({ dateTime: "2026-10-16T10:00:00", timeZone: "Europe/Prague" });
+    expect(u.description).toContain("TEL: 603354035");
+    expect(u.description).toContain("ČÍSLO PATRA A BYTU: 3 / 12");
+    expect(u.description).toContain("SOUHLAS S VRTÁNÍM: NE = dotaz na PEP");
+    expect(u.description).toContain("CASEID: CZ-1");
+    expect(u.description).not.toContain("PODB"); // jen pro síť T-Mobile
+    expect(u.extendedProperties.private).toEqual({ appkoo: "A1", objednavka: "O-8532577900", s7: "1-D79CTLE" });
+  });
+});
+
+describe("kontrola MWF ↔ kalendář", () => {
+  it("shoda", () => {
+    expect(zkontroluj([zak()], [ud()]).vysledky[0]).toMatchObject({ zavaznost: "shoda", problemy: [] });
+  });
+
+  it("chybí v kalendáři / jiný čas / jiný technik / jiný telefon", () => {
+    expect(zkontroluj([zak()], []).vysledky[0]!.zavaznost).toBe("rozpor");
+    expect(zkontroluj([zak()], [ud({ od: local(2026, 10, 16, 12, 0) })]).vysledky[0]!.problemy.join()).toMatch(/čas/);
+    expect(zkontroluj([zak()], [ud({ technik: "Vajc" })]).vysledky[0]!.problemy.join()).toMatch(/technik/);
+    expect(zkontroluj([zak()], [ud({ description: "TEL: 777000111 O-8532577900" })]).vysledky[0]!.problemy.join()).toMatch(/telefon/);
+  });
+
+  it("chybějící telefon a jiná adresa jsou jen administrativní", () => {
+    const r = zkontroluj([zak()], [ud({ description: "O-8532577900", location: "Kolín" })]).vysledky[0]!;
+    expect(r.zavaznost).toBe("admin");
+    expect(r.problemy).toHaveLength(2);
+  });
+
+  it("páruje podle skrytého ID a hlásí události jen v kalendáři", () => {
+    const r = zkontroluj([zak()], [ud({ summary: "přeplánováno", description: "TEL: 603354035", appkoo: "A1" }), ud({ id: "e2", description: "O-9999999999" })]);
+    expect(r.vysledky[0]!.udalost!.id).toBe("e1");
+    expect(r.jenVKalendari.map((u) => u.id)).toEqual(["e2"]);
+  });
+
+  it("volná okna VOLNY nejsou zakázky", () => {
+    const u = [ud({ summary: "VOLNY", description: "", od: local(2026, 10, 16, 14, 0), do: local(2026, 10, 16, 16, 0) }), ud()];
+    expect(volnaOkna(u, "Hristov", "2026-10-16")).toEqual([{ od: 14 * 60, do: 16 * 60 - 1 }]);
+    expect(zkontroluj([], u).jenVKalendari.map((x) => x.summary)).not.toContain("VOLNY");
+  });
+
+  it("podobnost adres", () => {
+    expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Na Strzi 1702/65 Praha")).toBeGreaterThanOrEqual(0.8);
+    expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Tyršova 1840, Benešov")).toBe(0);
+  });
+});
+
+describe("Google Calendar API", () => {
+  it("čte události a převede čas na pražský", async () => {
+    const api = { events: { list: async () => ({ data: { items: [
+      { id: "e1", summary: "x", start: { dateTime: "2026-10-16T08:00:00Z" }, end: { dateTime: "2026-10-16T10:00:00Z" } },
+      { id: "e2", summary: "dovolená", start: { date: "2026-10-16" }, end: { date: "2026-10-17" } },
+    ] } }) } } as any;
+    const u = await nactiUdalosti(api, [{ technik: "Hristov", kalendar: "c1" }], new Date(), new Date());
+    expect(u).toHaveLength(1);
+    expect(u[0]!.od).toEqual(local(2026, 10, 16, 10, 0)); // 08:00 UTC = 10:00 v Praze (letní čas)
+  });
+
+  it("zapíše novou událost, existující upraví, při změně technika smaže starou", async () => {
+    const volani: string[] = [];
+    const existujici: Record<string, string | undefined> = { c2: "e-stara" };
+    const api = { events: {
+      list: async (p: any) => ({ data: { items: existujici[p.calendarId] ? [{ id: existujici[p.calendarId] }] : [] } }),
+      insert: async (p: any) => (volani.push(`insert ${p.calendarId}`), { data: { id: "e-nova" } }),
+      patch: async (p: any) => (volani.push(`patch ${p.calendarId} ${p.eventId}`), { data: {} }),
+      delete: async (p: any) => (volani.push(`delete ${p.calendarId} ${p.eventId}`), { data: {} }),
+    } } as any;
+    const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59));
+    expect(await zapisUdalost(api, "c1", u)).toEqual({ eventId: "e-nova", akce: "vytvořeno" });
+    expect(await zapisUdalost(api, "c2", u)).toEqual({ eventId: "e-stara", akce: "upraveno" });
+    await zapisUdalost(api, "c1", u, { kalendar: "c2", eventId: "e-stara" });
+    expect(volani).toEqual(["insert c1", "patch c2 e-stara", "delete c2 e-stara", "insert c1"]);
+  });
+});
