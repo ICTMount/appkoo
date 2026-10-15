@@ -1,14 +1,22 @@
 -- Schéma databáze plánovací aplikace (PostgreSQL 16).
 -- Časy jsou místní čas Praha (timestamp without time zone), stejně jako v MWF.
 
+-- Každý došlý export (e-mail / nahrání v aplikaci / Google Drive) a co se s ním stalo
 CREATE TABLE import_run (
   id            bigserial PRIMARY KEY,
+  zdroj         text NOT NULL CHECK (zdroj IN ('email', 'upload', 'drive', 'cli')),
   soubor        text NOT NULL,
-  export_at     timestamp NOT NULL,
-  importovano   timestamptz NOT NULL DEFAULT now(),
-  pocet         integer NOT NULL,
+  hash          text NOT NULL,                -- SHA-256 obsahu; stejný soubor jinou cestou = duplicita
+  odesilatel    text,                         -- e-mail odesílatele / uživatel, který nahrál
+  zdroj_id      text,                         -- ID zprávy v Gmailu / ID souboru na Drive
+  prijato       timestamptz NOT NULL DEFAULT now(),
+  export_at     timestamp,                    -- čas exportu (z názvu souboru)
+  vysledek      text NOT NULL CHECK (vysledek IN ('importovano', 'preskoceno', 'odmitnuto')),
+  duvod         text,
+  pocet         integer,
   chybejici_sloupce text[] NOT NULL DEFAULT '{}'
 );
+CREATE UNIQUE INDEX ON import_run (hash) WHERE vysledek = 'importovano';
 
 -- Aktuální stav zakázky podle posledního importu (upsert podle ID aktivity)
 CREATE TABLE zakazka (

@@ -3,20 +3,12 @@
 //   --ai N  vytěží poznámky N zakázek v dojednávání přes Claude (vyžaduje ANTHROPIC_API_KEY)
 
 import { readFileSync } from "node:fs";
-import { basename } from "node:path";
 import { lhutaZak, planKontaktu } from "../domain/contact.js";
-import { fmtDate, fmtTime, local } from "../domain/time.js";
+import { fmtDate, fmtTime, tedPraha } from "../domain/time.js";
+import { casExportu } from "../ingest/prijem.js";
 import { importExport } from "../import/mwfExport.js";
 import { pokusyZPoznamky } from "../import/notes.js";
 import { vytezPoznamky } from "../ai/noteExtraction.js";
-
-/** "zakazky paw-grid-export-csv 20261014 18_01.csv" → 14.10.2026 18:01 */
-function casExportu(soubor: string): Date {
-  const m = basename(soubor).match(/(\d{4})(\d{2})(\d{2}) (\d{2})_(\d{2})/);
-  if (!m) throw new Error("Z názvu souboru nejde zjistit čas exportu (očekávám …YYYYMMDD HH_MM.csv).");
-  const [, y, mo, d, h, mi] = m.map(Number) as number[];
-  return local(y!, mo!, d!, h!, mi!);
-}
 
 const count = <T>(xs: T[]) =>
   Object.fromEntries([...xs.reduce((m, x) => m.set(x, (m.get(x) ?? 0) + 1), new Map<T, number>())].sort((a, b) => b[1] - a[1]));
@@ -24,7 +16,8 @@ const count = <T>(xs: T[]) =>
 async function main() {
   const [soubor, ...args] = process.argv.slice(2);
   if (!soubor) throw new Error("Chybí cesta k MWF exportu.");
-  const now = casExportu(soubor);
+  const { at: now, zNazvu } = casExportu(soubor, tedPraha());
+  if (!zNazvu) console.log("Čas exportu nejde zjistit z názvu souboru – použit aktuální čas.");
   const { zakazky, chybejiciSloupce } = importExport(readFileSync(soubor), now);
 
   console.log(`Export ${fmtDate(now)} ${fmtTime(now)} – ${zakazky.length} zakázek`);

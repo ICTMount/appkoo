@@ -52,3 +52,13 @@ export function parseCzDateTime(s: string): Date | null {
   const [, d, mo, y, h, mi] = m;
   return local(Number(y), Number(mo), Number(d), Number(h ?? 0), Number(mi ?? 0));
 }
+
+/** Aktuální čas jako „místní čas Praha uložený v UTC“ (viz začátek souboru) */
+export function tedPraha(now: Date = new Date()): Date {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(now)
+      .map((x) => [x.type, x.value]),
+  );
+  return local(Number(p.year), Number(p.month), Number(p.day), Number(p.hour), Number(p.minute));
+}
