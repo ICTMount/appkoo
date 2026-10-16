@@ -230,7 +230,7 @@ ${radek("Jméno", esc(z.zakaznik))}
 ${radek("Telefon", z.telefony.map((t) => `<a href="tel:${esc(t.replace(/\s/g, ""))}">${esc(t)}</a>`).join(", "))}
 ${radek("Adresa", esc(adresa))}
 ${radek("Subregión", esc(z.subregion))}
-${radek("Balík / produkt", esc([z.balik, z.produkt].filter(Boolean).join(" · ")))}
+${radek("Produkt", esc(z.produkt))}
 </dl></div>
 <div class="card"><h2>Zakázka</h2><dl>
 ${radek("Stav MWF", esc(z.stavMwf))}
@@ -242,6 +242,7 @@ ${radek("Termín", esc(z.termin ? `${dt(z.termin.od)} – ${fmtTime(z.termin.do)
 ${radek("Parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniNestandardni && `nestandardní: ${z.parkovaniNestandardni}`].filter(Boolean).join(" · ")))}
 ${radek("Vlastník infrastruktury", infraStitek(z.infrastruktura))}
 ${radek("Typ", esc(`${z.typAktivity}${z.predobjednavka ? " · předobjednávka" : ""}`))}
+${radek("P3: Typ balíka", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
 ${radek("Priorita", `<span class="prio ${d.priorita}">${d.priorita}</span> ${esc(d.duvod)}`)}
 ${radek("Preferovaný datum", esc(den(z.preferovanyDatum)))}
 ${radek("RFS", esc(den(z.rfs)))}
