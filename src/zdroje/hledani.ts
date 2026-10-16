@@ -145,12 +145,13 @@ async function zpravyProstoru(prostor: string, token: string, fetchFn: typeof fe
   return v;
 }
 
-export async function hledejChat(prostory: string[], vyrazy: string[], token: string, fetchFn: typeof fetch = fetch, dniZpet = 120): Promise<Nalez[]> {
+export async function hledejChat(prostory: string[], vyrazy: string[], token: string, fetchFn: typeof fetch = fetch, dniZpet = 60): Promise<Nalez[]> {
   if (!vyrazy.length || !prostory.length) return [];
   const hledane = vyrazy.map((v) => v.toLowerCase());
   const vysledek: Nalez[] = [];
-  for (const prostor of prostory) {
-    const { zpravy, nazev } = await zpravyProstoru(prostor, token, fetchFn, dniZpet);
+  // prostory souběžně – postupně to u velkých prostorů nestihlo časový limit
+  const nactene = await Promise.all(prostory.map(async (prostor) => ({ prostor, ...(await zpravyProstoru(prostor, token, fetchFn, dniZpet)) })));
+  for (const { prostor, zpravy, nazev } of nactene) {
     const shody = zpravy.filter((m) => hledane.some((v) => (m.text ?? "").toLowerCase().includes(v)));
     const vlakna = new Set(shody.map((m) => m.thread?.name).filter(Boolean));
     const idProstoru = prostor.replace(/^spaces\//, "");
@@ -184,12 +185,12 @@ async function sLimitem<T>(ms: number, p: Promise<T>): Promise<T> {
   }
 }
 
-export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: Date, limitMs = 12_000): Promise<VysledekZdroje[]> {
+export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: Date, limitMs = 12_000, limitChatMs = 25_000): Promise<VysledekZdroje[]> {
   const od = new Date(now.getTime() - 180 * 86_400_000);
   const do_ = new Date(now.getTime() + 90 * 86_400_000);
   const zdroj = async (z: Zdroj, f: () => Promise<Nalez[]>): Promise<VysledekZdroje> => {
     try {
-      return { zdroj: z, nalezy: await sLimitem(limitMs, f()) };
+      return { zdroj: z, nalezy: await sLimitem(z === "chat" ? limitChatMs : limitMs, f()) };
     } catch (e) {
       return { zdroj: z, nalezy: [], chyba: e instanceof Error ? e.message : String(e) };
     }

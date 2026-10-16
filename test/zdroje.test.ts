@@ -110,7 +110,7 @@ describe("zdroje", () => {
       chatToken: () => new Promise<string>(() => {}),
       prostory: ["spaces/S1"],
     };
-    const v = await hledejVsude(zav, ["O-8550000001"], new Date("2026-10-15T10:00:00Z"), 200);
+    const v = await hledejVsude(zav, ["O-8550000001"], new Date("2026-10-15T10:00:00Z"), 200, 200);
     expect(v.map((x) => [x.zdroj, x.chyba ? "chyba" : "ok"])).toEqual([["email", "chyba"], ["kalendar", "ok"], ["chat", "chyba"]]);
     expect(v[2]!.chyba).toContain("neodpověděl");
     const html = sekceZdroju(v);

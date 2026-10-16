@@ -17,7 +17,22 @@ describe("geokódování", () => {
     expect(await g.najdi("Na Strži 1702/65, Praha")).toEqual({ bod: { lat: 50.03, lon: 14.45 }, presnost: "adresa", zdroj: "google" });
     expect((await g.najdi("Neexistující 1")).presnost).toBe("nenalezeno");
     expect(volani[0]).toContain("components=country%3ACZ");
+    // odmítnutý klíč není „nenalezeno“ – musí skončit chybou (a neuložit se do cache)
+    const odmitnuto = googleGeokoder("SPATNY", (async () => new Response(JSON.stringify({ status: "REQUEST_DENIED", error_message: "API key not authorized", results: [] }))) as unknown as typeof fetch);
+    await expect(odmitnuto.najdi("Moravská 1553/52, Praha")).rejects.toThrow(/REQUEST_DENIED.*GOOGLE_MAPS_API_KEY/);
   });
+
+  it("cache: staré „nenalezeno“ (před opravou) se zkusí znovu, čerstvé ne", async () => {
+    const pg = new PGlite();
+    await pg.exec(readFileSync("db/schema.sql", "utf8"));
+    await pg.query("INSERT INTO geokod (adresa, lat, lon, presnost, zdroj) VALUES ('moravská 1553/52, praha', NULL, NULL, 'nenalezeno', 'google')");
+    let n = 0;
+    const g = sCache({ query: (s, p) => pg.query(s, p) as never }, { najdi: async (a) => (n++, a.includes("Moravská") ? { bod: { lat: 50.07, lon: 14.44 }, presnost: "adresa", zdroj: "google" } : { bod: null, presnost: "nenalezeno", zdroj: "google" }) });
+    expect((await g.najdi("Moravská 1553/52, Praha")).bod).toEqual({ lat: 50.07, lon: 14.44 });
+    await g.najdi("Neexistující 1");
+    expect((await g.najdi("Neexistující 1")).presnost).toBe("nenalezeno");
+    expect(n).toBe(2);
+  }, 60_000);
 
   it("cache: stejná adresa podruhé bez volání služby", async () => {
     const pg = new PGlite();
