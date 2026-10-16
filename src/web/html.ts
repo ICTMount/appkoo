@@ -88,11 +88,13 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .check{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
 pre.mwf{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:15px;user-select:all;white-space:pre-wrap}
 header{display:block;padding:0;position:sticky;top:0;z-index:5}
-header .lista{display:flex;gap:20px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:10px 20px}
-header .vlevo{display:flex;flex-direction:column;gap:10px}header .logo{font-size:20px}
+header .lista{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:start;padding:10px 20px}
+header .vlevo{justify-self:start}header .logo{font-size:20px}
+header .stred{display:flex;flex-direction:column;align-items:center;gap:8px}header .stred .export{align-items:center;text-align:center;font-size:12px;color:var(--muted)}
+@media (max-width:760px){header .lista{grid-template-columns:1fr}header .vlevo,header .stred,header .vpravo{justify-self:stretch;align-items:flex-start}}
 nav.zalozky{display:flex;gap:4px}nav.zalozky a{padding:7px 14px;border-radius:6px;color:var(--text);font-weight:600}
 nav.zalozky a.on{background:var(--accent);color:#fff}nav.zalozky a:hover{text-decoration:none;background:var(--line)}nav.zalozky a.on:hover{background:var(--accent)}
-header .vpravo{display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:12px;color:var(--muted)}
+header .vpravo{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:12px;color:var(--muted)}
 header .kdo{color:var(--text)}a.konfig{font-size:12px;font-weight:600}a.konfig.on{text-decoration:underline}
 .export{display:flex;flex-direction:column;gap:3px;min-width:230px}.export b{color:var(--text)}
 .bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}.bar span{display:block;height:100%}
@@ -146,10 +148,10 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulek)} – AppKoo</title><style>${CSS}</style></head><body>
 <header><div class="lista">
-<div class="vlevo"><a class="logo" href="/">AppKoo</a>
-<nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a></nav></div>
-<div class="vpravo">${cerstvost(stav)}<div class="kdo">${esc(uzivatel)}<!--role--></div>
-<nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav><!--konfigurace:${zal === "konfigurace" ? "on" : "off"}--></div></div>
+<div class="vlevo"><a class="logo" href="/">AppKoo</a></div>
+<div class="stred"><nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a></nav>${cerstvost(stav)}</div>
+<div class="vpravo"><nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav>
+<div class="kdo">${esc(uzivatel)}<!--role--></div><!--konfigurace:${zal === "konfigurace" ? "on" : "off"}--></div></div>
 <form class="hledani" action="/" method="get"><input name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku"><button>Najít a plánovat</button></form></header>
 <main>${telo}</main></body></html>`;
 }
