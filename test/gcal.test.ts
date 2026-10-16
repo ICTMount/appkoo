@@ -67,6 +67,16 @@ describe("kontrola MWF ↔ kalendář", () => {
     expect(volnaOkna([ud({ summary: "Hristov", barva: "10", od: local(2026, 10, 16, 8, 0), do: local(2026, 10, 16, 10, 0) })], "Hristov", "2026-10-16")).toEqual([{ od: 480, do: 599 }]);
   });
 
+  it("VOLNY sz (změna smlouvy FTTH / servis PIV) se pro instalaci nenabízí", async () => {
+    const { jeVyhrazeneVolno } = await import("../src/gcal/kontrola.js");
+    const sz = ud({ summary: "Papez - VOLNY sz", barva: "10", od: local(2026, 10, 16, 12, 0), do: local(2026, 10, 16, 13, 0) });
+    const bezny = ud({ summary: "Papez - VOLNY", barva: "10", od: local(2026, 10, 16, 14, 0), do: local(2026, 10, 16, 16, 0) });
+    expect(jeVyhrazeneVolno(sz)).toBe(true);
+    expect(jeVyhrazeneVolno(bezny)).toBe(false);
+    expect(volnaOkna([sz, bezny], "Hristov", "2026-10-16")).toEqual([{ od: 14 * 60, do: 16 * 60 - 1 }]);
+    expect(zkontroluj([], [sz]).jenVKalendari).toEqual([]);
+  });
+
   it("skutečné události: VOLNY a NEPLANOVAT nejsou zakázky, HTML popis se přečte", async () => {
     const { zHtml } = await import("../src/gcal/kalendar.js");
     const html = ud({ description: zHtml("<u>pero</u><br><br>TEL: 603354035<br>O-8532577900"), summary: "Hristov - FTTH O-8532577900 Patera SLA 23.10.2026 10:18 (LH)" });

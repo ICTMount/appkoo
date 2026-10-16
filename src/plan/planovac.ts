@@ -9,7 +9,7 @@
 import type { calendar_v3 } from "@googleapis/calendar";
 import type { Polozka } from "../config/ciselniky.js";
 import { nactiUdalosti } from "../gcal/kalendar.js";
-import { jeBlok, jeVolneOkno, type UdalostTechnika } from "../gcal/kontrola.js";
+import { jeBlok, jeVolneOkno, jeVyhrazeneVolno, type UdalostTechnika } from "../gcal/kontrola.js";
 import type { Zakazka } from "../import/mwfExport.js";
 import type { Fakta, Priorita } from "../domain/priorita.js";
 import { addDays, atTime, isoDate, minutesOfDay } from "../domain/time.js";
@@ -339,7 +339,7 @@ export async function navrhyProSlot(
   if (denKal.nedostupne.length) return { ...prazdne, nedostupne: denKal.nedostupne, chyba: `Kalendář technika ${t.jmeno} nejde přečíst.` };
   const den = denKal.udalosti.filter((u) => isoDate(u.od) === datum).sort((a, b) => a.od.getTime() - b.od.getTime());
   const vybrany = den.find((u) => u.id === slot.eventId);
-  if (!vybrany || !jeVolneOkno(vybrany) || vybrany.od.getTime() !== slot.od.getTime()) {
+  if (!vybrany || !jeVolneOkno(vybrany) || jeVyhrazeneVolno(vybrany) || vybrany.od.getTime() !== slot.od.getTime()) {
     return { ...prazdne, den, chyba: "Slot už není volný nebo se změnil jeho čas – vyberte slot znovu." };
   }
 
@@ -418,13 +418,15 @@ export interface DenPrehledu {
   technik: TechnikPlanu;
   zakazky: UdalostTechnika[];
   volne: UdalostTechnika[];
+  /** VOLNY sz – zkrácený slot (změna smlouvy FTTH / servis PIV), nenabízí se */
+  vyhrazene: UdalostTechnika[];
 }
 
 export async function prehledDne(api: calendar_v3.Calendar, technici: TechnikPlanu[], datum: string) {
   const kal = await nactiKalendare(api, technici, atTime(datum, 0), atTime(addDays(datum, 1), 0));
   const dny: DenPrehledu[] = kal.citelni.map((t) => {
     const jeho = kal.udalosti.filter((u) => u.technik === t.jmeno && isoDate(u.od) === datum).sort((a, b) => a.od.getTime() - b.od.getTime());
-    return { technik: t, zakazky: jeho.filter((u) => !jeVolneOkno(u) && !jeBlok(u)), volne: jeho.filter((u) => jeVolneOkno(u)) };
+    return { technik: t, zakazky: jeho.filter((u) => !jeVolneOkno(u) && !jeBlok(u)), volne: jeho.filter((u) => jeVolneOkno(u) && !jeVyhrazeneVolno(u)), vyhrazene: jeho.filter((u) => jeVyhrazeneVolno(u)) };
   });
   dny.sort((a, b) => Number(!a.volne.length) - Number(!b.volne.length) || a.zakazky.length - b.zakazky.length || a.technik.jmeno.localeCompare(b.technik.jmeno, "cs"));
   return { dny, nedostupne: kal.nedostupne };

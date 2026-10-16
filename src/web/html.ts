@@ -6,7 +6,7 @@ import type { Priorita } from "../domain/priorita.js";
 import type { Detail, PolozkaFronty, StavImportu } from "./data.js";
 import { pokusyZakazky } from "./data.js";
 import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, TechnikPlanu, VybranySlot } from "../plan/planovac.js";
-import { jeVolneOkno, type UdalostTechnika } from "../gcal/kontrola.js";
+import { jeVolneOkno, jeVyhrazeneVolno, type UdalostTechnika } from "../gcal/kontrola.js";
 import { POVINNA_POTVRZENI } from "./planovani.js";
 import type { Nalez, NalezLokality, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
 
@@ -111,6 +111,7 @@ h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid
 .ud{font-size:12px;padding:4px 0;border-top:1px solid var(--line)}.ud:first-of-type{border-top:0}.ud .cas{color:var(--muted);margin-right:4px}
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
 a.volny.vyb{outline:2px solid var(--accent)}
+.vyhrazeny{font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;border:1px dashed var(--line);color:var(--muted)}
 .card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:420px;overflow-y:auto}
 .grid>*{min-width:0}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
@@ -613,7 +614,9 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
         const zak = d.udalosti.filter((u) => !jeVolneOkno(u));
         const obsah = d.udalosti
           .map((u) =>
-            jeVolneOkno(u)
+            jeVyhrazeneVolno(u)
+              ? `<div class="vyhrazeny">${esc(hm(u.od))}–${esc(hm(u.do))} ${VYHRAZENY}</div>`
+              : jeVolneOkno(u)
               ? `<a class="volny${s.slot?.eventId === u.id ? " vyb" : ""}" href="${esc(odkazSlotu(u, s.den))}">${esc(hm(u.od))}–${esc(hm(u.do))} volno → doplnit</a>`
               : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
           )
@@ -624,10 +627,12 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
   } else if (s.prehled) {
     // den technika jako časová osa: zakázky a volné sloty VOLNY v pořadí podle času
     const radky = s.prehled.dny.map((d) => {
-      const osa = [...d.zakazky, ...d.volne]
+      const osa = [...d.zakazky, ...d.volne, ...d.vyhrazene]
         .sort((a, b) => a.od.getTime() - b.od.getTime())
         .map((u) =>
-          d.volne.includes(u)
+          d.vyhrazene.includes(u)
+            ? `<div class="vyhrazeny"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span> ${VYHRAZENY}</div>`
+            : d.volne.includes(u)
             ? `<a class="volny radek" href="${esc(odkazSlotu(u, s.den))}"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span> volno → doplnit</a>`
             : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
         )
@@ -644,6 +649,8 @@ ${s.prehled.nedostupne.length ? `<div class="warn">Kalendář nejde přečíst: 
   const dolni = s.slot && s.navrhy ? sekceNavrhu(s.slot, s.navrhy, s.zapis, s.casti) : s.technik ? `<p class="muted">Vyberte nahoře volný slot (zelený) – dole se nabídnou zakázky, které ho nejlépe doplní.</p>` : "";
   return stranka("Doplnit technika", uzivatel, stav, `${formular}${horni}${dolni}`, { zalozka: "technik" });
 }
+
+const VYHRAZENY = "VOLNY sz – zkrácený slot (změna smlouvy FTTH / servis PIV), nenabízí se";
 
 /** Dvě poslední poznámky z MWF (nejnovější první), zkrácené – aby bylo vidět, co se se zakázkou naposledy dělo */
 function posledniPoznamky(zaznamy: PolozkaFronty["z"]["zaznamy"], pocet = 2, delka = 180): string {

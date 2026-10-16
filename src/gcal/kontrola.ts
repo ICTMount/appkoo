@@ -41,6 +41,12 @@ const BLOK = /neplanovat|nedostupn|dovolen|skoleni/i;
 
 export const jeVolneOkno = (u: Pick<UdalostTechnika, "summary"> & { barva?: string }) =>
   (VOLNO.test(norm(u.summary)) || (u.barva === "10" && !/O-\d{6,}/.test(u.summary))) && !/dohod/i.test(u.summary);
+/**
+ * Nestandardní volný slot „Papez - VOLNY sz“: zkrácený slot pro změnu smlouvy u FTTH nebo servisní
+ * zásah u PIV. Není to zakázka, ale plánovač ho pro novou instalaci nenabízí – zobrazí se jen pro info.
+ */
+export const jeVyhrazeneVolno = (u: Pick<UdalostTechnika, "summary"> & { barva?: string }) =>
+  jeVolneOkno(u) && /\bvoln[yae]\b\s*[-–:]?\s*sz\b/.test(norm(u.summary));
 export const jeBlok = (u: Pick<UdalostTechnika, "summary">) => BLOK.test(norm(u.summary));
 
 /**
@@ -108,7 +114,7 @@ export function zkontroluj(zakazky: Zakazka[], udalosti: UdalostTechnika[]): { v
 /** Volná okna technika v daný den z událostí „VOLNY“ – vstup pro nabídku termínů */
 export function volnaOkna(udalosti: UdalostTechnika[], technik: string, den: string): Okno[] {
   return udalosti
-    .filter((u) => u.technik === technik && isoDate(u.od) === den && jeVolneOkno(u))
+    .filter((u) => u.technik === technik && isoDate(u.od) === den && jeVolneOkno(u) && !jeVyhrazeneVolno(u))
     .map((u) => ({ od: minutesOfDay(u.od), do: minutesOfDay(u.do) - 1 }))
     .sort((a, b) => a.od - b.od);
 }
