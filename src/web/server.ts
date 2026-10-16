@@ -45,7 +45,7 @@ import { calendar as calendarApi } from "@googleapis/calendar";
 import { gmail as gmailApi } from "@googleapis/gmail";
 import { delegace, SCOPY_KALENDAR } from "../google/delegace.js";
 import { hledejVsude, ocistitDotaz, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
-import { najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
+import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import { strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
 import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, nactiKontext, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 
@@ -241,12 +241,11 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (!q) return posli(res, 200, strankaUvod(stav, email));
         const presne = await najdiAktivitu(db, q);
         if (presne.length === 1) return presmeruj(`/zakazka/${encodeURIComponent(presne[0]!)}`);
-        // telefon, jméno, adresa – v otevřených zakázkách
-        const volne = presne.length || q.length < 3 ? [] : (await nactiFrontu(db, now, { hledat: q })).polozky.slice(0, 30);
-        if (!presne.length && volne.length === 1) return presmeruj(`/zakazka/${encodeURIComponent(volne[0]!.z.idAktivity)}`);
-        const polozky = presne.length
-          ? (await Promise.all(presne.map((id) => nactiDetail(db, id, now)))).flatMap((d) => (d ? [{ z: d.z, priorita: d.priorita }] : []))
-          : volne.map((p) => ({ z: p.z, priorita: p.priorita }));
+        // telefon, jméno, adresa: otevřené zakázky (bez ohledu na diakritiku) + všechny zakázky v DB (i uzavřené)
+        const volne = presne.length || q.length < 3 ? [] : (await nactiFrontu(db, now, { hledat: q })).polozky.slice(0, 30).map((p) => p.z.idAktivity);
+        const ids = presne.length ? presne : [...new Set([...volne, ...(await hledejZakazky(db, q))])].slice(0, 30);
+        if (!presne.length && ids.length === 1) return presmeruj(`/zakazka/${encodeURIComponent(ids[0]!)}`);
+        const polozky = (await Promise.all(ids.map((id) => nactiDetail(db, id, now)))).flatMap((d) => (d ? [{ z: d.z, priorita: d.priorita, uzavreno: d.uzavreno }] : []));
         const zdroje = n.zdroje && q.length >= 5 ? await hledejVsude(n.zdroje(), [q], now) : null;
         return posli(res, 200, strankaVysledku(q, polozky, zdroje, stav, email));
       }

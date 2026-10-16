@@ -227,6 +227,34 @@ export async function najdiAktivitu(db: Dotaz, dotaz: string): Promise<string[]>
   return rows.map((r) => r.id_aktivity);
 }
 
+/**
+ * Volné hledání ve všech zakázkách z MWF (i uzavřených): telefon (v Kontaktu i v poznámce), jméno, adresa, ID.
+ * Otevřené zakázky první, pak nejnovější.
+ */
+export async function hledejZakazky(db: Dotaz, dotaz: string, limit = 30): Promise<string[]> {
+  const q = dotaz.trim();
+  const cisla = q.replace(/\D/g, "");
+  if (/^[+\d\s/-]+$/.test(q) && cisla.length >= 6) {
+    const posledni9 = cisla.slice(-9); // +420 603 111 222 → 603111222
+    const { rows } = await db.query<{ id_aktivity: string }>(
+      `SELECT id_aktivity FROM zakazka
+        WHERE array_to_string(telefony, ',') LIKE $1 OR regexp_replace(poznamka, '[[:space:]/-]', '', 'g') LIKE $1
+        ORDER BY uzavreno NULLS FIRST, prideleno DESC NULLS LAST LIMIT $2`,
+      [`%${posledni9}%`, limit],
+    );
+    return rows.map((r) => r.id_aktivity);
+  }
+  if (q.length < 3) return [];
+  const vzor = `%${q.replace(/[%_]/g, "")}%`;
+  const { rows } = await db.query<{ id_aktivity: string }>(
+    `SELECT id_aktivity FROM zakazka
+      WHERE zakaznik ILIKE $1 OR adresa ILIKE $1 OR id_objednavky ILIKE $1 OR id_s7 ILIKE $1
+      ORDER BY uzavreno NULLS FIRST, prideleno DESC NULLS LAST LIMIT $2`,
+    [vzor, limit],
+  );
+  return rows.map((r) => r.id_aktivity);
+}
+
 export interface StavImportu {
   posledniExport: Date | null;
   posledniBeh: Date | null;

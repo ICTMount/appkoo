@@ -176,19 +176,19 @@ a dole nabídku, kam ji ideálně naplánovat.</p>
 
 export function strankaVysledku(
   dotaz: string,
-  polozky: { z: PolozkaFronty["z"]; priorita: Priorita }[],
+  polozky: { z: PolozkaFronty["z"]; priorita: Priorita; uzavreno?: Date | null }[],
   zdroje: VysledekZdroje[] | null,
   stav: StavImportu,
   uzivatel: string,
 ): string {
   const radky = polozky.map(
-    ({ z, priorita }) => `<tr><td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
+    ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
 <td>${infraStitek(z.infrastruktura)}</td><td>${esc(z.zakaznik)}<br><small>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</small></td>
-<td>${esc(z.typAktivity)}</td><td>${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
+<td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
   );
   const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${polozky.length} zakázek</small></h1>
 <div class="tbl"><table><thead><tr><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th><th>Priorita</th></tr></thead>
-<tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
+<tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF (otevřených i uzavřených) nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
 ${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo, { dotaz });
 }
@@ -306,12 +306,15 @@ ${sekcePlanovani(d, plan)}</section>`;
 const NAZEV_ZDROJE: Record<Zdroj, string> = { email: "E-mail (koordinace)", kalendar: "Kalendáře techniků", chat: "Google Chat" };
 
 function nalez(n: Nalez): string {
-  return `<div class="zaznam${n.veVlakne ? " muted" : ""}"><div class="hl"><b>${esc(n.titulek)}</b>${n.cas ? ` · ${esc(dt(n.cas))}` : ""}${
+  return `<div class="zaznam${n.veVlakne ? " muted" : ""}"><div class="hl"><b>${odkazyOId(esc(n.titulek))}</b>${n.cas ? ` · ${esc(dt(n.cas))}` : ""}${
     n.kdo ? ` · ${esc(n.kdo)}` : ""
   }${n.kde && n.kde !== n.titulek ? ` · ${esc(n.kde)}` : ""}${n.veVlakne ? " · ve vlákně" : ""}${
     n.odkaz ? ` · <a href="${esc(n.odkaz)}" target="_blank" rel="noopener">otevřít</a>` : ""
-  }</div>${esc(n.text)}</div>`;
+  }</div>${odkazyOId(esc(n.text))}</div>`;
 }
+
+/** O-ID v textu (e-mail, kalendář, chat) jako odkaz na plánování zakázky */
+const odkazyOId = (html: string) => html.replace(/O-\d{8,}/g, (o) => `<a href="/?q=${o}">${o}</a>`);
 
 /** Nálezy z e-mailu, kalendářů a chatu – každý zdroj vlastní karta, chyba zdroje nezablokuje ostatní */
 export function sekceZdroju(zdroje: VysledekZdroje[] | null): string {

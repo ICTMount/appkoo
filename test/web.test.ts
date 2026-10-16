@@ -196,3 +196,16 @@ describe("webový server", () => {
     expect(bezRovna(null)).toBe("");
   });
 });
+
+describe("hledání zakázky", () => {
+  it("telefon najde i uzavřenou zakázku a číslo v poznámce; jméno i bez diakritiky", async () => {
+    const get = await spust();
+    await db.query("UPDATE zakazka SET uzavreno = now() WHERE id_aktivity = 'A1'");
+    await db.query("UPDATE zakazka SET poznamka = poznamka || ' tel. zkz 606 666 615' WHERE id_aktivity = 'A3'");
+    const tel = await get("/?q=%2B420%20603%20111%20222", "davidh@ictmount.com");
+    expect(tel.status).toBe(302);
+    expect(tel.headers.get("location")).toBe("/zakazka/A1");
+    expect((await get("/?q=606666615", "davidh@ictmount.com")).headers.get("location")).toBe("/zakazka/A3");
+    expect((await get("/?q=Dvorak", "davidh@ictmount.com")).headers.get("location")).toBe("/zakazka/A2");
+  });
+});
