@@ -346,7 +346,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
                 }
               })()
             : Promise.resolve(null),
-          // „Realizovali jsme na lokalitě“: události techniků na stejné adrese
+          // „Instalovali jsme v lokalitě“: události techniků na stejné adrese
           n.zdroje && detail.z.adresa
             ? (async (): Promise<Lokalita> => {
                 try {

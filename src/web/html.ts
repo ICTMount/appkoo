@@ -112,7 +112,7 @@ h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
 a.volny.vyb{outline:2px solid var(--accent)}
 .vyhrazeny{font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;border:1px dashed var(--line);color:var(--muted)}
-.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:420px;overflow-y:auto}
+.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:420px;overflow-y:auto}.posun.zdroj{max-height:340px}
 .grid>*{min-width:0}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
 .konec-detailu{margin:26px 0 18px;border-top:3px double var(--line)}
@@ -217,7 +217,7 @@ ${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo, { dotaz });
 }
 
-/** Realizovali jsme na lokalitě: null nalezy = adresa bez ulice a čísla popisného */
+/** Instalovali jsme v lokalitě: null nalezy = adresa bez ulice a čísla popisného */
 export interface Lokalita {
   nalezy: NalezLokality[] | null;
   chyba?: string;
@@ -328,7 +328,7 @@ ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" 
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div>
 <div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun">${historieHtml}</div></div>
-<div class="card kompakt"><h2>Realizovali jsme na lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
+<div class="card kompakt"><h2>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 </div>
 <div class="konec-detailu"></div>
 <section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
@@ -344,7 +344,7 @@ function nalez(n: Nalez): string {
     n.kdo ? ` · ${esc(n.kdo)}` : ""
   }${n.kde && n.kde !== n.titulek ? ` · ${esc(n.kde)}` : ""}${n.veVlakne ? " · ve vlákně" : ""}${
     n.odkaz ? ` · <a href="${esc(n.odkaz)}" target="_blank" rel="noopener">otevřít</a>` : ""
-  }</div>${odkazyOId(esc(n.text))}</div>`;
+  }</div>${odkazyOId(esc(n.text.length > 160 ? `${n.text.slice(0, 159)}…` : n.text))}</div>`;
 }
 
 /** O-ID v textu (e-mail, kalendář, chat) jako odkaz na plánování zakázky */
@@ -360,7 +360,8 @@ export function sekceZdroju(zdroje: VysledekZdroje[] | null): string {
         : v.nalezy.length
           ? v.nalezy.slice(0, 30).map(nalez).join("") + (v.nalezy.length > 30 ? `<p class="muted">… a dalších ${v.nalezy.length - 30}</p>` : "")
           : `<span class="muted">nic nenalezeno</span>`;
-      return `<div class="card"><h2>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}</h2>${obsah}</div>`;
+      // dlouhý seznam (hlavně e-mail) se neroztahuje přes celou stránku – roluje uvnitř karty
+      return `<div class="card kompakt"><h2>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}</h2><div class="posun zdroj">${obsah}</div></div>`;
     })
     .join("")}</div>`;
 }

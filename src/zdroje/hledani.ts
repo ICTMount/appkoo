@@ -220,7 +220,7 @@ export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: 
   ]);
 }
 
-// ---------- Realizovali jsme na lokalitě ----------
+// ---------- Instalovali jsme v lokalitě ----------
 
 const bezDiakritiky = (x: string) => x.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 

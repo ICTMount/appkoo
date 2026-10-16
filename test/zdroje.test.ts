@@ -145,7 +145,7 @@ describe("zdroje", () => {
   });
 });
 
-describe("realizovali jsme na lokalitě", () => {
+describe("instalovali jsme v lokalitě", () => {
   it("ulice a číslo popisné z adresy MWF", () => {
     expect(uliceCislo("Praha, Krčská 991/63, 14000")).toEqual({ ulice: "Krčská", cp: "991" });
     expect(uliceCislo("České Budějovice, M. Horákové 1376/10, 37005")).toEqual({ ulice: "M. Horákové", cp: "1376" });
