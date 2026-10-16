@@ -124,6 +124,7 @@ form.terminy{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bott
 .trasa{margin-top:6px;font-size:12px;border-left:2px solid var(--line);padding-left:8px}.soused{padding:1px 0;color:var(--muted)}
 .soused .smer{display:inline-block;min-width:42px}.soused b{color:var(--text);font-weight:600}.soused .km{white-space:nowrap;font-weight:600;color:var(--text)}
 .soused.zakl{font-style:italic}.soused .km.dlouhy{color:var(--p1)}.soused.tato{color:var(--accent);font-weight:600}
+.mc{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;margin-left:4px;border-radius:4px;background:var(--line);color:var(--text);white-space:nowrap}
 .adr{color:var(--muted)}.pozn{font-size:12px;margin-top:4px;padding-left:6px;border-left:2px solid var(--line);color:var(--muted);max-width:520px}.pozn b{color:var(--text);font-weight:600}a.volny.radek{display:block;margin:3px 0}a.volny .cas{margin-right:4px}
 .rychle{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
 .rychle a.on{border-color:var(--accent);background:var(--accent);color:#fff}.rychle a:hover{text-decoration:none}
@@ -148,6 +149,14 @@ export function cerstvost(stav: StavImportu): string {
   const popis = h === null ? "zatím žádný export" : `před ${String(h).replace(".", ",")} h`;
   return `<div class="export"><div>Export MWF <b>${esc(dt(stav.posledniExport) || "–")}</b> · <span class="c-${trida}">${esc(popis)}</span></div><div class="bar" title="do 1 h zelená, do 2 h oranžová, přes 2 h červená"><span class="b-${trida}" style="width:${sirka.toFixed(0)}%"></span></div></div>`;
 }
+
+/** Městská část k adrese („Praha 4 – Krč“) – mapa adresa → část připravená serverem */
+export type Casti = Map<string, string>;
+const mc = (adresa: string | undefined | null, casti?: Casti) => {
+  const c = adresa ? casti?.get(adresa) : undefined;
+  return c ? ` <span class="mc">${esc(c)}</span>` : "";
+};
+const adresaZakazky = (z: { adresa: string; psc: string }) => [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
 
 /** Vlastník infrastruktury (TMCZ / CETIN / VDF) – štítek všude, kde je zakázka */
 export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník sítě">${esc(i || "?")}</span>`;
@@ -180,10 +189,11 @@ export function strankaVysledku(
   zdroje: VysledekZdroje[] | null,
   stav: StavImportu,
   uzivatel: string,
+  casti?: Casti,
 ): string {
   const radky = polozky.map(
     ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
-<td>${infraStitek(z.infrastruktura)}</td><td>${esc(z.zakaznik)}<br><small>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</small></td>
+<td>${infraStitek(z.infrastruktura)}</td><td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}</td>
 <td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
   );
   const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${polozky.length} zakázek</small></h1>
@@ -194,6 +204,8 @@ ${sekceZdroju(zdroje)}`;
 }
 
 export interface PlanovaniZakazky {
+  /** městské části adres na stránce */
+  casti?: Casti;
   /** „jiné termíny“: hledá se od tohoto dne (YYYY-MM-DD) */
   odData?: string;
   brany: Brany;
@@ -231,7 +243,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
 
   const adresa = [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
   const mapa = adresa
-    ? `<div class="card"><h2>Adresa a mapa</h2><div>${esc(adresa)}</div>
+    ? `<div class="card"><h2>Adresa a mapa</h2><div>${esc(adresa)}${mc(adresa, plan.casti)}</div>
 <iframe class="mapa" title="Mapa" loading="lazy" referrerpolicy="no-referrer" src="https://www.google.com/maps?q=${esc(encodeURIComponent(adresa))}&amp;z=15&amp;output=embed"></iframe>
 <div><a href="https://www.google.com/maps/search/?api=1&amp;query=${esc(encodeURIComponent(adresa))}" target="_blank" rel="noopener">Google Mapy</a> · <a href="https://mapy.cz/zakladni?q=${esc(encodeURIComponent(adresa))}" target="_blank" rel="noopener">Mapy.cz</a></div></div>`
     : "";
@@ -258,7 +270,7 @@ ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená $
 <div class="card"><h2>Zákazník</h2><dl>
 ${radek("Zákazník", esc(z.zakaznik))}
 ${radek("Kontakt", z.telefony.map((t) => `<a href="tel:${esc(t.replace(/\s/g, ""))}">${esc(t)}</a>`).join(", "))}
-${radek("Adresa / PSČ", esc(adresa))}
+${radek("Adresa / PSČ", esc(adresa) + mc(adresa, plan.casti))}
 ${radek("Subregion", esc(z.subregion))}
 ${radek("Produkt", esc(z.produkt))}
 </dl></div>
@@ -371,7 +383,7 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
     const q = new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() });
     const so = m.sousede;
     const radekSouseda = (smer: string, x: NonNullable<MoznostSlotu["sousede"]>["pred"]) =>
-      `<div class="soused${x.zakladna ? " zakl" : ""}"><span class="smer">${smer}</span> ${x.cas ? `<b>${esc(x.cas)}</b> ` : ""}${esc(x.popis)} <span class="km${x.km > DLOUHY_PREJEZD_KM ? " dlouhy" : ""}">${x.km.toFixed(1)} km</span></div>`;
+      `<div class="soused${x.zakladna ? " zakl" : ""}"><span class="smer">${smer}</span> ${x.cas ? `<b>${esc(x.cas)}</b> ` : ""}${esc(x.popis)}${mc(x.adresa, plan.casti)} <span class="km${x.km > DLOUHY_PREJEZD_KM ? " dlouhy" : ""}">${x.km.toFixed(1)} km</span></div>`;
     const adresaZ = [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
     const mapa = so && adresaZ
       ? `https://www.google.com/maps/dir/${[so.pred.adresa ?? "", adresaZ, so.po.adresa ?? ""].filter(Boolean).map((a) => encodeURIComponent(a)).join("/")}`
@@ -517,11 +529,11 @@ const odkazSlotu = (u: UdalostTechnika, den: string) =>
   `/technik?${new URLSearchParams({ t: u.technik, den, k: u.kalendar, e: u.id, od: u.od.toISOString(), do: u.do.toISOString() })}`;
 
 /** Text události bez jména technika na začátku; O-ID jako odkaz na plánování zakázky; adresa (MWF, jinak z kalendáře) */
-function textUdalosti(u: UdalostTechnika, adresy?: Map<string, string>): string {
+function textUdalosti(u: UdalostTechnika, adresy?: Map<string, string>, casti?: Casti): string {
   const t = esc(u.summary.replace(/^[^-]+-\s*/, "")).replace(/O-\d{6,}/g, (o) => `<a href="/?q=${o}">${o}</a>`);
   const o = u.summary.match(/O-\d{6,}/)?.[0];
   const adresa = (o && adresy?.get(o)) || u.location;
-  return `${t}${adresa ? ` <span class="adr">· ${esc(adresa)}</span>` : ""}`;
+  return `${t}${adresa ? ` <span class="adr">· ${esc(adresa)}</span>${mc(adresa, casti)}` : ""}`;
 }
 
 export interface StrankaTechnika {
@@ -534,6 +546,7 @@ export interface StrankaTechnika {
   dny: { datum: string; udalosti: UdalostTechnika[] }[];
   /** O-číslo → úplná adresa z MWF (jinak se bere místo z kalendáře) */
   adresy?: Map<string, string>;
+  casti?: Casti;
   /** rychlá volba dne: nejbližší pracovní dny */
   rychleDny: string[];
   /** bez vybraného technika: přehled všech techniků pro den */
@@ -571,7 +584,7 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
           .map((u) =>
             jeVolneOkno(u)
               ? `<a class="volny${s.slot?.eventId === u.id ? " vyb" : ""}" href="${esc(odkazSlotu(u, s.den))}">${esc(hm(u.od))}–${esc(hm(u.do))} volno → doplnit</a>`
-              : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy)}</div>`,
+              : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
           )
           .join("");
         return `<div class="card"><h3>${esc(DNY_DLOUHE(d.datum))} ${esc(fmtDate(d.datum))} <small class="muted">· ${zak.length} ${zak.length === 1 ? "událost" : "událostí"}</small></h3>${obsah || `<span class="muted">prázdný den</span>`}</div>`;
@@ -585,7 +598,7 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
         .map((u) =>
           d.volne.includes(u)
             ? `<a class="volny radek" href="${esc(odkazSlotu(u, s.den))}"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span> volno → doplnit</a>`
-            : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy)}</div>`,
+            : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
         )
         .join("");
       return `<tr><td><a href="/technik?t=${encodeURIComponent(d.technik.jmeno)}&den=${esc(s.den)}"><b>${esc(d.technik.jmeno)}</b></a><br><small class="muted">${esc(d.technik.skupiny.join(", "))}</small></td>
@@ -597,7 +610,7 @@ ${s.prehled.nedostupne.length ? `<div class="warn">Kalendář nejde přečíst: 
 <tbody>${radky.join("") || `<tr><td colspan="4" class="muted">Žádný technik s čitelným kalendářem (zkontrolujte číselník Technici).</td></tr>`}</tbody></table></div>`;
   }
 
-  const dolni = s.slot && s.navrhy ? sekceNavrhu(s.slot, s.navrhy, s.zapis) : s.technik ? `<p class="muted">Vyberte nahoře volný slot (zelený) – dole se nabídnou zakázky, které ho nejlépe doplní.</p>` : "";
+  const dolni = s.slot && s.navrhy ? sekceNavrhu(s.slot, s.navrhy, s.zapis, s.casti) : s.technik ? `<p class="muted">Vyberte nahoře volný slot (zelený) – dole se nabídnou zakázky, které ho nejlépe doplní.</p>` : "";
   return stranka("Doplnit technika", uzivatel, stav, `${formular}${horni}${dolni}`, { zalozka: "technik" });
 }
 
@@ -613,7 +626,7 @@ function posledniPoznamky(zaznamy: PolozkaFronty["z"]["zaznamy"], pocet = 2, del
     .join("");
 }
 
-function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean }): string {
+function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean }, casti?: Casti): string {
   const smi = zapis.zapnuty && zapis.smiTechnik(vyb.technik.jmeno);
   const radky = v.navrhy.map((n, i) => {
     const z = n.kandidat.z;
@@ -628,7 +641,7 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
     return `<tr><td>${i + 1}</td>
 <td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
 <td>${infraStitek(z.infrastruktura)}</td>
-<td>${esc(z.zakaznik)}<br><small>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</small>${posledniPoznamky(z.zaznamy)}</td>
+<td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}${posledniPoznamky(z.zaznamy)}</td>
 <td><span class="prio ${n.kandidat.priorita}">${n.kandidat.priorita}</span></td>
 <td class="nowrap">${n.kandidat.slaKonec ? esc(dt(n.kandidat.slaKonec)) : ""}${n.poSla ? `<br><span class="prio P1">po SLA</span>` : ""}</td>
 <td class="nowrap">+${n.kmNavic.toFixed(1)} km<br><small>den ${n.kmDne.toFixed(0)} km</small></td>

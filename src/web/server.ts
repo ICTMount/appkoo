@@ -47,7 +47,7 @@ import { delegace, SCOPY_KALENDAR } from "../google/delegace.js";
 import { hledejVsude, ocistitDotaz, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import { strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
-import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, nactiKontext, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
+import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, mestskeCasti, nactiKontext, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 
 export interface NastaveniWebu {
   povoleni: string[];
@@ -190,6 +190,13 @@ function posli(res: ServerResponse, kod: number, html: string) {
 
 export function vytvorHandler(db: Db, n: NastaveniWebu) {
   const ted = n.ted ?? (() => tedPraha());
+  const geokoderWebu = async () => {
+    try {
+      return n.planovac ? (await n.planovac()).geokoder : null;
+    } catch {
+      return null;
+    }
+  };
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
     const tema = temaZCookie(req.headers.cookie);
@@ -247,7 +254,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (!presne.length && ids.length === 1) return presmeruj(`/zakazka/${encodeURIComponent(ids[0]!)}`);
         const polozky = (await Promise.all(ids.map((id) => nactiDetail(db, id, now)))).flatMap((d) => (d ? [{ z: d.z, priorita: d.priorita, uzavreno: d.uzavreno }] : []));
         const zdroje = n.zdroje && q.length >= 5 ? await hledejVsude(n.zdroje(), [q], now) : null;
-        return posli(res, 200, strankaVysledku(q, polozky, zdroje, stav, email));
+        const casti = await mestskeCasti(await geokoderWebu(), polozky.map((p) => [p.z.adresa, p.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ")));
+        return posli(res, 200, strankaVysledku(q, polozky, zdroje, stav, email, casti));
       }
       if (url.pathname === "/hledat") return presmeruj(`/?q=${encodeURIComponent(url.searchParams.get("q") ?? "")}`);
       if (url.pathname === "/planovani" || url.pathname === "/planovani/slot") return presmeruj(`/technik?${url.searchParams}`);
@@ -337,7 +345,11 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
               })()
             : Promise.resolve(null),
         ]);
-        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, ...(odData ? { odData } : {}) }));
+        const casti = await mestskeCasti(await geokoderWebu(), [
+          [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
+          ...(nabidka?.moznosti ?? []).flatMap((m) => [m.sousede?.pred.adresa, m.sousede?.po.adresa]),
+        ]);
+        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, casti, ...(odData ? { odData } : {}) }));
       }
 
       // ---------- Doplnit technika: jeho dny nahoře, vhodné zakázky do vybraného slotu dole ----------
@@ -393,6 +405,15 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         } else {
           s.prehled = await prehledDne(zav.api, kontext.technici, den);
         }
+        const adresaUdalosti = (u: { summary: string; location: string }) => {
+          const o = u.summary.match(/O-\d{6,}/)?.[0];
+          return (o && kontext.adresyZMwf.get(o)) || u.location;
+        };
+        s.casti = await mestskeCasti(zav.geokoder, [
+          ...s.dny.flatMap((d) => d.udalosti.map(adresaUdalosti)),
+          ...(s.prehled?.dny ?? []).flatMap((d) => d.zakazky.map(adresaUdalosti)),
+          ...(s.navrhy?.navrhy ?? []).map((x) => [x.kandidat.z.adresa, x.kandidat.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ")),
+        ]);
         return posli(res, 200, strankaTechnika(s, stav, email));
       }
 

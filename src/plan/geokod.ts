@@ -11,6 +11,32 @@ export interface VysledekGeokodu {
   bod: Bod | null;
   presnost: Presnost;
   zdroj: string;
+  /** městská část / část obce, např. „Praha 4 – Krč“ (null = služba ji nevrátila) */
+  cast?: string | null;
+}
+
+interface SlozkaAdresy {
+  long_name: string;
+  types: string[];
+}
+
+/** Městská část z odpovědi Google: „Praha 4“ (sublocality_level_1) + část obce / k. ú. (neighborhood) */
+export function castZGoogle(slozky: SlozkaAdresy[] | undefined): string | null {
+  if (!slozky?.length) return null;
+  const typ = (t: string) => slozky.find((x) => x.types.includes(t))?.long_name;
+  const obvod = typ("sublocality_level_1");
+  const cast = typ("neighborhood") ?? typ("sublocality_level_2");
+  const obec = typ("locality");
+  const casti = [obvod ?? (cast && obec && cast !== obec ? obec : undefined), cast && cast !== obvod ? cast : undefined].filter(Boolean);
+  return casti.length ? casti.join(" – ") : null;
+}
+
+/** „Praha N“ podle PSČ (100 00–199 99), když služba městskou část nevrátí */
+export function prahaZPsc(adresa: string): string | null {
+  if (!/praha/i.test(adresa)) return null;
+  const m = adresa.match(/\b1(\d)\d\s?\d{2}\b/);
+  if (!m) return null;
+  return `Praha ${m[1] === "0" ? "10" : m[1]}`;
 }
 
 export interface Geokoder {
@@ -62,7 +88,7 @@ export function googleGeokoder(apiKey = process.env.GOOGLE_MAPS_API_KEY ?? "", f
     const data = (await res.json()) as {
       status: string;
       error_message?: string;
-      results?: { geometry: { location: { lat: number; lng: number }; location_type: string } }[];
+      results?: { geometry: { location: { lat: number; lng: number }; location_type: string }; address_components?: SlozkaAdresy[] }[];
     };
     // nejdřív stav: REQUEST_DENIED / OVER_QUERY_LIMIT nejsou „adresa neexistuje“ – nesmí se uložit jako nenalezeno
     if (data.status === "ZERO_RESULTS") return { bod: null, presnost: "nenalezeno", zdroj: "google" };
@@ -76,6 +102,7 @@ export function googleGeokoder(apiKey = process.env.GOOGLE_MAPS_API_KEY ?? "", f
       bod: { lat: r.geometry.location.lat, lon: r.geometry.location.lng },
       presnost: PRESNOST_GOOGLE[r.geometry.location_type] ?? "obec",
       zdroj: "google",
+      cast: castZGoogle(r.address_components),
     };
   };
   return {
@@ -90,23 +117,33 @@ export function googleGeokoder(apiKey = process.env.GOOGLE_MAPS_API_KEY ?? "", f
 }
 
 /** Geokodér s cache v databázi – službu volá jen pro adresy, které ještě nezná */
+/** Sloupec mestska_cast přibyl později – doplní se do tabulky při prvním použití (jednou za běh) */
+let castPripravena: Promise<unknown> | null = null;
+
 export function sCache(db: Dotaz, sluzba: Geokoder): Geokoder {
   return {
     async najdi(adresa) {
+      castPripravena ??= db.query("ALTER TABLE geokod ADD COLUMN IF NOT EXISTS mestska_cast text").catch(() => undefined);
+      await castPripravena;
       const klic = klicAdresy(adresa);
       // „nenalezeno“ platí jen 24 h a jen od opravené verze (:2) – dřívější chyby klíče se uložily jako nenalezeno
-      const { rows } = await db.query<{ lat: number | null; lon: number | null; presnost: Presnost; zdroj: string; cerstve: boolean }>(
-        "SELECT lat, lon, presnost, zdroj, vytvoreno > now() - interval '24 hours' AS cerstve FROM geokod WHERE adresa = $1",
+      const { rows } = await db.query<{ lat: number | null; lon: number | null; presnost: Presnost; zdroj: string; cerstve: boolean; mestska_cast: string | null }>(
+        "SELECT lat, lon, presnost, zdroj, vytvoreno > now() - interval '24 hours' AS cerstve, mestska_cast FROM geokod WHERE adresa = $1",
         [klic],
       );
       const r = rows[0];
-      if (r && r.lat !== null && r.lon !== null) return { bod: { lat: r.lat, lon: r.lon }, presnost: r.presnost, zdroj: r.zdroj };
+      // u adres z Googlu bez zjištěné městské části (uložené dřív) se jednou zeptáme znovu
+      const doplnitCast = r && r.lat !== null && r.zdroj === "google" && r.mestska_cast === null;
+      if (r && r.lat !== null && r.lon !== null && !doplnitCast) {
+        return { bod: { lat: r.lat, lon: r.lon }, presnost: r.presnost, zdroj: r.zdroj, cast: r.mestska_cast || null };
+      }
       if (r && r.cerstve && r.zdroj.endsWith(":2")) return { bod: null, presnost: r.presnost, zdroj: r.zdroj.slice(0, -2) };
       const v = await sluzba.najdi(adresa);
       await db.query(
-        `INSERT INTO geokod (adresa, lat, lon, presnost, zdroj) VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT (adresa) DO UPDATE SET lat = EXCLUDED.lat, lon = EXCLUDED.lon, presnost = EXCLUDED.presnost, zdroj = EXCLUDED.zdroj, vytvoreno = now()`,
-        [klic, v.bod?.lat ?? null, v.bod?.lon ?? null, v.presnost, v.bod ? v.zdroj : `${v.zdroj}:2`],
+        `INSERT INTO geokod (adresa, lat, lon, presnost, zdroj, mestska_cast) VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (adresa) DO UPDATE SET lat = EXCLUDED.lat, lon = EXCLUDED.lon, presnost = EXCLUDED.presnost, zdroj = EXCLUDED.zdroj,
+           mestska_cast = EXCLUDED.mestska_cast, vytvoreno = now()`,
+        [klic, v.bod?.lat ?? null, v.bod?.lon ?? null, v.presnost, v.bod ? v.zdroj : `${v.zdroj}:2`, v.cast ?? ""],
       );
       return v;
     },

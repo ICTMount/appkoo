@@ -1,6 +1,7 @@
 // Plánování termínu z webu: kontext z databáze, údaje z formuláře, zápis do kalendáře a evidence.
 
 import { nactiCiselnik } from "../db/ciselniky.js";
+import { prahaZPsc, type Geokoder } from "../plan/geokod.js";
 import type { Dotaz } from "../db/db.js";
 import { ts } from "../db/db.js";
 import type { UdajeHovoru } from "../gcal/udalost.js";
@@ -123,4 +124,28 @@ export function presunZParametru(p: URLSearchParams): { pk: string; pe: string; 
 
 export async function smazUdalost(db: Dotaz, kalendar: string, eventId: string) {
   await db.query("DELETE FROM gcal_udalost WHERE kalendar = $1 AND event_id = $2", [kalendar, eventId]);
+}
+
+/**
+ * Městské části k adresám na stránce („Praha 4 – Krč“): z geokódování (cache v DB), jinak „Praha N“ podle PSČ.
+ * Chyba služby stránku nezastaví – adresa jen zůstane bez části.
+ */
+export async function mestskeCasti(geokoder: Geokoder | null, adresy: (string | undefined | null)[]): Promise<Map<string, string>> {
+  const vysledek = new Map<string, string>();
+  const fronta = [...new Set(adresy.filter((a): a is string => !!a && a.trim().length > 2))];
+  await Promise.all(
+    Array.from({ length: Math.min(8, fronta.length) }, async () => {
+      for (let a = fronta.shift(); a !== undefined; a = fronta.shift()) {
+        let cast: string | null | undefined = null;
+        try {
+          cast = geokoder ? (await geokoder.najdi(a)).cast : null;
+        } catch {
+          cast = null;
+        }
+        const c = cast || prahaZPsc(a);
+        if (c) vysledek.set(a, c);
+      }
+    }),
+  );
+  return vysledek;
 }

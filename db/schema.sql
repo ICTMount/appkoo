@@ -128,7 +128,8 @@ CREATE TABLE geokod (
   lon        double precision,
   presnost   text NOT NULL,                  -- 'adresa' | 'ulice' | 'obec' | 'nenalezeno'
   zdroj      text NOT NULL,                  -- 'google' | 'mapy.com' | 'rucne'
-  vytvoreno  timestamptz NOT NULL DEFAULT now()
+  vytvoreno  timestamptz NOT NULL DEFAULT now(),
+  mestska_cast text                          -- „Praha 4 – Krč“; '' = služba ji nevrátila, NULL = zatím nezjišťováno
 );
 
 -- Události v kalendářích techniků, které vytvořila / spáruje aplikace

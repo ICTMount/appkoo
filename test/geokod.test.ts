@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { googleGeokoder, klicAdresy, sCache, variantyAdresy } from "../src/plan/geokod.js";
+import { castZGoogle, googleGeokoder, klicAdresy, prahaZPsc, sCache, variantyAdresy } from "../src/plan/geokod.js";
 
 describe("geokódování", () => {
   it("Google: přesnost podle typu výsledku, nenalezeno bez chyby", async () => {
@@ -20,6 +20,21 @@ describe("geokódování", () => {
     // odmítnutý klíč není „nenalezeno“ – musí skončit chybou (a neuložit se do cache)
     const odmitnuto = googleGeokoder("SPATNY", (async () => new Response(JSON.stringify({ status: "REQUEST_DENIED", error_message: "API key not authorized", results: [] }))) as unknown as typeof fetch);
     await expect(odmitnuto.najdi("Moravská 1553/52, Praha")).rejects.toThrow(/REQUEST_DENIED.*GOOGLE_MAPS_API_KEY/);
+  });
+
+  it("městská část: Praha 4 – Krč z odpovědi Google, jinak Praha N podle PSČ", () => {
+    expect(castZGoogle([
+      { long_name: "991", types: ["premise"] },
+      { long_name: "Krč", types: ["neighborhood", "political"] },
+      { long_name: "Praha 4", types: ["political", "sublocality", "sublocality_level_1"] },
+      { long_name: "Praha", types: ["locality", "political"] },
+    ])).toBe("Praha 4 – Krč");
+    expect(castZGoogle([{ long_name: "Zelené Předměstí", types: ["neighborhood"] }, { long_name: "Pardubice", types: ["locality"] }])).toBe("Pardubice – Zelené Předměstí");
+    expect(castZGoogle([{ long_name: "Příbram", types: ["locality"] }])).toBeNull();
+    expect(prahaZPsc("Praha, Krčská 991/63, 14000")).toBe("Praha 4");
+    expect(prahaZPsc("Praha, Moravská 1553/52, 120 00")).toBe("Praha 2");
+    expect(prahaZPsc("Praha, Bečovská 1, 10400")).toBe("Praha 10");
+    expect(prahaZPsc("Beroun, Švermova 1381/22, 26601")).toBeNull();
   });
 
   it("varianty adresy z MWF: český tvar, bez čísla orientačního, nakonec obec", async () => {
