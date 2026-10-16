@@ -129,7 +129,8 @@ function posli(res: ServerResponse, kod: number, html: string) {
     "cache-control": "no-store",
     "x-content-type-options": "nosniff",
     "referrer-policy": "same-origin",
-    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+    // mapa adresy: jen vložená Google mapa (iframe), jinak nic z cizích domén
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-src https://www.google.com; form-action 'self'; frame-ancestors 'none'",
   });
   res.end(html);
 }

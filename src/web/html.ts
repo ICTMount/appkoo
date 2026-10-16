@@ -108,6 +108,8 @@ h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid
 .ud{font-size:12px;padding:4px 0;border-top:1px solid var(--line)}.ud:first-of-type{border-top:0}.ud .cas{color:var(--muted);margin-right:4px}
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
 a.volny.vyb{outline:2px solid var(--accent)}@media (prefers-color-scheme:dark){a.volny{background:#173322;color:#a5d6a7}}
+iframe.mapa{width:100%;height:220px;border:1px solid var(--line);border-radius:6px;margin:8px 0}
+table.male{font-size:12px}table.male th,table.male td{padding:3px 6px}details summary{cursor:pointer;margin-top:6px}
 .uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
 `;
 
@@ -186,11 +188,39 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
     )
     .join("");
 
-  const historie = d.historie
-    .map(
-      (h) => `<tr><td class="nowrap">${esc(dt(h.export_at))}</td><td>${esc(h.stav_mwf)}</td><td>${esc(h.parkovani ?? "")}</td><td>${esc(h.vysledek ?? "")}</td><td>${esc(dt(h.termin_od))}</td><td>${esc(h.technik ?? "")}</td></tr>`,
-    )
-    .join("");
+  // SLA jako konkrétní čas: čas exportu + „Do splnění“ z MWF
+  const sla = z.doSplneniMin !== null && stav.posledniExport ? new Date(stav.posledniExport.getTime() + z.doSplneniMin * 60_000) : null;
+  const slaText = (() => {
+    if (!sla) return "";
+    const h = Math.round((sla.getTime() - now.getTime()) / 3_600_000);
+    const kdy = `${denTydne(sla)} ${dt(sla)}`;
+    return h < 0
+      ? `<b class="c-cerv">${esc(kdy)} · po SLA ${esc(String(-h))} h</b>`
+      : `<b class="${h <= 24 ? "c-oranz" : ""}">${esc(kdy)}</b> · zbývá ${esc(h >= 48 ? `${Math.round(h / 24)} dní` : `${h} h`)}`;
+  })();
+
+  const adresa = [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
+  const mapa = adresa
+    ? `<div class="card"><h2>Adresa a mapa</h2><div>${esc(adresa)}</div>
+<iframe class="mapa" title="Mapa" loading="lazy" referrerpolicy="no-referrer" src="https://www.google.com/maps?q=${esc(encodeURIComponent(adresa))}&amp;z=15&amp;output=embed"></iframe>
+<div><a href="https://www.google.com/maps/search/?api=1&amp;query=${esc(encodeURIComponent(adresa))}" target="_blank" rel="noopener">Google Mapy</a> · <a href="https://mapy.cz/zakladni?q=${esc(encodeURIComponent(adresa))}" target="_blank" rel="noopener">Mapy.cz</a></div></div>`
+    : "";
+
+  const POSLEDNI = 5;
+  const radkyHistorie = (rows: typeof d.historie) =>
+    rows
+      .map(
+        (h) => `<tr><td class="nowrap">${esc(dt(h.export_at))}</td><td>${esc(h.stav_mwf)}</td><td>${esc(h.parkovani ?? "")}</td><td>${esc(h.vysledek ?? "")}</td><td>${esc(dt(h.termin_od))}</td><td>${esc(h.technik ?? "")}</td></tr>`,
+      )
+      .join("");
+  const hlavicka = `<thead><tr><th>Export</th><th>Stav</th><th>Parkování</th><th>Výsledek</th><th>Termín</th><th>Zdroj</th></tr></thead>`;
+  const historieHtml = d.historie.length
+    ? `<table class="male">${hlavicka}<tbody>${radkyHistorie(d.historie.slice(0, POSLEDNI))}</tbody></table>${
+        d.historie.length > POSLEDNI
+          ? `<details><summary class="muted">všech ${d.historie.length} změn</summary><table class="male">${hlavicka}<tbody>${radkyHistorie(d.historie.slice(POSLEDNI))}</tbody></table></details>`
+          : ""
+      }`
+    : `<span class="muted">bez historie</span>`;
 
   const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${bezRovna(z.idS7) ? ` · S7 ${esc(bezRovna(z.idS7))}` : ""} · aktivita ${esc(z.idAktivity)}</small></h1>
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
@@ -198,25 +228,33 @@ ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená $
 <div class="card"><h2>Zákazník</h2><dl>
 ${radek("Jméno", esc(z.zakaznik))}
 ${radek("Telefon", z.telefony.map((t) => `<a href="tel:${esc(t.replace(/\s/g, ""))}">${esc(t)}</a>`).join(", "))}
-${radek("Adresa", esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ")))}
+${radek("Adresa", esc(adresa))}
 ${radek("Subregión", esc(z.subregion))}
 ${radek("Balík / produkt", esc([z.balik, z.produkt].filter(Boolean).join(" · ")))}
 </dl></div>
 <div class="card"><h2>Zakázka</h2><dl>
-${radek("Vlastník infrastruktury", infraStitek(z.infrastruktura))}
-${radek("Typ", esc(`${z.typAktivity}${z.predobjednavka ? " · předobjednávka" : ""}`))}
-${radek("Priorita", `<span class="prio ${d.priorita}">${d.priorita}</span> ${esc(d.duvod)}`)}
 ${radek("Stav MWF", esc(z.stavMwf))}
 ${radek("Zdroj", esc(z.technik))}
 ${radek("Přiděleno", esc(dt(z.prideleno)))}
+${radek("Výsledek dojednávání", esc(z.vysledek ?? ""))}
+${radek("SLA do", slaText)}
 ${radek("Termín", esc(z.termin ? `${dt(z.termin.od)} – ${fmtTime(z.termin.do)}` : ""))}
 ${radek("Parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniNestandardni && `nestandardní: ${z.parkovaniNestandardni}`].filter(Boolean).join(" · ")))}
-${radek("Výsledek dojednávání", esc(z.vysledek ?? ""))}
+${radek("Vlastník infrastruktury", infraStitek(z.infrastruktura))}
+${radek("Typ", esc(`${z.typAktivity}${z.predobjednavka ? " · předobjednávka" : ""}`))}
+${radek("Priorita", `<span class="prio ${d.priorita}">${d.priorita}</span> ${esc(d.duvod)}`)}
 ${radek("Preferovaný datum", esc(den(z.preferovanyDatum)))}
 ${radek("RFS", esc(den(z.rfs)))}
-${radek("Do splnění SLA", z.doSplneniMin !== null ? esc(`${Math.round(z.doSplneniMin / 60)} h (k času exportu)`) : "")}
 ${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
 </dl></div>
+${mapa}
+</div>
+${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity se stejným O-ID</h2>${d.souvisejici
+    .map((s) => `<div><a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> · ${esc(s.typ_aktivity)} · ${esc(s.stav_mwf)}${s.uzavreno ? " · uzavřeno" : ""}</div>`)
+    .join("")}</div>` : ""}
+<div class="card scroll" style="margin-top:12px"><h2>Poznámka MWF (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
+${sekceZdroju(zdroje)}
+<div class="grid" style="margin-top:12px">
 <div class="card"><h2>Kontaktování</h2><dl>
 ${radek("Stav", esc(stavKontaktu(d, now)))}
 ${radek("Další kontakt", esc(denIso(d.dalsiKontakt)))}
@@ -225,15 +263,8 @@ ${radek("SMS", esc(`odesláno ${d.plan.sms.odeslano}${d.plan.sms.doporucena ? " 
 ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" : "nedovoláno"}${p.sms ? " + SMS" : ""}`).join("; ")))}
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div>
+<div class="card"><h2>Historie změn mezi exporty</h2>${historieHtml}</div>
 </div>
-${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity se stejným O-ID</h2>${d.souvisejici
-    .map((s) => `<div><a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> · ${esc(s.typ_aktivity)} · ${esc(s.stav_mwf)}${s.uzavreno ? " · uzavřeno" : ""}</div>`)
-    .join("")}</div>` : ""}
-<div class="grid" style="margin-top:12px">
-<div class="card scroll"><h2>Poznámka MWF (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
-<div class="card scroll"><h2>Historie změn mezi exporty</h2><div class="tbl" style="border:0"><table><thead><tr><th>Export</th><th>Stav</th><th>Parkování</th><th>Výsledek</th><th>Termín</th><th>Zdroj</th></tr></thead><tbody>${historie || `<tr><td colspan="6" class="muted">bez historie</td></tr>`}</tbody></table></div></div>
-</div>
-${sekceZdroju(zdroje)}
 <h2 class="sekce" id="planovani">Kam naplánovat</h2>
 ${sekcePlanovani(d, plan)}`;
 
