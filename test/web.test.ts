@@ -146,7 +146,7 @@ describe("webový server", () => {
     const h1 = await a1.text();
     expect(h1).toContain("Adresa a mapa");
     expect(h1).toContain("P3: Typ balíka");
-    expect(h1).toContain("https://www.google.com/maps?q=Pr%C3%A1va%201%2C%20Praha");
+    expect(h1).toContain("https://www.google.com/maps?q=Prav%C3%A1%201%2C%20Praha");
     expect(h1.indexOf("Poznámka (nejnovější")).toBeLessThan(h1.indexOf("Kontaktování"));
     const hledani = await get("/?q=O-8550000003", "davidh@ictmount.com");
     expect(hledani.status).toBe(302);
