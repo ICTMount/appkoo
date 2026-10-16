@@ -82,6 +82,11 @@ Dva pohledy (záložky nahoře), pod nimi hledání zakázky přes celou šířk
 - `/zakazka/<ID>/zapis` formulář podle call scriptu → přepis slotu VOLNY na zakázku (patička SHEET2CAL zůstane,
   obsazený slot se nepřepíše) → evidence v `gcal_udalost` → text „Zákazník: … (datum, čas)“ pro MWF.
   Zápis zapíná `ZAPIS_KALENDARE=ano` a `ZAPIS_TECHNICI` (jména čárkami nebo `vsichni`).
+- **Uživatelé a role** (číselník Uživatelé): správce = Konfigurace, koordinátorka = plánování a zápis, jen čtení.
+  Správci ze `SPRAVCI` (výchozí davidh@ictmount.com) mají přístup vždy. Dokud je číselník prázdný, platí `POVOLENI_UZIVATELE`.
+  IAP pouští celou doménu (`domain:ictmount.com`), o přístupu rozhoduje aplikace.
+- **Konfigurace** (`/konfigurace`, jen správce): přehled číselníků, obsah, stažení CSV, nahrání CSV → náhled změn a chyb
+  → uložení; historie kdo / kdy / co. Nastavení plánování (limit km, zaplnění dne, SLA, okno, horizont) čte plánovač.
 - Číselníky (technici, blacklist lokalit…) se nahrávají z CSV: `npm run ciselnik -- technici technici.csv --ulozit`, blacklist `npm run ciselnik -- blacklist blacklist.csv --ulozit`.
 - Přístup hlídá IAP (role *IAP-secured Web App User*) a navíc seznam `POVOLENI_UZIVATELE`
   (e-maily nebo `@doména`, čárkami). `IAP_AUDIENCE` zapne i ověření podpisu IAP.

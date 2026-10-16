@@ -7,6 +7,8 @@ import { parseCsv } from "../import/csv.js";
 import { PRAVIDLA, type NastaveniKontaktu } from "../domain/contact.js";
 import { PODMINKY, PODMINKY_ID, PRIORITY, type PodminkaId, type Priorita, type PravidloPriority } from "../domain/priorita.js";
 import { HOUR } from "../domain/time.js";
+import type { NastaveniPlanu } from "../plan/sloty.js";
+import type { NastaveniDoplneni } from "../plan/doplneni.js";
 
 export type TypSloupce = "text" | "seznam" | "cislo" | "anoNe" | "vyber";
 
@@ -24,7 +26,7 @@ export interface Sloupec {
 
 export type CiselnikId =
   | "technici" | "typyAkci" | "koordinatorky" | "regiony" | "blokovaneLokality" | "kontakty"
-  | "pravidlaPriority" | "nastaveniKontaktu";
+  | "pravidlaPriority" | "nastaveniKontaktu" | "nastaveniPlanovani";
 
 export interface Ciselnik {
   id: CiselnikId;
@@ -33,6 +35,30 @@ export interface Ciselnik {
   klic: string;
   sloupce: Sloupec[];
 }
+
+/** Role uživatelů: správce = konfigurace a uživatelé; koordinátorka = plánování a zápis; jen čtení = bez zápisu */
+export const ROLE_UZIVATELU = ["správce", "koordinátorka", "jen čtení"] as const;
+
+/** Parametry plánování (číselník Nastavení plánování) – výchozí hodnoty odpovídají dohodě z fáze 1 */
+export const PARAMETRY_PLANOVANI = {
+  maxZajizdkaKm: { vychozi: 75, popis: "Max. zajížďka pro jednu zakázku (km)" },
+  penalizacePrazdnyDenKm: { vychozi: 100, popis: "Penalizace za otevření prázdného dne technika (km) – „zaplnit den“" },
+  bonusZaZakazkuVeDniKm: { vychozi: 6, popis: "Zvýhodnění za každou zakázku, kterou už technik ten den má (km)" },
+  maxZakazekProBonus: { vychozi: 4, popis: "Zvýhodnění se počítá nejvýš pro tolik zakázek" },
+  penalizacePoSlaKm: { vychozi: 80, popis: "Penalizace slotu po termínu SLA (km)" },
+  preferovaneOdHod: { vychozi: 10, popis: "Preferované okno termínů od (hodina)" },
+  preferovaneDoHod: { vychozi: 14, popis: "Preferované okno termínů do (hodina)" },
+  penalizaceMimoPreferovaneKm: { vychozi: 8, popis: "Penalizace slotu mimo preferované okno (km)" },
+  dniNabidky: { vychozi: 10, popis: "Kolik pracovních dní dopředu hledat volné sloty" },
+  delkaPraceMin: { vychozi: 110, popis: "Výchozí délka práce u zakázky (min)" },
+  bonusSlaProslo: { vychozi: 60, popis: "Doplnění slotu: zvýhodnění zakázky po SLA (km)" },
+  bonusSlaDo48h: { vychozi: 40, popis: "Doplnění slotu: zvýhodnění, SLA do 48 h (km)" },
+  bonusSlaDo5dni: { vychozi: 20, popis: "Doplnění slotu: zvýhodnění, SLA do 5 dní (km)" },
+  bonusPrioritaP1: { vychozi: 20, popis: "Doplnění slotu: zvýhodnění priority P1 (km)" },
+  bonusPrioritaP2: { vychozi: 10, popis: "Doplnění slotu: zvýhodnění priority P2 (km)" },
+  flexDni: { vychozi: 21, popis: "Doplnění slotu: jak daleko dopředu hledat zakázky „flex“ k přesunu (dní)" },
+} as const;
+export type ParametrPlanovani = keyof typeof PARAMETRY_PLANOVANI;
 
 export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
   technici: {
@@ -64,17 +90,19 @@ export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
       { klic: "routing", nazev: "Nedokončené na", typ: "text" },
     ],
   },
+  // Uživatelé aplikace = koordinátorky a vedoucí. Kdo tu není (a není ve SPRAVCI), do aplikace nesmí.
   koordinatorky: {
     id: "koordinatorky",
-    nazev: "Koordinátorky",
+    nazev: "Uživatelé",
     klic: "email",
     sloupce: [
       { klic: "email", nazev: "E-mail", typ: "text", povinny: true },
       { klic: "jmeno", nazev: "Jméno", typ: "text", povinny: true },
       { klic: "inicialy", nazev: "Iniciály", typ: "text" },
-      { klic: "role", nazev: "Role", typ: "vyber", hodnoty: ["vedoucí", "operátorka"], povinny: true },
+      { klic: "role", nazev: "Role", typ: "vyber", hodnoty: ROLE_UZIVATELU, povinny: true },
       { klic: "regiony", nazev: "Regiony", typ: "seznam", odkaz: "regiony" },
       { klic: "routing", nazev: "Nedokončené", typ: "vyber", hodnoty: ["", "FTTH Praha", "FTTH mimo Prahu", "PIV / SAT"] },
+      { klic: "aktivni", nazev: "Aktivní", typ: "anoNe" },
     ],
   },
   regiony: {
@@ -120,6 +148,16 @@ export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
         "pokusuDenne", "prahObjemu", "odstupPokusuHodin", "dnu", "volaniOd", "volaniDo", "odstupSmsHodin", "minSms", "lhutaZakDni",
       ], povinny: true },
       { klic: "hodnota", nazev: "Hodnota", typ: "text", povinny: true },
+      { klic: "poznamka", nazev: "Poznámka", typ: "text" },
+    ],
+  },
+  nastaveniPlanovani: {
+    id: "nastaveniPlanovani",
+    nazev: "Nastavení plánování",
+    klic: "parametr",
+    sloupce: [
+      { klic: "parametr", nazev: "Parametr", typ: "vyber", hodnoty: Object.keys(PARAMETRY_PLANOVANI), povinny: true },
+      { klic: "hodnota", nazev: "Hodnota", typ: "cislo", povinny: true },
       { klic: "poznamka", nazev: "Poznámka", typ: "text" },
     ],
   },
@@ -356,5 +394,58 @@ export function nastaveniKontaktu(polozky: Polozka[], kVolaniNaKoordinatorku = 0
     },
     lhutaZakDni: cislo("lhutaZakDni", 5),
     upozorneni,
+  };
+}
+
+export const VYCHOZI_NASTAVENI_PLANOVANI: Polozka[] = Object.entries(PARAMETRY_PLANOVANI).map(([parametr, p]) => ({
+  parametr,
+  hodnota: p.vychozi,
+  poznamka: p.popis,
+}));
+
+/** Výchozí obsah číselníku, když je v aplikaci prázdný (pro stažení šablony CSV) */
+export const VYCHOZI_POLOZKY: Partial<Record<CiselnikId, Polozka[]>> = {
+  nastaveniKontaktu: VYCHOZI_NASTAVENI_KONTAKTU,
+  nastaveniPlanovani: VYCHOZI_NASTAVENI_PLANOVANI,
+};
+
+export interface NastaveniPlanovaniApp {
+  plan: Partial<NastaveniPlanu>;
+  doplneni: Partial<NastaveniDoplneni>;
+  dniNabidky: number;
+  delkaPraceMin: number;
+  flexDni: number;
+}
+
+/** Číselník Nastavení plánování → nastavení pro nabídku termínů (režim A) a doplnění slotu (režim B) */
+export function nastaveniPlanovani(polozky: Polozka[]): NastaveniPlanovaniApp {
+  const v = new Map<string, number>();
+  for (const p of polozky) {
+    const n = typeof p.hodnota === "number" ? p.hodnota : Number(String(p.hodnota ?? "").replace(",", "."));
+    if (String(p.parametr) in PARAMETRY_PLANOVANI && Number.isFinite(n)) v.set(String(p.parametr), n);
+  }
+  const h = (k: ParametrPlanovani) => v.get(k) ?? PARAMETRY_PLANOVANI[k].vychozi;
+  const delka = Math.max(15, h("delkaPraceMin"));
+  return {
+    plan: {
+      maxZajizdkaKm: h("maxZajizdkaKm"),
+      penalizacePrazdnyDenKm: h("penalizacePrazdnyDenKm"),
+      bonusZaZakazkuVeDniKm: h("bonusZaZakazkuVeDniKm"),
+      maxZakazekProBonus: h("maxZakazekProBonus"),
+      penalizacePoSlaKm: h("penalizacePoSlaKm"),
+      preferovaneOkno: { od: h("preferovaneOdHod") * 60, do: h("preferovaneDoHod") * 60 },
+      penalizaceMimoPreferovaneKm: h("penalizaceMimoPreferovaneKm"),
+    },
+    doplneni: {
+      maxZajizdkaKm: h("maxZajizdkaKm"),
+      bonusSlaProslo: h("bonusSlaProslo"),
+      bonusSlaDo48h: h("bonusSlaDo48h"),
+      bonusSlaDo5dni: h("bonusSlaDo5dni"),
+      bonusPriorita: { P1: h("bonusPrioritaP1"), P2: h("bonusPrioritaP2"), P3: 0, P0: 0 },
+      trvaniMin: delka,
+    },
+    dniNabidky: Math.min(30, Math.max(1, Math.round(h("dniNabidky")))),
+    delkaPraceMin: delka,
+    flexDni: Math.min(60, Math.max(1, Math.round(h("flexDni")))),
   };
 }

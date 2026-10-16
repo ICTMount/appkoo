@@ -10,7 +10,8 @@
 // Proměnné prostředí:
 //   DATABASE_URL         připojení k Cloud SQL (secret)
 //   PORT                 nastavuje Cloud Run (výchozí 8080)
-//   POVOLENI_UZIVATELE   e-maily nebo domény (@ictmount.com), čárkami; výchozí @ictmount.com
+//   SPRAVCI              e-maily správců (vždy přístup + Konfigurace), čárkami; výchozí davidh@ictmount.com
+//   POVOLENI_UZIVATELE   přechodně, dokud je číselník Uživatelé prázdný: e-maily nebo domény (@ictmount.com)
 //   IAP_AUDIENCE         volitelně: /projects/<číslo>/locations/<region>/services/<služba> – ověření podpisu IAP
 //   DEV_USER             jen pro lokální vývoj: e-mail, pod kterým se jde bez IAP
 //   ZAPIS_KALENDARE      „ano“ = zápis termínů do kalendářů techniků zapnutý (jinak jen náhled nabídky)
@@ -23,7 +24,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
 import { OAuth2Client } from "google-auth-library";
-import type { Dotaz } from "../db/db.js";
+import type { Db } from "../db/db.js";
+import { CISELNIKY, nahledImportu, VYCHOZI_POLOZKY, exportCsv, type CiselnikId } from "../config/ciselniky.js";
+import { nactiCiselnik, ulozImport } from "../db/ciselniky.js";
+import { decodeExport } from "../import/csv.js";
+import { nactiHistorii, nactiPolozky, nactiPrehled, strankaCiselniku, strankaKonfigurace, strankaNahledu } from "./konfigurace.js";
+import { POPIS_ROLE, roleUzivatele, type Role } from "./uzivatele.js";
 import { pgDb } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
 import { faktaZakazky } from "../domain/priorita.js";
@@ -53,6 +59,8 @@ export interface NastaveniWebu {
   zapis?: { zapnuty: boolean; technici: string[] | "vsichni" };
   /** e-mail, kalendáře a chat (pilíř 1 – hledání ve všech zdrojích) */
   zdroje?: () => ZavislostiZdroju;
+  /** správci (e-maily) – vždy role správce, i když nejsou v číselníku Uživatelé */
+  spravci?: string[];
 }
 
 /** Formulář smí přijít jen z vlastní stránky (ochrana proti podvrženému odeslání z cizího webu) */
@@ -67,15 +75,44 @@ export function zVlastniStranky(req: IncomingMessage): boolean {
   }
 }
 
-async function ctiFormular(req: IncomingMessage, max = 64 * 1024): Promise<URLSearchParams> {
+class PrilisVelke extends Error {}
+
+async function ctiTelo(req: IncomingMessage, max: number): Promise<Buffer> {
   const casti: Buffer[] = [];
   let delka = 0;
   for await (const c of req) {
     delka += (c as Buffer).length;
-    if (delka > max) throw new Error("Formulář je příliš velký.");
+    if (delka > max) throw new PrilisVelke("Formulář je příliš velký.");
     casti.push(c as Buffer);
   }
-  return new URLSearchParams(Buffer.concat(casti).toString("utf8"));
+  return Buffer.concat(casti);
+}
+
+async function ctiFormular(req: IncomingMessage, max = 64 * 1024): Promise<URLSearchParams> {
+  return new URLSearchParams((await ctiTelo(req, max)).toString("utf8"));
+}
+
+/** multipart/form-data (nahrání souboru): pole → { obsah, soubor } */
+export function rozlozMultipart(telo: Buffer, contentType: string): Map<string, { obsah: Buffer; soubor?: string }> {
+  const vysledek = new Map<string, { obsah: Buffer; soubor?: string }>();
+  const hranice = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  if (!hranice) return vysledek;
+  const oddelovac = Buffer.from(`--${hranice[1] ?? hranice[2]}`);
+  let pozice = telo.indexOf(oddelovac);
+  while (pozice >= 0) {
+    const dalsi = telo.indexOf(oddelovac, pozice + oddelovac.length);
+    if (dalsi < 0) break;
+    const cast = telo.subarray(pozice + oddelovac.length + 2, dalsi - 2); // bez \r\n na začátku a konci
+    const konecHlavicek = cast.indexOf("\r\n\r\n");
+    if (konecHlavicek > 0) {
+      const hlavicky = cast.subarray(0, konecHlavicek).toString("utf8");
+      const jmeno = hlavicky.match(/name="([^"]*)"/i)?.[1];
+      const soubor = hlavicky.match(/filename="([^"]*)"/i)?.[1];
+      if (jmeno) vysledek.set(jmeno, { obsah: cast.subarray(konecHlavicek + 4), ...(soubor !== undefined ? { soubor } : {}) });
+    }
+    pozice = dalsi;
+  }
+  return vysledek;
 }
 
 /** Vybraný slot z parametrů (k = kalendář, e = událost VOLNY, t = technik, od/do) */
@@ -125,6 +162,8 @@ async function uzivatel(req: IncomingMessage, n: NastaveniWebu): Promise<string 
 
 /** Vzhled zvolený přepínačem (cookie „tema“): light / dark; bez cookie podle systému */
 const temaOdpovedi = new WeakMap<ServerResponse, "light" | "dark">();
+/** Role přihlášeného uživatele – do lišty se doplní role a (správci) záložka Konfigurace */
+const roleOdpovedi = new WeakMap<ServerResponse, Role>();
 export function temaZCookie(cookie: string | undefined): "light" | "dark" | null {
   const v = (cookie ?? "").match(/(?:^|;\s*)tema=(light|dark)(?:;|$)/)?.[1];
   return v === "light" || v === "dark" ? v : null;
@@ -133,6 +172,10 @@ export function temaZCookie(cookie: string | undefined): "light" | "dark" | null
 function posli(res: ServerResponse, kod: number, html: string) {
   const tema = temaOdpovedi.get(res);
   if (tema) html = html.replace('<html lang="cs">', `<html lang="cs" data-theme="${tema}">`);
+  const role = roleOdpovedi.get(res);
+  html = html
+    .replace(/<!--konfigurace:(on|off)-->/, (_, on) => (role === "spravce" ? `<a href="/konfigurace" class="${on === "on" ? "on" : ""}">⚙ Konfigurace</a>` : ""))
+    .replace("<!--role-->", role ? ` · ${POPIS_ROLE[role]}` : "");
   res.writeHead(kod, {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
@@ -144,7 +187,7 @@ function posli(res: ServerResponse, kod: number, html: string) {
   res.end(html);
 }
 
-export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
+export function vytvorHandler(db: Db, n: NastaveniWebu) {
   const ted = n.ted ?? (() => tedPraha());
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -156,12 +199,14 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
         res.end("ok");
         return;
       }
-      const zapisCesta = /^\/zakazka\/[^/]+\/zapis$/.test(url.pathname);
-      if (req.method !== "GET" && !(req.method === "POST" && zapisCesta)) return posli(res, 405, strankaChyby(405, "Nepovolená operace."));
+      const postCesta = /^\/zakazka\/[^/]+\/zapis$/.test(url.pathname) || /^\/konfigurace\/[A-Za-z]+\/(nahled|ulozit)$/.test(url.pathname);
+      if (req.method !== "GET" && !(req.method === "POST" && postCesta)) return posli(res, 405, strankaChyby(405, "Nepovolená operace."));
 
       const email = await uzivatel(req, n);
       if (!email) return posli(res, 401, strankaChyby(401, "Nepřihlášený uživatel – aplikace se otevírá přes přihlášení Google."));
-      if (!povolenUzivatel(email, n.povoleni)) return posli(res, 403, strankaChyby(403, `Účet ${email} nemá do aplikace přístup.`));
+      const role = await roleUzivatele(db, email, n.spravci ?? [], (e) => povolenUzivatel(e, n.povoleni));
+      if (!role) return posli(res, 403, strankaChyby(403, `Účet ${email} nemá do aplikace přístup – požádejte správce o přidání do Konfigurace → Uživatelé.`));
+      roleOdpovedi.set(res, role);
 
       // přepínač světlý / tmavý / podle systému – uloží volbu do cookie a vrátí se na stránku, odkud přišel
       if (url.pathname === "/tema") {
@@ -186,7 +231,7 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
         res.writeHead(302, { location: kam });
         res.end();
       };
-      const zapis = n.zapis ?? { zapnuty: false, technici: [] };
+      const zapis = role === "cteni" ? { zapnuty: false, technici: [] as string[] } : (n.zapis ?? { zapnuty: false, technici: [] });
       const smiTechnik = (t: string) => smiZapisovat(t, zapis.technici);
 
       // ---------- Plánovat zakázku: hledání → zakázka ----------
@@ -224,7 +269,7 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
         const puvodni = presun && kontext.technici.find((t) => t.jmeno === presun.pt && t.kalendar === presun.pk);
         if (!vyb || !technik || (presun && (!puvodni || !detail.z.termin))) return posli(res, 400, strankaChyby(400, "Neplatný výběr slotu – vyberte termín znovu z nabídky."));
         const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presun });
-        const povolen = zapis.zapnuty && smiTechnik(technik.jmeno) && (!puvodni || smiTechnik(puvodni.jmeno)) && !brany.blokace.length;
+        const povolen = role !== "cteni" && zapis.zapnuty && smiTechnik(technik.jmeno) && (!puvodni || smiTechnik(puvodni.jmeno)) && !brany.blokace.length;
         if (req.method === "GET") return posli(res, 200, strankaZapisu(detail, vyb, brany, povolen, stav, email));
 
         if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
@@ -276,7 +321,12 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
             ? (async (): Promise<Nabidka> => {
                 try {
                   const sla = slaKonec(detail.z, stav.posledniExport ?? now);
-                  return await nabidniProZakazku(detail.z, detail.priorita, sla, kontext.technici, await planovac(), now, { adresyZMwf: kontext.adresyZMwf });
+                  return await nabidniProZakazku(detail.z, detail.priorita, sla, kontext.technici, await planovac(), now, {
+                    adresyZMwf: kontext.adresyZMwf,
+                    nastaveni: kontext.nastaveni.plan,
+                    dni: kontext.nastaveni.dniNabidky,
+                    trvaniMin: kontext.nastaveni.delkaPraceMin,
+                  });
                 } catch (e) {
                   console.log(JSON.stringify({ severity: "ERROR", message: `Nabídka termínů: ${e instanceof Error ? e.message : String(e)}`, objednavka: detail.z.idObjednavky }));
                   return { moznosti: [], nedostupne: [], bezZakladny: [], bezPolohy: 0, technikuCelkem: 0, chyba: `Nabídku se nepodařilo spočítat: ${e instanceof Error ? e.message : String(e)}` };
@@ -319,12 +369,80 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
           if (vyb && vyb.t === technik.jmeno && vyb.k === technik.kalendar) {
             s.slot = { technik, eventId: vyb.e, od: vyb.od, do: vyb.do };
             const kandidati = await kandidatiKDoplneni(db, now, kontext.blokovane, stav.posledniExport ?? now);
-            s.navrhy = await navrhyProSlot(s.slot, kandidati, kontext.technici, zav, { adresyZMwf: kontext.adresyZMwf });
+            s.navrhy = await navrhyProSlot(s.slot, kandidati, kontext.technici, zav, {
+              adresyZMwf: kontext.adresyZMwf,
+              nastaveni: kontext.nastaveni.doplneni,
+              flexDni: kontext.nastaveni.flexDni,
+            });
           }
         } else {
           s.prehled = await prehledDne(zav.api, kontext.technici, den);
         }
         return posli(res, 200, strankaTechnika(s, stav, email));
+      }
+
+      // ---------- Konfigurace (jen správce) ----------
+      if (url.pathname === "/konfigurace" || url.pathname.startsWith("/konfigurace/")) {
+        if (role !== "spravce") return posli(res, 403, strankaChyby(403, "Konfiguraci může měnit jen správce."));
+        if (url.pathname === "/konfigurace") return posli(res, 200, strankaKonfigurace(await nactiPrehled(db), stav, email));
+        const mk = url.pathname.match(/^\/konfigurace\/([A-Za-z]+)(?:\/(csv|nahled|ulozit))?$/);
+        const id = mk?.[1] as CiselnikId | undefined;
+        if (!mk || !id || !(id in CISELNIKY)) return posli(res, 404, strankaChyby(404, "Číselník neexistuje."));
+        const akce = mk[2];
+        if (!akce) {
+          const p = url.searchParams;
+          const zprava = p.has("ulozeno") ? `Uloženo: přidáno ${p.get("pridano") ?? 0}, změněno ${p.get("zmeneno") ?? 0}, deaktivováno ${p.get("odebrano") ?? 0}.` : null;
+          return posli(res, 200, strankaCiselniku(id, await nactiPolozky(db, id), await nactiHistorii(db, id), zprava, stav, email));
+        }
+        if (akce === "csv") {
+          const polozky = await nactiCiselnik(db, id, false);
+          const csv = exportCsv(id, polozky.length ? polozky : (VYCHOZI_POLOZKY[id] ?? []));
+          res.writeHead(200, {
+            "content-type": "text/csv; charset=utf-8",
+            "content-disposition": `attachment; filename="${id}.csv"`,
+            "cache-control": "no-store",
+            "x-content-type-options": "nosniff",
+          });
+          res.end(csv);
+          return;
+        }
+        if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
+        const ostatni = { regiony: await nactiCiselnik(db, "regiony"), typyAkci: await nactiCiselnik(db, "typyAkci") };
+        const nahled = async (text: string) => nahledImportu(id, text, await nactiCiselnik(db, id, false), Object.fromEntries(Object.entries(ostatni).filter(([, v]) => v.length)));
+        try {
+          if (akce === "nahled") {
+            const ct = String(req.headers["content-type"] ?? "");
+            let obsah: Buffer | undefined;
+            let soubor = "CSV";
+            let nahradit = false;
+            if (ct.startsWith("multipart/form-data")) {
+              const pole = rozlozMultipart(await ctiTelo(req, 2 * 1024 * 1024), ct);
+              obsah = pole.get("soubor")?.obsah;
+              soubor = pole.get("soubor")?.soubor || soubor;
+              nahradit = pole.get("nahradit")?.obsah.toString("utf8") === "ano";
+            } else {
+              const f = await ctiFormular(req, 2 * 1024 * 1024);
+              obsah = f.get("csv") !== null ? Buffer.from(f.get("csv")!, "utf8") : undefined;
+              nahradit = f.get("nahradit") === "ano";
+            }
+            if (!obsah?.length) return posli(res, 400, strankaChyby(400, "Vyberte soubor CSV."));
+            const text = decodeExport(obsah);
+            return posli(res, 200, strankaNahledu(id, await nahled(text), Buffer.from(text, "utf8").toString("base64"), soubor, nahradit, stav, email));
+          }
+          // ulozit: náhled se spočítá znovu nad aktuálním stavem (mezitím mohl někdo číselník změnit)
+          const f = await ctiFormular(req, 4 * 1024 * 1024);
+          const text = Buffer.from(f.get("csv") ?? "", "base64").toString("utf8");
+          const n2 = await nahled(text);
+          if (!n2.lzeUlozit) return posli(res, 422, strankaNahledu(id, n2, f.get("csv") ?? "", f.get("soubor") ?? "CSV", f.get("nahradit") === "ano", stav, email));
+          const r = await ulozImport(db, id, n2, `web: ${(f.get("soubor") ?? "CSV").slice(0, 80)}`, email, f.get("nahradit") === "ano");
+          console.log(JSON.stringify({ severity: "INFO", message: `Konfigurace: ${CISELNIKY[id].nazev} uložen`, uzivatel: email, ...r }));
+          res.writeHead(303, { location: `/konfigurace/${id}?ulozeno=1&pridano=${r.pridano}&zmeneno=${r.zmeneno}&odebrano=${r.odebrano}` });
+          res.end();
+          return;
+        } catch (e) {
+          if (e instanceof PrilisVelke) return posli(res, 413, strankaChyby(413, "Soubor je příliš velký (max. 2 MB)."));
+          throw e;
+        }
       }
 
       return posli(res, 404, strankaChyby(404, "Stránka neexistuje."));
@@ -341,6 +459,7 @@ function main() {
   const db = pgDb(env.DATABASE_URL);
   const handler = vytvorHandler(db, {
     povoleni: (env.POVOLENI_UZIVATELE ?? "@ictmount.com").split(",").map((s) => s.trim()).filter(Boolean),
+    spravci: (env.SPRAVCI ?? "davidh@ictmount.com").split(",").map((s) => s.trim()).filter(Boolean),
     overIap: env.IAP_AUDIENCE ? overovacIap(env.IAP_AUDIENCE) : undefined,
     devUser: env.DEV_USER,
     planovac: (() => {

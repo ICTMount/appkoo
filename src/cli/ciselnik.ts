@@ -12,9 +12,10 @@ import { pgDb } from "../db/db.js";
 
 async function main() {
   const [zadano, soubor, ...prepinace] = process.argv.slice(2);
-  const id = zadano === "blacklist" ? "blokovaneLokality" : zadano; // Blacklist lokalit
+  const ALIASY: Record<string, string> = { blacklist: "blokovaneLokality", uzivatele: "koordinatorky", planovani: "nastaveniPlanovani" };
+  const id = (zadano && ALIASY[zadano]) || zadano;
   if (!id || !soubor || !(id in CISELNIKY)) {
-    throw new Error(`Použití: npm run ciselnik -- <${[...Object.keys(CISELNIKY), "blacklist"].join("|")}> <soubor.csv> [--ulozit] [--nahradit]`);
+    throw new Error(`Použití: npm run ciselnik -- <${[...Object.keys(CISELNIKY), "blacklist", "uzivatele", "planovani"].join("|")}> <soubor.csv> [--ulozit] [--nahradit]`);
   }
   const db = pgDb();
   const cid = id as CiselnikId;

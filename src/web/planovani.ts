@@ -8,7 +8,7 @@ import { kontrolaBran, techniciZCiselniku, type TechnikPlanu, type ZakazkaKDopln
 import { faktaZakazky } from "../domain/priorita.js";
 import { slaKonec } from "../plan/kpi.js";
 import { nactiFrontu } from "./data.js";
-import type { Polozka } from "../config/ciselniky.js";
+import { nastaveniPlanovani, type NastaveniPlanovaniApp, type Polozka } from "../config/ciselniky.js";
 
 export interface KontextPlanovani {
   technici: TechnikPlanu[];
@@ -16,21 +16,25 @@ export interface KontextPlanovani {
   koordinatorky: Polozka[];
   /** O-číslo → úplná adresa z MWF (místo v kalendáři bývá bez obce) */
   adresyZMwf: Map<string, string>;
+  /** číselník Nastavení plánování (limity, bonusy, horizont) */
+  nastaveni: NastaveniPlanovaniApp;
 }
 
 export async function nactiKontext(db: Dotaz): Promise<KontextPlanovani> {
-  const [technici, blokovane, koordinatorky, adresy] = await Promise.all([
+  const [technici, blokovane, koordinatorky, adresy, planovani] = await Promise.all([
     nactiCiselnik(db, "technici"),
     nactiCiselnik(db, "blokovaneLokality"),
     nactiCiselnik(db, "koordinatorky"),
     db.query<{ o: string; adresa: string | null; psc: string | null }>(
       "SELECT id_objednavky_zaklad AS o, adresa, psc FROM zakazka WHERE uzavreno IS NULL AND adresa IS NOT NULL",
     ),
+    nactiCiselnik(db, "nastaveniPlanovani"),
   ]);
   return {
     technici: techniciZCiselniku(technici),
     blokovane,
     koordinatorky,
+    nastaveni: nastaveniPlanovani(planovani),
     adresyZMwf: new Map(adresy.rows.map((r) => [r.o, [r.adresa, (r.psc ?? "").replace(/^=+/, "")].filter(Boolean).join(", ")])),
   };
 }

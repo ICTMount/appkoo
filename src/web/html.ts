@@ -125,7 +125,7 @@ table.male{font-size:12px}table.male th,table.male td{padding:3px 6px}details su
 .tema{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}.tema a{padding:3px 9px;color:var(--muted);font-size:12px}.tema a:hover{text-decoration:none;background:var(--line)}:root:not([data-theme]) .tema .t-auto,:root[data-theme=light] .tema .t-light,:root[data-theme=dark] .tema .t-dark{background:var(--accent);color:#fff}
 `;
 
-export type Zalozka = "zakazka" | "technik";
+export type Zalozka = "zakazka" | "technik" | "konfigurace";
 
 /** Stáří posledního exportu MWF: do 1 h zelená, do 2 h oranžová, déle červená */
 export function cerstvost(stav: StavImportu): string {
@@ -144,8 +144,8 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulek)} – AppKoo</title><style>${CSS}</style></head><body>
 <header><div class="lista"><a class="logo" href="/">AppKoo</a>
-<nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a></nav>
-<div class="vpravo">${cerstvost(stav)}<nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav><div>${esc(uzivatel)}</div></div></div>
+<nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a><!--konfigurace:${zal === "konfigurace" ? "on" : "off"}--></nav>
+<div class="vpravo">${cerstvost(stav)}<nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav><div>${esc(uzivatel)}<!--role--></div></div></div>
 <form class="hledani" action="/" method="get"><input name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku"><button>Najít a plánovat</button></form></header>
 <main>${telo}</main></body></html>`;
 }

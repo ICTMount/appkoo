@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { nahledImportu } from "../src/config/ciselniky.js";
+import { nahledImportu, nastaveniPlanovani } from "../src/config/ciselniky.js";
 import { nactiCiselnik, ulozImport } from "../src/db/ciselniky.js";
 import type { Db } from "../src/db/db.js";
 import { faktaZakazky } from "../src/domain/priorita.js";
@@ -293,5 +293,73 @@ describe("web: nabídka a zápis termínu", () => {
     expect(w.k.patche.map((p) => p.eventId)).toEqual(["v2", "f1"]);
     expect(String(w.k.patche[0]!.requestBody.summary)).toContain("O-8560000004");
     expect(w.k.patche[1]!.requestBody).toMatchObject({ summary: "Hristov - VOLNY", colorId: "10", description: "[SHEET2CAL] K1" });
+  });
+});
+
+describe("uživatelé a Konfigurace", () => {
+  async function web(spravci: string[]) {
+    const server = createServer(vytvorHandler(db, { povoleni: ["@ictmount.com"], spravci, ted: () => TED }));
+    servery.push(server);
+    await new Promise<void>((r) => server.listen(0, r));
+    const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const hl = (email: string) => ({ "x-goog-authenticated-user-email": `accounts.google.com:${email}` });
+    return {
+      get: (c: string, email = "davidh@ictmount.com") => fetch(base + c, { headers: hl(email), redirect: "manual" }),
+      post: (c: string, body: string | FormData, email = "davidh@ictmount.com", ct?: string) =>
+        fetch(base + c, { method: "POST", headers: { ...hl(email), origin: base, ...(ct ? { "content-type": ct } : {}) }, body, redirect: "manual" }),
+    };
+  }
+
+  it("role: správce ze SPRAVCI, pak jen uživatelé z číselníku; jen čtení nezapisuje", async () => {
+    const w = await web(["davidh@ictmount.com"]);
+    // číselník Uživatelé prázdný → přechodně celá doména (koordinátorka), Konfigurace jen správce
+    expect((await w.get("/", "jana@ictmount.com")).status).toBe(200);
+    expect((await w.get("/konfigurace", "jana@ictmount.com")).status).toBe(403);
+    const uvod = await (await w.get("/")).text();
+    expect(uvod).toContain('href="/konfigurace"');
+    expect(uvod).toContain("· správce");
+
+    const csv = "E-mail;Jméno;Iniciály;Role;Aktivní\njana@ictmount.com;Jana Hadravová;JH;koordinátorka;ano\npetra@ictmount.com;Petra;PO;jen čtení;ano\nstara@ictmount.com;Stará;SS;koordinátorka;ne";
+    await ulozImport(db, "koordinatorky", nahledImportu("koordinatorky", csv, []), "test", "test");
+    expect((await w.get("/", "jana@ictmount.com")).status).toBe(200);
+    expect((await w.get("/", "cizi@ictmount.com")).status).toBe(403);
+    expect((await w.get("/", "stara@ictmount.com")).status).toBe(403);
+    expect(await (await w.get("/", "petra@ictmount.com")).text()).toContain("· jen čtení");
+    expect((await w.get("/")).status).toBe(200); // správce i bez řádku v číselníku
+  });
+
+  it("CSV: stažení, nahrání souboru → náhled → uložení s historií", async () => {
+    const w = await web(["davidh@ictmount.com"]);
+    const prehled = await (await w.get("/konfigurace")).text();
+    expect(prehled).toContain("Nastavení plánování");
+    expect(prehled).toContain("Blacklist lokalit");
+
+    const sablona = await w.get("/konfigurace/nastaveniPlanovani/csv");
+    expect(sablona.headers.get("content-type")).toContain("text/csv");
+    expect(await sablona.text()).toContain("maxZajizdkaKm;75;");
+
+    const fd = new FormData();
+    fd.append("soubor", new Blob(["Parametr;Hodnota\nmaxZajizdkaKm;60\ndniNabidky;7"], { type: "text/csv" }), "planovani.csv");
+    const nahled = await w.post("/konfigurace/nastaveniPlanovani/nahled", fd);
+    expect(nahled.status).toBe(200);
+    const hn = await nahled.text();
+    expect(hn).toContain("planovani.csv");
+    expect(hn).toContain("Uložit změny");
+    const csv64 = hn.match(/name="csv" value="([^"]+)"/)![1]!;
+
+    const ulozeni = await w.post("/konfigurace/nastaveniPlanovani/ulozit", new URLSearchParams({ csv: csv64, soubor: "planovani.csv" }).toString(), undefined, "application/x-www-form-urlencoded");
+    expect(ulozeni.status).toBe(303);
+    expect(ulozeni.headers.get("location")).toContain("pridano=2");
+    const detail = await (await w.get(ulozeni.headers.get("location")!)).text();
+    expect(detail).toContain("Uloženo: přidáno 2");
+    expect(detail).toContain("web: planovani.csv");
+    expect(nastaveniPlanovani(await nactiCiselnik(db, "nastaveniPlanovani"))).toMatchObject({ dniNabidky: 7, plan: { maxZajizdkaKm: 60 }, doplneni: { maxZajizdkaKm: 60 } });
+
+    // chybný soubor se neuloží; koordinátorka konfiguraci nesmí
+    const spatne = new FormData();
+    spatne.append("soubor", new Blob(["Parametr;Hodnota\nneznamy;1"]), "x.csv");
+    expect(await (await w.post("/konfigurace/nastaveniPlanovani/nahled", spatne)).text()).toContain("Import obsahuje chyby");
+    await ulozImport(db, "koordinatorky", nahledImportu("koordinatorky", "E-mail;Jméno;Role\njana@ictmount.com;Jana;koordinátorka", []), "test", "test");
+    expect((await w.post("/konfigurace/technici/nahled", new FormData(), "jana@ictmount.com")).status).toBe(403);
   });
 });
