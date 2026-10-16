@@ -44,8 +44,9 @@ import { isWorkday } from "../domain/workdays.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
 import { gmail as gmailApi } from "@googleapis/gmail";
 import { delegace, SCOPY_KALENDAR } from "../google/delegace.js";
-import { hledejVsude, ocistitDotaz, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
+import { hledejNaLokalite, hledejVsude, ocistitDotaz, sLimitem, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
+import type { Lokalita } from "./html.js";
 import { strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
 import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, mestskeCasti, nactiKontext, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 
@@ -325,7 +326,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const odP = url.searchParams.get("od") ?? "";
         const odData = /^\d{4}-\d{2}-\d{2}$/.test(odP) && !Number.isNaN(Date.parse(odP)) && odP > isoDate(now) ? odP : undefined;
         const spocitat = !brany.blokace.length && !detail.uzavreno && planovac;
-        const [zdroje, nabidka] = await Promise.all([
+        const adresaZ = [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
+        const [zdroje, nabidka, lokalita] = await Promise.all([
           n.zdroje ? hledejVsude(n.zdroje(), vyrazyZakazky(detail.z), now) : Promise.resolve(null),
           spocitat
             ? (async (): Promise<Nabidka> => {
@@ -344,12 +346,23 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
                 }
               })()
             : Promise.resolve(null),
+          // „Realizovali jsme na lokalitě“: události techniků na stejné adrese
+          n.zdroje && detail.z.adresa
+            ? (async (): Promise<Lokalita> => {
+                try {
+                  const nalezy = await sLimitem(12_000, (async () => hledejNaLokalite(await n.zdroje!().kalendar(), adresaZ, detail.z.idObjednavkyZaklad, now))());
+                  return { nalezy };
+                } catch (e) {
+                  return { nalezy: [], chyba: e instanceof Error ? e.message : String(e) };
+                }
+              })()
+            : Promise.resolve(null),
         ]);
         const casti = await mestskeCasti(await geokoderWebu(), [
           [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
           ...(nabidka?.moznosti ?? []).flatMap((m) => [m.sousede?.pred.adresa, m.sousede?.po.adresa]),
         ]);
-        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, casti, ...(odData ? { odData } : {}) }));
+        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, casti, lokalita, ...(odData ? { odData } : {}) }));
       }
 
       // ---------- Doplnit technika: jeho dny nahoře, vhodné zakázky do vybraného slotu dole ----------

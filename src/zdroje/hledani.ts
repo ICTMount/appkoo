@@ -176,7 +176,7 @@ export async function hledejChat(prostory: string[], vyrazy: string[], token: st
 
 // ---------- Vše najednou ----------
 
-async function sLimitem<T>(ms: number, p: Promise<T>): Promise<T> {
+export async function sLimitem<T>(ms: number, p: Promise<T>): Promise<T> {
   let t: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([p, new Promise<never>((_, rej) => (t = setTimeout(() => rej(new Error(`zdroj neodpověděl do ${ms / 1000} s`)), ms)))]);
@@ -200,4 +200,67 @@ export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: 
     zdroj("kalendar", async () => hledejKalendar(await zav.kalendar(), vyrazy, od, do_)),
     zdroj("chat", async () => hledejChat(zav.prostory, vyrazy, await zav.chatToken(), zav.fetchFn)),
   ]);
+}
+
+// ---------- Realizovali jsme na lokalitě ----------
+
+const bezDiakritiky = (x: string) => x.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+/** Ulice a číslo popisné z adresy MWF („Praha, Krčská 991/63“ → Krčská, 991) */
+export function uliceCislo(adresa: string): { ulice: string; cp: string } | null {
+  for (const cast of adresa.split(",").map((x) => x.trim())) {
+    const m = cast.match(/^(\p{L}[\p{L}\s.'-]*?)\s+(\d+)(?:\/\d+\w*)?$/u);
+    if (m && !/^praha$/i.test(m[1]!.trim())) return { ulice: m[1]!.trim(), cp: m[2]! };
+  }
+  return null;
+}
+
+export interface NalezLokality extends Nalez {
+  oId?: string;
+  budouci: boolean;
+}
+
+/**
+ * Události v kalendářích techniků na stejné adrese (ulice + číslo popisné) za poslední 2 roky i dopředu –
+ * co už jsme na lokalitě dělali (zásuvky, přístup, SVJ…). Události této zakázky a volné sloty se vynechají.
+ */
+export async function hledejNaLokalite(cal: calendar_v3.Calendar, adresa: string, vyloucitOId: string, now: Date, max = 20): Promise<NalezLokality[] | null> {
+  const uc = uliceCislo(adresa);
+  if (!uc) return null;
+  const dotaz = `${uc.ulice} ${uc.cp}`;
+  const ulice = bezDiakritiky(uc.ulice);
+  const cislo = new RegExp(`(^|[^\\d])${uc.cp}(/|[^\\d]|$)`);
+  const { data } = await cal.calendarList.list({ maxResults: 250 });
+  const kalendare = (data.items ?? []).filter((k) => k.id && !k.id.endsWith("@group.v.calendar.google.com"));
+  const nalezy = new Map<string, NalezLokality>();
+  await Promise.all(
+    kalendare.map(async (k) => {
+      const r = await cal.events.list({
+        calendarId: k.id!,
+        q: dotaz,
+        singleEvents: true,
+        timeMin: new Date(now.getTime() - 730 * 86_400_000).toISOString(),
+        timeMax: new Date(now.getTime() + 60 * 86_400_000).toISOString(),
+        maxResults: 50,
+      });
+      for (const e of r.data.items ?? []) {
+        const summary = e.summary ?? "";
+        if (!e.id || e.status === "cancelled" || /\bvoln[yáé]\b/i.test(bezDiakritiky(summary)) || (vyloucitOId && summary.includes(vyloucitOId))) continue;
+        const kde = bezDiakritiky(`${e.location ?? ""} ${(e.description ?? "").slice(0, 2000)}`);
+        if (!kde.includes(ulice) || !cislo.test(kde)) continue; // full-text hledání kalendáře je volné – ověřit ulici i číslo
+        const cas = zApi(e.start?.dateTime ?? e.start?.date);
+        nalezy.set(`${k.id}/${e.id}`, {
+          zdroj: "kalendar",
+          cas,
+          titulek: summary,
+          kde: k.summary ?? k.id!,
+          text: e.location ?? "",
+          odkaz: e.htmlLink ?? null,
+          oId: summary.match(/O-\d{8,}/)?.[0],
+          budouci: !!cas && cas > now,
+        });
+      }
+    }),
+  );
+  return [...nalezy.values()].sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0)).slice(0, max);
 }

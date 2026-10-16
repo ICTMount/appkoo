@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { delegace } from "../src/google/delegace.js";
-import { hledejChat, hledejEmaily, hledejKalendar, hledejVsude, ocistitDotaz, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
+import { hledejChat, hledejEmaily, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, uliceCislo, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
 import { sekceZdroju } from "../src/web/html.js";
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -119,3 +119,39 @@ describe("zdroje", () => {
     expect(sekceZdroju(null)).toContain("není zapnuté");
   });
 });
+
+describe("realizovali jsme na lokalitě", () => {
+  it("ulice a číslo popisné z adresy MWF", () => {
+    expect(uliceCislo("Praha, Krčská 991/63, 14000")).toEqual({ ulice: "Krčská", cp: "991" });
+    expect(uliceCislo("České Budějovice, M. Horákové 1376/10, 37005")).toEqual({ ulice: "M. Horákové", cp: "1376" });
+    expect(uliceCislo("Příbram")).toBeNull();
+  });
+
+  it("jen události na stejné ulici a č. p., bez této zakázky a volných slotů; nejnovější nahoře", async () => {
+    const dotazy: string[] = [];
+    const cal = {
+      calendarList: { list: async () => ({ data: { items: [{ id: "K1", summary: "Vajc Tomas" }] } }) },
+      events: {
+        list: async (p: { q: string }) => {
+          dotazy.push(p.q);
+          return {
+            data: {
+              items: [
+                { id: "a", status: "confirmed", summary: "Vajc - FTTH O-85511111111 Novák", location: "Krčská 991/63, Praha 4", start: { dateTime: "2026-05-04T10:00:00+02:00" }, htmlLink: "https://cal/a" },
+                { id: "b", status: "confirmed", summary: "Vajc - FTTH O-85522222222 Malá", location: "Krčská 991/12", start: { dateTime: "2026-08-04T10:00:00+02:00" }, htmlLink: "https://cal/b" },
+                { id: "c", status: "confirmed", summary: "Vajc - FTTH O-85533333333 Jiná", location: "Krčská 9911/1", start: { dateTime: "2026-08-05T10:00:00+02:00" } },
+                { id: "d", status: "confirmed", summary: "Vajc - VOLNY", location: "Krčská 991", start: { dateTime: "2026-08-06T10:00:00+02:00" } },
+                { id: "e", status: "confirmed", summary: "Vajc - FTTH O-85547833023 tato", location: "Krčská 991/63", start: { dateTime: "2026-10-20T10:00:00+02:00" } },
+              ],
+            },
+          };
+        },
+      },
+    } as never;
+    const n = await hledejNaLokalite(cal, "Praha, Krčská 991/63, 14000", "O-85547833023", new Date("2026-10-16T12:00:00Z"));
+    expect(dotazy).toEqual(["Krčská 991"]);
+    expect(n!.map((x) => x.oId)).toEqual(["O-85522222222", "O-85511111111"]);
+    expect(n![0]!.odkaz).toBe("https://cal/b");
+  });
+});
+

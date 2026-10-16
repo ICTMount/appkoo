@@ -8,7 +8,7 @@ import { pokusyZakazky } from "./data.js";
 import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, TechnikPlanu, VybranySlot } from "../plan/planovac.js";
 import { jeVolneOkno, type UdalostTechnika } from "../gcal/kontrola.js";
 import { POVINNA_POTVRZENI } from "./planovani.js";
-import type { Nalez, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
+import type { Nalez, NalezLokality, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
 
 export function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -203,7 +203,14 @@ ${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo, { dotaz });
 }
 
+/** Realizovali jsme na lokalitě: null nalezy = adresa bez ulice a čísla popisného */
+export interface Lokalita {
+  nalezy: NalezLokality[] | null;
+  chyba?: string;
+}
+
 export interface PlanovaniZakazky {
+  lokalita?: Lokalita | null;
   /** městské části adres na stránce */
   casti?: Casti;
   /** „jiné termíny“: hledá se od tohoto dne (YYYY-MM-DD) */
@@ -307,6 +314,7 @@ ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" 
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div>
 <div class="card kompakt"><h2>Historie změn mezi exporty</h2>${historieHtml}</div>
+<div class="card kompakt"><h2>Realizovali jsme na lokalitě</h2>${sekceLokality(plan.lokalita)}</div>
 </div>
 <div class="konec-detailu"></div>
 <section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
@@ -361,6 +369,20 @@ function hlavickaZakazky(d: Detail): string {
 <h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
 }
 
+
+function sekceLokality(l: Lokalita | null | undefined): string {
+  if (!l) return `<span class="muted">Kalendáře techniků nejsou zapnuté (chybí delegace účtu tmcz01).</span>`;
+  if (l.chyba) return `<div class="err">Kalendáře nedostupné: ${esc(l.chyba)}</div>`;
+  if (!l.nalezy) return `<span class="muted">Adresa nemá ulici a číslo popisné – nelze hledat.</span>`;
+  if (!l.nalezy.length) return `<span class="muted">Na této adrese jsme v posledních 2 letech nic nerealizovali.</span>`;
+  return `<table class="male"><tbody>${l.nalezy
+    .map(
+      (n) => `<tr${n.budouci ? ` class="muted"` : ""}><td class="nowrap">${esc(n.cas ? fmtDate(n.cas) : "")}${n.budouci ? "<br><small>plán</small>" : ""}</td>
+<td>${odkazyOId(esc(n.titulek.replace(/^[^-]+-\s*/, "")))}<br><small class="muted">${esc(n.kde ?? "")}${n.text ? ` · ${esc(n.text)}` : ""}</small></td>
+<td class="nowrap">${n.odkaz ? `<a href="${esc(n.odkaz)}" target="_blank" rel="noopener">v kalendáři →</a>` : ""}</td></tr>`,
+    )
+    .join("")}</tbody></table>`;
+}
 
 function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
   const z = d.z;
