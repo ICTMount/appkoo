@@ -70,7 +70,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}.P0{background:var(--p0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:14px;margin:0 0 8px}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
+.card h2{font-size:14px;margin:0 0 8px}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
@@ -328,7 +328,7 @@ ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" 
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div></div>
 <div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun">${historieHtml}</div></div>
-<div class="card kompakt"><h2>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
+<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 </div>
 <div class="konec-detailu"></div>
 <section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
@@ -336,6 +336,15 @@ ${sekcePlanovani(d, plan)}</section>`;
 
   return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, telo, { dotaz: z.idObjednavky || z.idAktivity });
 }
+
+/** Ikony služeb Google Workspace (obecné, bez log): obálka = e-mail, kalendář, bublina = chat */
+const svg = (cesta: string) =>
+  `<svg class="ikona" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${cesta}</svg>`;
+const IKONA: Record<Zdroj, string> = {
+  email: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>'),
+  kalendar: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+  chat: svg('<path d="M4 5h16v11H9l-5 4z"/>'),
+};
 
 const NAZEV_ZDROJE: Record<Zdroj, string> = { email: "E-mail (koordinace)", kalendar: "Kalendáře techniků", chat: "Google Chat" };
 
@@ -361,7 +370,7 @@ export function sekceZdroju(zdroje: VysledekZdroje[] | null): string {
           ? v.nalezy.slice(0, 30).map(nalez).join("") + (v.nalezy.length > 30 ? `<p class="muted">… a dalších ${v.nalezy.length - 30}</p>` : "")
           : `<span class="muted">nic nenalezeno</span>`;
       // dlouhý seznam (hlavně e-mail) se neroztahuje přes celou stránku – roluje uvnitř karty
-      return `<div class="card kompakt"><h2>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}</h2><div class="posun zdroj">${obsah}</div></div>`;
+      return `<div class="card kompakt"><h2 class="s-ikonou"><span class="i-${v.zdroj}">${IKONA[v.zdroj]}</span>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}</h2><div class="posun zdroj">${obsah}</div></div>`;
     })
     .join("")}</div>`;
 }
