@@ -58,4 +58,17 @@ describe("import číselníku z CSV", () => {
     expect(n.bezeZmeny).toBe(2);
     expect(n.chyby).toEqual([]);
   });
+
+  it("technici: primární a 2. adresa výjezdu, e-mail, dvakrát „Typy akcí“ se sloučí, starší hlavička projde", () => {
+    const csv = [
+      "Technik;Jméno v kalendáři;ID kalendáře;Výjezd z (primarni adresa);Výjezd z (2. adresa) ;Typy akcí;Typy akcí;Aktivní;e-mail",
+      "Píša;Pisa;K1;Hostinné;Praha 9;PIV;FTTH;ano;pisa@example.cz",
+    ].join("\n");
+    const n = nahledImportu("technici", csv, []);
+    expect(n.chyby).toEqual([]);
+    expect(n.polozky[0]).toMatchObject({ jmeno: "Píša", vyjezd: "Hostinné", vyjezd2: "Praha 9", typyAkci: ["PIV", "FTTH"], email: "pisa@example.cz", aktivni: true });
+    const stary = nahledImportu("technici", "Technik;Výjezd z (adresa)\nHristov;Praha 9", []);
+    expect(stary.polozky[0]).toMatchObject({ vyjezd: "Praha 9" });
+  });
 });
+

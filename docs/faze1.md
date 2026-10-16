@@ -60,7 +60,7 @@ Postup v aplikaci: **Plánování** (horní lišta) → den → technici seřaze
 slotu „doplnit“ → seznam vhodných zakázek → „Vybrat“ → call script → zápis.
 
 Kandidáti:
-- otevřené zakázky **bez termínu**, které projdou branami (ZAK, smlouva s JP, blokovaná lokalita, adresa) a mají prioritu P1–P3,
+- otevřené zakázky **bez termínu**, které projdou branami (ZAK, smlouva s JP, blacklist lokalit, adresa) a mají prioritu P1–P3,
 - **už naplánované zakázky s poznámkou „flex“** (pozitivní – „flex“, „flexibilní“; „ne flex“, „není flex“ se nepočítá)
   v poznámce MWF nebo v události kalendáře, jen **přesun dopředu** (slot je dřív než současný termín).
   Po zápisu se původní událost vrátí na **VOLNY** (patička SHEET2CAL zůstane) a koordinátorka změní termín v MWF.

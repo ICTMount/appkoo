@@ -11,9 +11,10 @@ import { nactiCiselnik, ulozImport } from "../db/ciselniky.js";
 import { pgDb } from "../db/db.js";
 
 async function main() {
-  const [id, soubor, ...prepinace] = process.argv.slice(2);
+  const [zadano, soubor, ...prepinace] = process.argv.slice(2);
+  const id = zadano === "blacklist" ? "blokovaneLokality" : zadano; // Blacklist lokalit
   if (!id || !soubor || !(id in CISELNIKY)) {
-    throw new Error(`Použití: npm run ciselnik -- <${Object.keys(CISELNIKY).join("|")}> <soubor.csv> [--ulozit] [--nahradit]`);
+    throw new Error(`Použití: npm run ciselnik -- <${[...Object.keys(CISELNIKY), "blacklist"].join("|")}> <soubor.csv> [--ulozit] [--nahradit]`);
   }
   const db = pgDb();
   const cid = id as CiselnikId;

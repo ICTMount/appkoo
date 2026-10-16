@@ -152,4 +152,4 @@ Sloupce, které v CSV nejsou, se u existujících řádků nemění. Řádky chy
 6. **Termín v minulosti.** Pravidlo `termin_probehl` ji dá do P1 – ověřit, že tak má být.
 7. **Lhůta ZAK.** Počítá se od posledního záznamu `[Parkovanie]`. Zapisuje MWF tento záznam při každém zaparkování?
 8. ~~Priorita P1–P0.~~ **Vyřešeno 15.10.:** pravidla priority jsou číselník v Konfiguraci (i CSV), výpočet `urciPrioritu`.
-9. **Blokované lokality.** Zatím je hlídá jen Claude podle textu, kontrola adresy proti číselníku chybí.
+9. **Blacklist lokalit.** Zatím je hlídá jen Claude podle textu, kontrola adresy proti číselníku chybí.

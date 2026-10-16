@@ -18,6 +18,8 @@ export interface Sloupec {
   hodnoty?: readonly string[]; // pro typ "vyber"
   /** hodnoty musí existovat v jiném číselníku (jen upozornění, ne chyba) */
   odkaz?: CiselnikId;
+  /** starší / jiné názvy hlavičky, které import také přijme */
+  aliasy?: string[];
 }
 
 export type CiselnikId =
@@ -41,11 +43,13 @@ export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
       { klic: "jmeno", nazev: "Technik", typ: "text", povinny: true },
       { klic: "typyAkci", nazev: "Typy akcí", typ: "seznam", odkaz: "typyAkci" },
       { klic: "regiony", nazev: "Regiony", typ: "seznam", odkaz: "regiony" },
-      { klic: "vyjezd", nazev: "Výjezd z (adresa)", typ: "text" },
+      { klic: "vyjezd", nazev: "Výjezd z (primární adresa)", typ: "text", aliasy: ["Výjezd z (adresa)", "Výjezd z"] },
+      { klic: "vyjezd2", nazev: "Výjezd z (2. adresa)", typ: "text" },
       { klic: "kalendar", nazev: "ID kalendáře", typ: "text" },
       { klic: "nazevVKalendari", nazev: "Jméno v kalendáři", typ: "text" },
       { klic: "dovednosti", nazev: "Dovednosti v MWF", typ: "seznam" },
       { klic: "aktivni", nazev: "Aktivní", typ: "anoNe" },
+      { klic: "email", nazev: "E-mail", typ: "text", aliasy: ["email", "mail"] },
     ],
   },
   typyAkci: {
@@ -86,7 +90,7 @@ export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
   },
   blokovaneLokality: {
     id: "blokovaneLokality",
-    nazev: "Blokované lokality",
+    nazev: "Blacklist lokalit",
     klic: "adresa",
     sloupce: [
       { klic: "adresa", nazev: "Lokalita", typ: "text", povinny: true },
@@ -206,7 +210,7 @@ export function nahledImportu(
 
   const mapa = new Map<number, Sloupec>();
   hlavicka.forEach((h, i) => {
-    const s = def.sloupce.find((x) => norm(x.nazev) === norm(h) || norm(x.klic) === norm(h));
+    const s = def.sloupce.find((x) => [x.nazev, x.klic, ...(x.aliasy ?? [])].some((n) => norm(n) === norm(h)));
     if (s) mapa.set(i, s);
     else if (h.trim()) chyby.push({ radek: 1, sloupec: h, zprava: `neznámý sloupec „${h}“ – bude ignorován`, zavaznost: "upozornění" });
   });
@@ -230,7 +234,9 @@ export function nahledImportu(
     const p: Polozka = {};
     mapa.forEach((s, idx) => {
       const { hodnota, chyba } = prevedHodnotu(s, r[idx] ?? "");
-      p[s.klic] = hodnota;
+      // sloupec typu seznam může být v CSV víckrát (např. dvakrát „Typy akcí“) – hodnoty se sloučí
+      const dosud = p[s.klic];
+      p[s.klic] = Array.isArray(dosud) && Array.isArray(hodnota) ? [...new Set([...dosud, ...hodnota])] : hodnota;
       if (chyba) chyby.push({ radek: cislo, sloupec: s.nazev, zprava: chyba, zavaznost: "chyba" });
       if (s.odkaz && Array.isArray(hodnota) && odkazy.has(s.odkaz)) {
         const nezname = hodnota.filter((h) => !odkazy.get(s.odkaz!)!.has(norm(h)));

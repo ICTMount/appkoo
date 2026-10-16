@@ -1,6 +1,6 @@
 // Plánovač pro web: nabídka termínů pro jednu zakázku a kontrola, jestli se smí plánovat.
 //
-// 1. Brány (zlatá pravidla koordinace): ZAK čeká na PEP, smlouva s JP (r_2), blokovaná lokalita,
+// 1. Brány (zlatá pravidla koordinace): ZAK čeká na PEP, smlouva s JP (r_2), blacklist lokalit,
 //    už dohodnutý termín, chybějící adresa → termín se nenabídne.
 // 2. Technici z číselníku Technici (aktivní, s kalendářem, se správnou dovedností FTTH / PIV / SAT).
 // 3. Kalendáře techniků na N pracovních dní: zakázky + volné sloty VOLNY (SHEET2CAL).
@@ -29,6 +29,9 @@ export interface TechnikPlanu {
   nazevVKalendari: string;
   kalendar: string;
   vyjezd: string;
+  /** 2. adresa výjezdu (volitelná) */
+  vyjezd2?: string;
+  email?: string;
   skupiny: Skupina[];
 }
 
@@ -51,6 +54,8 @@ export function techniciZCiselniku(polozky: Polozka[]): TechnikPlanu[] {
         nazevVKalendari: String(p.nazevVKalendari || p.jmeno),
         kalendar: String(p.kalendar),
         vyjezd: String(p.vyjezd ?? ""),
+        ...(p.vyjezd2 ? { vyjezd2: String(p.vyjezd2) } : {}),
+        ...(p.email ? { email: String(p.email) } : {}),
         skupiny: skupiny.length ? skupiny : ["FTTH"],
       };
     });
@@ -82,7 +87,7 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
     const lok = norm(String(b.adresa ?? ""));
     const infra = String(b.infrastruktura ?? "");
     if (lok && adresa.includes(lok) && (!infra || infra === z.infrastruktura)) {
-      blokace.push(`Blokovaná lokalita „${String(b.adresa)}“${infra ? ` (${infra})` : ""}: ${String(b.duvod ?? "")}`);
+      blokace.push(`Lokalita na blacklistu „${String(b.adresa)}“${infra ? ` (${infra})` : ""}: ${String(b.duvod ?? "")}`);
     }
   }
   return { blokace, upozorneni };
@@ -180,7 +185,7 @@ export async function nabidniProZakazku(
   const bezZakladny = new Set<string>();
   let bezPolohy = 0;
   for (const d of dny) {
-    const s = await sestavDny(citelni.map((t) => ({ jmeno: t.jmeno, vyjezd: t.vyjezd })), udalosti, d, zav.geokoder, opts.trvaniMin ?? 110, adresaZMwf);
+    const s = await sestavDny(citelni.map((t) => ({ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 })), udalosti, d, zav.geokoder, opts.trvaniMin ?? 110, adresaZMwf);
     s.bezZakladny.forEach((x) => bezZakladny.add(x));
     bezPolohy += s.bezPolohy.length;
     for (const den of s.dny) {
@@ -195,12 +200,17 @@ export async function nabidniProZakazku(
     zav.vzdalenosti,
     dnes,
     opts.nastaveni,
-    opts.pocet ?? 5,
+    (opts.pocet ?? 5) * 2,
   );
 
   const podleJmena = new Map(citelni.map((t) => [t.jmeno, t]));
   const moznosti: MoznostSlotu[] = [];
+  const videne = new Set<string>();
   for (const m of zakladni) {
+    // technik se 2. adresou má den ve dvou variantách – stejný slot jen jednou (lepší varianta je první)
+    const klic = `${m.technik}|${m.datum}|${m.okno.od}`;
+    if (videne.has(klic) || moznosti.length >= (opts.pocet ?? 5)) continue;
+    videne.add(klic);
     const t = podleJmena.get(m.technik)!;
     const slot = udalosti.find((u) => u.technik === m.technik && isoDate(u.od) === m.datum && minutesOfDay(u.od) === m.okno.od && jeVolneOkno(u));
     if (!slot) continue;
@@ -289,9 +299,8 @@ export async function navrhyProSlot(
     const o = oCislo(u);
     return o ? opts.adresyZMwf?.get(o) : undefined;
   };
-  const s = await sestavDny([{ jmeno: t.jmeno, vyjezd: t.vyjezd }], den, datum, zav.geokoder, opts.nastaveni?.trvaniMin ?? 110, adresaZMwf);
-  const denTechnika = s.dny[0];
-  if (!denTechnika) return { ...prazdne, den, chyba: `Technik ${t.jmeno} nemá v číselníku adresu výjezdu (nebo ji nejde najít na mapě).` };
+  const s = await sestavDny([{ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 }], den, datum, zav.geokoder, opts.nastaveni?.trvaniMin ?? 110, adresaZMwf);
+  if (!s.dny.length) return { ...prazdne, den, chyba: `Technik ${t.jmeno} nemá v číselníku adresu výjezdu (nebo ji nejde najít na mapě).` };
 
   // Kandidáti se správnou dovedností; naplánované jen s termínem po slotu (přesun dopředu)
   const vhodne = zakazky.filter((k) => t.skupiny.includes(skupinaZakazky(k.z.typAktivity)) && (!k.z.termin || k.z.termin.od > slot.od));
@@ -335,7 +344,16 @@ export async function navrhyProSlot(
   }
 
   const okno = { od: minutesOfDay(slot.od), do: minutesOfDay(slot.do) - 1 };
-  const navrhy = doplnSlot(denTechnika, okno, kandidati, zav.vzdalenosti, opts.nastaveni, opts.pocet ?? 10);
+  // varianty dne (primární / 2. adresa výjezdu): u každé zakázky platí výhodnější varianta
+  const nejlepsi = new Map<string, NavrhDoplneni>();
+  for (const d of s.dny) {
+    for (const n of doplnSlot(d, okno, kandidati, zav.vzdalenosti, opts.nastaveni, kandidati.length)) {
+      const id = n.kandidat.z.idAktivity;
+      const dosud = nejlepsi.get(id);
+      if (!dosud || n.skore < dosud.skore) nejlepsi.set(id, n);
+    }
+  }
+  const navrhy = [...nejlepsi.values()].sort((a, b) => a.skore - b.skore).slice(0, opts.pocet ?? 10);
   return {
     navrhy,
     kandidatu: vsichni.length,

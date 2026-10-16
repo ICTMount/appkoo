@@ -1,6 +1,7 @@
 // Sestaví dny techniků pro optimalizaci ze skutečných dat:
 // zakázky = události v kalendáři technika (adresa → souřadnice), volná okna = události VOLNY,
-// start a konec dne = adresa výjezdu technika z číselníku Technici.
+// start a konec dne = adresa výjezdu technika z číselníku Technici. Má-li technik i 2. adresu výjezdu,
+// vzniknou dvě varianty dne (z každé adresy) a nabídka si vezme výhodnější.
 
 import { isoDate, minutesOfDay } from "../domain/time.js";
 import { jeBlok, jeVolneOkno, volnaOkna, type UdalostTechnika } from "../gcal/kontrola.js";
@@ -11,7 +12,9 @@ import type { Navsteva } from "./trasa.js";
 
 export interface TechnikProPlan {
   jmeno: string;
-  vyjezd: string; // adresa z číselníku
+  vyjezd: string; // primární adresa z číselníku
+  /** druhá adresa výjezdu – den se zkusí z obou a plánovač vezme výhodnější */
+  vyjezd2?: string;
   pracujeOd?: number;
   pracujeDo?: number;
 }
@@ -39,6 +42,7 @@ export async function sestavDny(
 
   for (const t of technici) {
     const zakladna = t.vyjezd ? (await geokoder.najdi(t.vyjezd)).bod : null;
+    const zakladna2 = t.vyjezd2 ? (await geokoder.najdi(t.vyjezd2)).bod : null;
     if (!zakladna) {
       bezZakladny.push(t.jmeno);
       continue;
@@ -56,10 +60,12 @@ export async function sestavDny(
       const delka = Math.round((u.do.getTime() - u.od.getTime()) / 60_000);
       navstevy.push({ id: u.appkoo ?? u.id, bod, od: minutesOfDay(u.od), do: minutesOfDay(u.do) - 1, trvani: Math.min(delka, vychoziDelkaMin) || vychoziDelkaMin });
     }
-    dny.push({
-      den: { technik: t.jmeno, datum, zakladna, pracujeOd: t.pracujeOd ?? 7 * 60 + 30, pracujeDo: t.pracujeDo ?? 19 * 60, navstevy },
-      volnaOkna: volnaOkna(udalosti, t.jmeno, datum),
-    });
+    for (const z of zakladna2 ? [zakladna, zakladna2] : [zakladna]) {
+      dny.push({
+        den: { technik: t.jmeno, datum, zakladna: z, pracujeOd: t.pracujeOd ?? 7 * 60 + 30, pracujeDo: t.pracujeDo ?? 19 * 60, navstevy },
+        volnaOkna: volnaOkna(udalosti, t.jmeno, datum),
+      });
+    }
   }
   return { dny, bezPolohy, bezZakladny };
 }
