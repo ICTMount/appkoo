@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { googleGeokoder, klicAdresy, sCache } from "../src/plan/geokod.js";
+import { googleGeokoder, klicAdresy, sCache, variantyAdresy } from "../src/plan/geokod.js";
 
 describe("geokódování", () => {
   it("Google: přesnost podle typu výsledku, nenalezeno bez chyby", async () => {
@@ -20,6 +20,26 @@ describe("geokódování", () => {
     // odmítnutý klíč není „nenalezeno“ – musí skončit chybou (a neuložit se do cache)
     const odmitnuto = googleGeokoder("SPATNY", (async () => new Response(JSON.stringify({ status: "REQUEST_DENIED", error_message: "API key not authorized", results: [] }))) as unknown as typeof fetch);
     await expect(odmitnuto.najdi("Moravská 1553/52, Praha")).rejects.toThrow(/REQUEST_DENIED.*GOOGLE_MAPS_API_KEY/);
+  });
+
+  it("varianty adresy z MWF: český tvar, bez čísla orientačního, nakonec obec", async () => {
+    expect(variantyAdresy("Praha, Moravská 1553/52, 12000").map((v) => v.text)).toEqual([
+      "Praha, Moravská 1553/52, 12000",
+      "Moravská 1553/52, 120 00 Praha",
+      "Moravská 1553, Praha",
+      "120 00 Praha",
+    ]);
+    expect(variantyAdresy("Příbram").map((v) => v.text)).toEqual(["Příbram"]);
+    const dotazy: string[] = [];
+    const g = googleGeokoder("K", (async (url: URL) => {
+      const a = url.searchParams.get("address")!;
+      dotazy.push(a);
+      return new Response(JSON.stringify(a.startsWith("Moravská 1553/52")
+        ? { status: "OK", results: [{ geometry: { location: { lat: 50.07, lng: 14.44 }, location_type: "ROOFTOP" } }] }
+        : { status: "ZERO_RESULTS", results: [] }));
+    }) as unknown as typeof fetch);
+    expect((await g.najdi("Praha, Moravská 1553/52, 12000")).presnost).toBe("adresa");
+    expect(dotazy).toHaveLength(2);
   });
 
   it("cache: staré „nenalezeno“ (před opravou) se zkusí znovu, čerstvé ne", async () => {
