@@ -1,21 +1,56 @@
-# Fáze 1 – tři pilíře
+# Fáze 1 – zadání
 
-Verze: 16.10.2026 · stav: pilíř 1 hotový v kódu, pilíře 2 a 3 v přípravě
+Verze: 16.10.2026 · podle zadání vedoucího koordinace
 
-| Pilíř | Co koordinátorka udělá | Co aplikace ukáže / udělá | Stav |
-|---|---|---|---|
-| 1. Hledání | zadá O-ID, S7, telefon nebo jméno | na jedné stránce: MWF (stav, poznámky, historie), e-maily koordinace, události v kalendářích techniků, zprávy v Google Chatu (včetně odpovědí ve vlákně) | hotovo v kódu (`src/zdroje/`, `/hledat`, detail zakázky) |
-| 2. Zakázka → technik | zadá ID zakázky | naplánuje ji technikovi (upřesnit: kdo vybírá technika, zápis do kalendáře) | návrh v `src/plan/planovac.ts`, čeká na upřesnění |
-| 3. Slot → zakázky | vybere technika a konkrétní time-slot | nabídne zakázky, kterými slot doplnit (plnění kalendáře) | připravuje se |
+**Cíl:** nástroj, který koordinátorkám výrazně zjednoduší plánování. Na jednom místě vidí všechno o zakázce
+a aplikace jim navrhne, kam zakázku umístit (nebo čím doplnit kalendář technika).
 
-## Pilíř 1 – zdroje
+## 1. Zdroje dat (napojení)
 
-| Zdroj | Jak se čte | Co se hledá |
+| Zdroj | Jak se dostane do aplikace | Stav |
 |---|---|---|
-| MWF | databáze z importu exportů | přesně: ID aktivity, O-ID, S7; volně: telefon, jméno, adresa |
-| E-mail | Gmail schránky tmcz01 (zrcadlo skupiny koordinace), posledních 365 dní | „O-…“ OR „S7“ |
-| Kalendáře | všechny kalendáře v seznamu tmcz01 (kalendáře techniků), −180 až +90 dní | O-ID, S7 |
-| Google Chat | vybrané prostory (`CHAT_PROSTORY`), posledních 120 dní, cache 5 min | O-ID, S7 v textu + odpovědi ve stejném vlákně |
+| Export MWF (CSV) | 3 cesty: složka na Google Drive, e-mail na schránku, nahrání přímo v aplikaci | Drive hotovo a běží (každých 15 min); e-mail hotovo v kódu (čeká na delegaci); **nahrání v aplikaci chybí** |
+| E-mail (schránka koordinace) | čtení jménem tmcz01 (delegace) | hotovo v kódu – hledá se živě v Gmailu |
+| Google Chat | čtení jménem tmcz01 (delegace), vybrané prostory | hotovo v kódu – hledá se živě |
+| Google Kalendář techniků | čtení (a pro plánování zápis) jménem tmcz01 | čtení hotovo v kódu |
 
-Vše jen ke čtení, jménem `tmcz01@ictmount.com` (delegace v rámci domény, bez klíče – `src/google/delegace.ts`).
-Každý zdroj má limit 12 s; výpadek jednoho zdroje ostatní nezastaví.
+## 2. Hledání (horní lišta)
+
+- Jedno pole nahoře na každé stránce.
+- Hledá se podle: všech ID zakázky (O-ID, S7, ID aktivity), telefonu, adresy – a ideálně **fulltextově přes všechna data**
+  (poznámky MWF, e-maily, chat, kalendář).
+- Najde-li jednu zakázku → rovnou její přehled; jinak seznam shod.
+
+## 3. Přehled zakázky (jedna obrazovka)
+
+Jedna velká stránka, uvnitř samostatné sekce (menší okna):
+
+| Sekce | Obsah | Stav |
+|---|---|---|
+| Stav zakázky (MWF) | stav, parkování, termín, SLA, priorita, kontaktování | hotovo |
+| Poznámky a historie MWF | záznamy poznámky, změny mezi exporty | hotovo |
+| Kalendář | události zakázky u techniků (minulé i budoucí) | hotovo v kódu |
+| E-mailová korespondence | zprávy k zakázce | hotovo v kódu |
+| Google Chat | zprávy k zakázce + odpovědi ve vlákně | hotovo v kódu |
+
+## 4. Plánování – režim A: zakázka → slot
+
+Koordinátorka zadá **jednu konkrétní zakázku**. Aplikace nabídne **ideální umístění**:
+- s ohledem na **SLA**,
+- na **trasu technika** (problém obchodního cestujícího – co nejméně km navíc, návaznost na sousední zakázky),
+- na **zaplnění kalendáře** (doplnit rozpracované dny, ne otevírat prázdné),
+- zdroj: export MWF (zakázky, adresy, SLA) **spárovaný** s Google Kalendářem (volné sloty VOLNY, naplánované zakázky).
+
+Stav: výpočet hotový v kódu (`src/plan/planovac.ts`), čeká na upřesnění detailů a čtení kalendářů přes delegaci.
+
+## 5. Plánování – režim B: slot → zakázky (doplnění technika)
+
+Vidíme, že technik má na nejbližší den(y) v kalendáři málo zakázek. Koordinátorka **vybere time slot**
+(technik + den + okno) a aplikace **doplní zakázky, které se do něj ideálně hodí** – opačný pohled k režimu A,
+ze stejných zdrojů a podle stejných kritérií (trasa dne, SLA, priorita, zaplnění).
+
+Stav: připravuje se.
+
+## Otevřené otázky
+
+Viz konverzace 16.10.2026 – doplní se sem s odpověďmi.
