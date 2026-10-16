@@ -173,6 +173,9 @@ const mc = (adresa: string | undefined | null, casti?: Casti) => {
 const adresaZakazky = (z: { adresa: string; psc: string }) => [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
 
 /** Vlastník infrastruktury (TMCZ / CETIN / VDF) – štítek všude, kde je zakázka */
+/** ID S7 obj.; předobjednávka ho nemá – místo něj typ aktivity (Predobjednavka_FTTH) */
+const s7 = (z: { idS7: string; predobjednavka?: boolean; typAktivity: string }) => bezRovna(z.idS7) || (z.predobjednavka ? z.typAktivity || "Predobjednavka_FTTH" : "");
+
 /** Předobjednávka (Typ aktivity Predobjednavka_*) – realizovat až po změně na standardní zakázku */
 export const predobjStitek = (z: { predobjednavka?: boolean }) =>
   z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – realizovat až po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
@@ -210,7 +213,7 @@ export function strankaVysledku(
   casti?: Casti,
 ): string {
   const radky = polozky.map(
-    ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
+    ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${s7(z) ? `<br><small>${esc(s7(z))}</small>` : ""}</td>
 <td>${infraStitek(z.infrastruktura)}${predobjStitek(z)}</td><td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}</td>
 <td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
   );
@@ -289,7 +292,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
       }`
     : `<span class="muted">bez historie</span>`;
 
-  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${bezRovna(z.idS7) ? ` · ID S7 obj. ${esc(bezRovna(z.idS7))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – zakázku lze realizovat až po změně na standardní zakázku v MWF${z.rfs ? `, RFS ${esc(den(z.rfs))}` : ""}. Termín zatím neplánovat.</div>` : ""}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
@@ -699,7 +702,7 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
     }
     const smiZde = smi && (!p || zapis.smiTechnik(p.technik));
     return `<tr><td>${i + 1}</td>
-<td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
+<td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${s7(z) ? `<br><small>${esc(s7(z))}</small>` : ""}</td>
 <td>${infraStitek(z.infrastruktura)}</td>
 <td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}${posledniPoznamky(z.zaznamy)}</td>
 <td><span class="prio ${n.kandidat.priorita}">${n.kandidat.priorita}</span></td>
