@@ -97,7 +97,7 @@ nav.zalozky a.on{background:var(--accent);color:#fff}nav.zalozky a:hover{text-de
 header .vpravo{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:12px;color:var(--muted)}
 header .kdo{color:var(--text)}a.konfig{font-size:12px;font-weight:600}a.konfig.on{text-decoration:underline}
 .export{display:flex;flex-direction:column;gap:3px;min-width:230px}.export b{color:var(--text)}
-.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}.bar span{display:block;height:100%}
+.bar{position:relative;align-self:stretch;width:100%;height:6px;border-radius:3px;margin-top:3px;background:linear-gradient(90deg,#2e9d4b 0%,#2e9d4b 20%,#e08a00 37%,#d32f2f 55%,#d32f2f 100%)}.bar span{position:absolute;top:-3px;width:4px;height:12px;margin-left:-2px;border-radius:2px;background:var(--text);box-shadow:0 0 0 2px var(--bg)}
 .b-zel{background:#2e9d4b}.b-oranz{background:#e08a00}.b-cerv{background:#d32f2f}
 .c-zel{color:#2e9d4b;font-weight:600}.c-oranz{color:#e08a00;font-weight:600}.c-cerv{color:#d32f2f;font-weight:600}
 form.hledani{display:flex;gap:8px;padding:8px 20px;border-top:1px solid var(--line)}form.hledani input{flex:1;font-size:15px;padding:8px 10px}
@@ -152,9 +152,10 @@ export type Zalozka = "zakazka" | "technik" | "konfigurace";
 export function cerstvost(stav: StavImportu): string {
   const h = stav.stariHodin;
   const trida = h === null || h > 2 ? "cerv" : h > 1 ? "oranz" : "zel";
-  const sirka = h === null ? 100 : Math.min(100, Math.max(4, (h / 3) * 100));
+  // ukazatel na škále 0–4 h: zelená do 1 h, oranžová do 2 h, pak červená
+  const sirka = h === null ? 98 : Math.min(98, Math.max(2, (h / 4) * 100));
   const popis = h === null ? "zatím žádný export" : `před ${String(h).replace(".", ",")} h`;
-  return `<div class="export"><div>Export MWF <b>${esc(dt(stav.posledniExport) || "–")}</b> · <span class="c-${trida}">${esc(popis)}</span></div><div class="bar" title="do 1 h zelená, do 2 h oranžová, přes 2 h červená"><span class="b-${trida}" style="width:${sirka.toFixed(0)}%"></span></div></div>`;
+  return `<div class="export"><div>Export MWF <b>${esc(dt(stav.posledniExport) || "–")}</b> · <span class="c-${trida}">${esc(popis)}</span></div><div class="bar" title="do 1 h zelená, do 2 h oranžová, přes 2 h červená"><span style="left:${sirka.toFixed(0)}%"></span></div></div>`;
 }
 
 /** Městská část k adrese („Praha 4 – Krč“) – mapa adresa → část připravená serverem */
