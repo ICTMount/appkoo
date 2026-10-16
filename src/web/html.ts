@@ -108,6 +108,12 @@ h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid
 .ud{font-size:12px;padding:4px 0;border-top:1px solid var(--line)}.ud:first-of-type{border-top:0}.ud .cas{color:var(--muted);margin-right:4px}
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
 a.volny.vyb{outline:2px solid var(--accent)}@media (prefers-color-scheme:dark){a.volny{background:#173322;color:#a5d6a7}}
+.card.kompakt{padding:8px 12px;font-size:12px}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.card.kompakt dl{gap:2px 10px}
+.konec-detailu{margin:26px 0 18px;border-top:3px double var(--line)}
+section.planovani{border:2px solid var(--accent);border-radius:10px;padding:14px 16px 6px;background:color-mix(in srgb,var(--accent) 6%,var(--panel));box-shadow:0 2px 10px rgba(0,0,0,.06)}
+section.planovani>h2{font-size:20px;margin:0 0 12px;color:var(--accent)}section.planovani>h2 small{font-size:13px;color:var(--muted);font-weight:400}
+section.planovani .tbl{border-color:var(--accent)}
 iframe.mapa{width:100%;height:220px;border:1px solid var(--line);border-radius:6px;margin:8px 0}
 table.male{font-size:12px}table.male th,table.male td{padding:3px 6px}details summary{cursor:pointer;margin-top:6px}
 .uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
@@ -256,7 +262,7 @@ ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další 
 <div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
 ${sekceZdroju(zdroje)}
 <div class="grid" style="margin-top:12px">
-<div class="card"><h2>Kontaktování</h2><dl>
+<div class="card kompakt"><h2>Kontaktování</h2><dl>
 ${radek("Stav", esc(stavKontaktu(d, now)))}
 ${radek("Další kontakt", esc(denIso(d.dalsiKontakt)))}
 ${radek("Navolané dny", esc(`${d.plan.navolaneDny} (cíl ${d.plan.pokusuDenne} pokus/y denně)`))}
@@ -264,10 +270,11 @@ ${radek("SMS", esc(`odesláno ${d.plan.sms.odeslano}${d.plan.sms.doporucena ? " 
 ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" : "nedovoláno"}${p.sms ? " + SMS" : ""}`).join("; ")))}
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div>
-<div class="card"><h2>Historie změn mezi exporty</h2>${historieHtml}</div>
+<div class="card kompakt"><h2>Historie změn mezi exporty</h2>${historieHtml}</div>
 </div>
-<h2 class="sekce" id="planovani">Kam naplánovat</h2>
-${sekcePlanovani(d, plan)}`;
+<div class="konec-detailu"></div>
+<section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
+${sekcePlanovani(d, plan)}</section>`;
 
   return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, telo, { dotaz: z.idObjednavky || z.idAktivity });
 }
