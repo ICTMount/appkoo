@@ -1,5 +1,5 @@
 // HTML stránky webového rozhraní (vykreslují se na serveru, bez JavaScriptu na klientu).
-// Zakázka se vždy označuje ID O- (ID obj. v ext. systéme); S7 je doplňkové.
+// Zakázka se vždy označuje ID O- (ID obj. v ext. systému); S7 je doplňkové.
 
 import { fmtDate, fmtTime, isoDate } from "../domain/time.js";
 import type { Priorita } from "../domain/priorita.js";
@@ -125,7 +125,7 @@ export function cerstvost(stav: StavImportu): string {
 }
 
 /** Vlastník infrastruktury (TMCZ / CETIN / VDF) – štítek všude, kde je zakázka */
-export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník siete">${esc(i || "?")}</span>`;
+export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník sítě">${esc(i || "?")}</span>`;
 
 export function stranka(titulek: string, uzivatel: string, stav: StavImportu, telo: string, o: { zalozka?: Zalozka; dotaz?: string } = {}): string {
   const zal = o.zalozka ?? "zakazka";
@@ -159,7 +159,7 @@ export function strankaVysledku(
 <td>${esc(z.typAktivity)}</td><td>${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
   );
   const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${polozky.length} zakázek</small></h1>
-<div class="tbl"><table><thead><tr><th>ID obj. v ext. systéme / ID S7 obj.</th><th>P17: Vlastník siete</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th><th>Priorita</th></tr></thead>
+<div class="tbl"><table><thead><tr><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th><th>Priorita</th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
 ${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo, { dotaz });
@@ -213,7 +213,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
         (h) => `<tr><td class="nowrap">${esc(dt(h.export_at))}</td><td>${esc(h.stav_mwf)}</td><td>${esc(h.parkovani ?? "")}</td><td>${esc(h.vysledek ?? "")}</td><td>${esc(dt(h.termin_od))}</td><td>${esc(h.technik ?? "")}</td></tr>`,
       )
       .join("");
-  const hlavicka = `<thead><tr><th>Export</th><th>Stav</th><th>Dôvod parkovania</th><th>Výsledok dojednávania</th><th>Dohodnutý termín</th><th>Pracovný zdroj</th></tr></thead>`;
+  const hlavicka = `<thead><tr><th>Export</th><th>Stav</th><th>Důvod parkování</th><th>Výsledek dojednávání</th><th>Dohodnutý termín</th><th>Pracovní zdroj</th></tr></thead>`;
   const historieHtml = d.historie.length
     ? `<table class="male">${hlavicka}<tbody>${radkyHistorie(d.historie.slice(0, POSLEDNI))}</tbody></table>${
         d.historie.length > POSLEDNI
@@ -228,29 +228,29 @@ ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená $
 <div class="card"><h2>Zákazník</h2><dl>
 ${radek("Zákazník", esc(z.zakaznik))}
 ${radek("Kontakt", z.telefony.map((t) => `<a href="tel:${esc(t.replace(/\s/g, ""))}">${esc(t)}</a>`).join(", "))}
-${radek("Adresa / Psč", esc(adresa))}
-${radek("Subregión", esc(z.subregion))}
+${radek("Adresa / PSČ", esc(adresa))}
+${radek("Subregion", esc(z.subregion))}
 ${radek("Produkt", esc(z.produkt))}
 </dl></div>
 <div class="card"><h2>Zakázka</h2><dl>
 ${radek("Stav", esc(z.stavMwf))}
-${radek("Pracovný zdroj", esc(z.technik))}
-${radek("Čas postúpenia dod.", esc(dt(z.prideleno)))}
-${radek("Výsledok dojednávania", esc(z.vysledek ?? ""))}
+${radek("Pracovní zdroj", esc(z.technik))}
+${radek("Čas postoupení dod.", esc(dt(z.prideleno)))}
+${radek("Výsledek dojednávání", esc(z.vysledek ?? ""))}
 ${radek("Do splnění", slaText)}
 ${radek("Dohodnutý termín", esc(z.termin ? `${dt(z.termin.od)} – ${fmtTime(z.termin.do)}` : ""))}
-${radek("Dôvod parkovania", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniNestandardni && `nestandardní: ${z.parkovaniNestandardni}`].filter(Boolean).join(" · ")))}
-${radek("P17: Vlastník siete", infraStitek(z.infrastruktura))}
+${radek("Důvod parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniNestandardni && `nestandardní: ${z.parkovaniNestandardni}`].filter(Boolean).join(" · ")))}
+${radek("P17: Vlastník sítě", infraStitek(z.infrastruktura))}
 ${radek("Typ aktivity", esc(`${z.typAktivity}${z.predobjednavka ? " · předobjednávka" : ""}`))}
-${radek("P3: Typ balíka", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
+${radek("P3: Typ balíčku", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
 ${radek("Priorita", `<span class="prio ${d.priorita}">${d.priorita}</span> ${esc(d.duvod)}`)}
-${radek("Preferovaný dátum", esc(den(z.preferovanyDatum)))}
-${radek("Dátum RFS", esc(den(z.rfs)))}
+${radek("Preferované datum", esc(den(z.preferovanyDatum)))}
+${radek("Datum RFS", esc(den(z.rfs)))}
 ${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
 </dl></div>
 ${mapa}
 </div>
-${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity se stejným ID obj. v ext. systéme</h2>${d.souvisejici
+${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity se stejným ID obj. v ext. systému</h2>${d.souvisejici
     .map((s) => `<div>ID aktivity <a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> · ${esc(s.typ_aktivity)} · ${esc(s.stav_mwf)}${s.uzavreno ? " · uzavřeno" : ""}</div>`)
     .join("")}</div>` : ""}
 <div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
@@ -547,7 +547,7 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
   return `<h2 class="sekce">Zakázky do slotu ${esc(slot(vyb.od, vyb.do))} · ${esc(vyb.technik.jmeno)}</h2>
 ${v.chyba ? `<div class="err">${esc(v.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
-<div class="tbl"><table><thead><tr><th>#</th><th>ID obj. v ext. systéme / ID S7 obj.</th><th>P17: Vlastník siete</th><th>Zákazník / Adresa</th><th>Priorita</th><th>Do splnění</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>
+<div class="tbl"><table><thead><tr><th>#</th><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Priorita</th><th>Do splnění</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="9" class="muted">${v.chyba ? "" : "Žádná vhodná zakázka v dosahu (max 75 km zajížďky)."}</td></tr>`}</tbody></table></div>
 <p class="muted">Kandidátů ${v.kandidatu} (z toho flex k přesunu ${v.flex}). Pořadí: naléhavost SLA a priorita, pak km navíc oproti trase dne. Zákazníkovi je vždy potřeba zavolat a termín potvrdit.</p>`;
 }
