@@ -14,7 +14,7 @@ describe("geokódování", () => {
       }));
     }) as unknown as typeof fetch;
     const g = googleGeokoder("KLIC", fakeFetch);
-    expect(await g.najdi("Na Strži 1702/65, Praha")).toEqual({ bod: { lat: 50.03, lon: 14.45 }, presnost: "adresa", zdroj: "google" });
+    expect(await g.najdi("Na Strži 1702/65, Praha")).toEqual({ bod: { lat: 50.03, lon: 14.45 }, presnost: "adresa", zdroj: "google", cast: null });
     expect((await g.najdi("Neexistující 1")).presnost).toBe("nenalezeno");
     expect(volani[0]).toContain("components=country%3ACZ");
     // odmítnutý klíč není „nenalezeno“ – musí skončit chybou (a neuložit se do cache)
@@ -75,7 +75,7 @@ describe("geokódování", () => {
     let n = 0;
     const g = sCache({ query: (s, p) => pg.query(s, p) as never }, { najdi: async () => (n++, { bod: { lat: 1, lon: 2 }, presnost: "adresa", zdroj: "test" }) });
     await g.najdi("Švermova 1381/22, Beroun");
-    expect(await g.najdi("švermova  1381/22,  Beroun")).toEqual({ bod: { lat: 1, lon: 2 }, presnost: "adresa", zdroj: "test" });
+    expect(await g.najdi("švermova  1381/22,  Beroun")).toMatchObject({ bod: { lat: 1, lon: 2 }, presnost: "adresa", zdroj: "test" });
     expect(n).toBe(1);
     expect(klicAdresy("Na Drážce 1561, Pardubice", "530 03")).toBe("na drážce 1561, pardubice, 530 03");
   }, 60_000);
