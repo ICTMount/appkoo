@@ -139,7 +139,7 @@ describe("webový server", () => {
     expect(detail.status).toBe(200);
     const hd = await detail.text();
     expect(hd).toContain("Dvořák, Petr");
-    expect(hd).toContain("Vlastník infrastruktury");
+    expect(hd).toContain("P17: Vlastník siete");
     expect(hd).toContain("Kam naplánovat");
     const a1 = await get("/zakazka/A1", "davidh@ictmount.com");
     expect(a1.headers.get("content-security-policy")).toContain("frame-src https://www.google.com");
@@ -147,7 +147,7 @@ describe("webový server", () => {
     expect(h1).toContain("Adresa a mapa");
     expect(h1).toContain("P3: Typ balíka");
     expect(h1).toContain("https://www.google.com/maps?q=Pr%C3%A1va%201%2C%20Praha");
-    expect(h1.indexOf("Poznámka MWF")).toBeLessThan(h1.indexOf("Kontaktování"));
+    expect(h1.indexOf("Poznámka (nejnovější")).toBeLessThan(h1.indexOf("Kontaktování"));
     const hledani = await get("/?q=O-8550000003", "davidh@ictmount.com");
     expect(hledani.status).toBe(302);
     expect(hledani.headers.get("location")).toBe("/zakazka/A3");
