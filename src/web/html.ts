@@ -92,7 +92,7 @@ header .lista{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-ite
 header .vlevo{justify-self:start}header .logo{font-size:20px}
 header .stred{display:flex;flex-direction:column;align-items:center;gap:8px}header .stred .export{align-items:center;text-align:center;font-size:12px;color:var(--muted)}
 @media (max-width:760px){header .lista{grid-template-columns:1fr}header .vlevo,header .stred,header .vpravo{justify-self:stretch;align-items:flex-start}}
-nav.zalozky{display:flex;gap:8px;justify-content:center;padding:4px 20px 10px}nav.zalozky a{font-size:15px;padding:8px 22px}nav.zalozky a{padding:7px 14px;border-radius:6px;color:var(--text);font-weight:600}
+nav.zalozky{display:flex;gap:8px;justify-content:flex-start;padding:4px 20px 10px}nav.zalozky a{font-size:15px;padding:8px 22px}nav.zalozky a{padding:7px 14px;border-radius:6px;color:var(--text);font-weight:600}
 nav.zalozky a.on{background:var(--accent);color:#fff}nav.zalozky a:hover{text-decoration:none;background:var(--line)}nav.zalozky a.on:hover{background:var(--accent)}
 header .vpravo{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:12px;color:var(--muted)}
 header .kdo{color:var(--text)}a.konfig{font-size:12px;font-weight:600}a.konfig.on{text-decoration:underline}
