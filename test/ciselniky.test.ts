@@ -21,7 +21,7 @@ describe("import číselníku z CSV", () => {
     const n = nahledImportu("technici", csv, technici, { regiony });
     expect(n.nove.map((p) => p.jmeno)).toEqual(["Novák"]);
     expect(n.zmenene).toHaveLength(1);
-    expect(n.zmenene[0]!.sloupce).toEqual(["Regiony", "Výjezd z (adresa)"]);
+    expect(n.zmenene[0]!.sloupce).toEqual(["Regiony", "Výjezd z (primární adresa)"]);
     expect(n.zmenene[0]!.po.nazevVKalendari).toBe("Brestanský"); // sloupec v CSV chybí → zůstane
     expect(n.bezeZmeny).toBe(1);
     expect(n.nove[0]!.aktivni).toBe(true);
