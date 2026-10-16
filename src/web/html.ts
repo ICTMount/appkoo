@@ -70,7 +70,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}.P0{background:var(--p0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle}.predobj-pruh{border-left:4px solid #7b1fa2}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
+.card h2{font-size:14px;margin:0 0 8px}.predobj{font-size:12px;font-weight:600;color:#9c4dcc;vertical-align:middle;margin-left:4px}.predobj-pruh{border-left:4px solid #7b1fa2}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
@@ -178,7 +178,13 @@ const s7 = (z: { idS7: string; predobjednavka?: boolean; typAktivity: string }) 
 
 /** Předobjednávka (Typ aktivity Predobjednavka_*) – realizovat až po změně na standardní zakázku */
 export const predobjStitek = (z: { predobjednavka?: boolean }) =>
-  z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
+  z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF">předobjednávka</span>` : "";
+
+/** Buňka ID v seznamech: O-ID (+ předobjednávka), pod tím malým písmem ID S7 obj. a u předobjednávky RFS */
+const idBunka = (z: { idAktivity: string; idObjednavky: string; idS7: string; predobjednavka?: boolean; typAktivity: string; rfs?: Date | null }) =>
+  `<a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${predobjStitek(z)}${s7(z) ? `<br><small>${esc(s7(z))}</small>` : ""}${
+    z.predobjednavka && z.rfs ? `<br><small>RFS ${esc(den(z.rfs))}</small>` : ""
+  }`;
 
 export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník sítě">${esc(i || "?")}</span>`;
 
@@ -213,8 +219,8 @@ export function strankaVysledku(
   casti?: Casti,
 ): string {
   const radky = polozky.map(
-    ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${s7(z) ? `<br><small>${esc(s7(z))}</small>` : ""}</td>
-<td>${infraStitek(z.infrastruktura)}${predobjStitek(z)}</td><td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}</td>
+    ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid">${idBunka(z)}</td>
+<td>${infraStitek(z.infrastruktura)}</td><td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}</td>
 <td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
   );
   const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${polozky.length} zakázek</small></h1>
@@ -292,7 +298,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
       }`
     : `<span class="muted">bez historie</span>`;
 
-  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)}${predobjStitek(z)} ${infraStitek(z.infrastruktura)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
@@ -398,7 +404,7 @@ const slot = (od: Date, do_: Date) => `${denTydne(od)} ${fmtDate(od)} ${fmtTime(
 function hlavickaZakazky(d: Detail): string {
   const z = d.z;
   return `<p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← ${esc(z.idObjednavky || z.idAktivity)}</a></p>
-<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
+<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)}${predobjStitek(z)} ${infraStitek(z.infrastruktura)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
 }
 
 
@@ -702,8 +708,8 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
     }
     const smiZde = smi && (!p || zapis.smiTechnik(p.technik));
     return `<tr><td>${i + 1}</td>
-<td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${s7(z) ? `<br><small>${esc(s7(z))}</small>` : ""}</td>
-<td>${infraStitek(z.infrastruktura)}${predobjStitek(z)}</td>
+<td class="oid">${idBunka(z)}</td>
+<td>${infraStitek(z.infrastruktura)}</td>
 <td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}${posledniPoznamky(z.zaznamy)}</td>
 <td><span class="prio ${n.kandidat.priorita}">${n.kandidat.priorita}</span></td>
 <td class="nowrap">${n.kandidat.slaKonec ? esc(dt(n.kandidat.slaKonec)) : ""}${n.poSla ? `<br><span class="prio P1">po SLA</span>` : ""}</td>
