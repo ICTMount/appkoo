@@ -296,6 +296,7 @@ describe("web: nabídka a zápis termínu", () => {
     expect(hs).toContain("O-8560000004");
     expect(hs).toContain("přesun dopředu (flex)");
     expect(hs).toContain('class="infra i-');
+    expect(hs).toContain("může i dřív"); // poslední poznámka z MWF u kandidáta
     expect(hs).not.toContain("O-8560000002"); // blokovaná lokalita / ZAK
     expect(hs).not.toContain("O-8560000003"); // PIV + smlouva s JP
 

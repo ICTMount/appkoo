@@ -124,7 +124,7 @@ form.terminy{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bott
 .trasa{margin-top:6px;font-size:12px;border-left:2px solid var(--line);padding-left:8px}.soused{padding:1px 0;color:var(--muted)}
 .soused .smer{display:inline-block;min-width:42px}.soused b{color:var(--text);font-weight:600}.soused .km{white-space:nowrap;font-weight:600;color:var(--text)}
 .soused.zakl{font-style:italic}.soused .km.dlouhy{color:var(--p1)}.soused.tato{color:var(--accent);font-weight:600}
-.adr{color:var(--muted)}a.volny.radek{display:block;margin:3px 0}a.volny .cas{margin-right:4px}
+.adr{color:var(--muted)}.pozn{font-size:12px;margin-top:4px;padding-left:6px;border-left:2px solid var(--line);color:var(--muted);max-width:520px}.pozn b{color:var(--text);font-weight:600}a.volny.radek{display:block;margin:3px 0}a.volny .cas{margin-right:4px}
 .rychle{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
 .rychle a.on{border-color:var(--accent);background:var(--accent);color:#fff}.rychle a:hover{text-decoration:none}
 form.filtr label b{color:var(--text);margin-left:4px}
@@ -601,6 +601,18 @@ ${s.prehled.nedostupne.length ? `<div class="warn">Kalendář nejde přečíst: 
   return stranka("Doplnit technika", uzivatel, stav, `${formular}${horni}${dolni}`, { zalozka: "technik" });
 }
 
+/** Dvě poslední poznámky z MWF (nejnovější první), zkrácené – aby bylo vidět, co se se zakázkou naposledy dělo */
+function posledniPoznamky(zaznamy: PolozkaFronty["z"]["zaznamy"], pocet = 2, delka = 180): string {
+  const posledni = zaznamy.slice(-pocet).reverse();
+  if (!posledni.length) return `<div class="pozn muted">bez poznámky v MWF</div>`;
+  return posledni
+    .map((x) => {
+      const text = x.text.length > delka ? `${x.text.slice(0, delka - 1)}…` : x.text;
+      return `<div class="pozn"><b>${esc(`${fmtDate(x.at).slice(0, 6)} ${fmtTime(x.at)}`)}</b> ${esc(x.autor.replace(/\s*\(Vegacom\)/i, ""))}${x.kody.length ? ` · ${esc(x.kody.join(", "))}` : ""}: ${esc(text)}</div>`;
+    })
+    .join("");
+}
+
 function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean }): string {
   const smi = zapis.zapnuty && zapis.smiTechnik(vyb.technik.jmeno);
   const radky = v.navrhy.map((n, i) => {
@@ -616,7 +628,7 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
     return `<tr><td>${i + 1}</td>
 <td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
 <td>${infraStitek(z.infrastruktura)}</td>
-<td>${esc(z.zakaznik)}<br><small>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</small></td>
+<td>${esc(z.zakaznik)}<br><small>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</small>${posledniPoznamky(z.zaznamy)}</td>
 <td><span class="prio ${n.kandidat.priorita}">${n.kandidat.priorita}</span></td>
 <td class="nowrap">${n.kandidat.slaKonec ? esc(dt(n.kandidat.slaKonec)) : ""}${n.poSla ? `<br><span class="prio P1">po SLA</span>` : ""}</td>
 <td class="nowrap">+${n.kmNavic.toFixed(1)} km<br><small>den ${n.kmDne.toFixed(0)} km</small></td>
