@@ -54,6 +54,12 @@ afterEach(async () => {
   await new Promise<void>((r) => s.close(() => r()));
 });
 
+async function spustSPortem() {
+  server = createServer(vytvorHandler(db, { povoleni: ["@ictmount.com"], ted: () => TED }));
+  await new Promise<void>((r) => server!.listen(0, r));
+  return (server.address() as AddressInfo).port;
+}
+
 async function spust(povoleni = ["@ictmount.com"], devUser?: string) {
   server = createServer(vytvorHandler(db, { povoleni, devUser, ted: () => TED }));
   await new Promise<void>((r) => server!.listen(0, r));
@@ -155,6 +161,22 @@ describe("webový server", () => {
     expect((await get("/zakazka/NIC", "davidh@ictmount.com")).status).toBe(404);
     expect((await get("/", "jina@ictmount.com")).status).toBe(403); // jen vyjmenovaní uživatelé
     expect(await (await get("/healthz")).text()).toBe("ok");
+  });
+
+  it("přepínač vzhledu: cookie tema, návrat na stránku, data-theme na <html>", async () => {
+    const port = await spustSPortem();
+    const hl = { "x-goog-authenticated-user-email": "accounts.google.com:davidh@ictmount.com" };
+    const r = await fetch(`http://127.0.0.1:${port}/tema?t=dark`, { redirect: "manual", headers: { ...hl, referer: `http://127.0.0.1:${port}/zakazka/A1` } });
+    expect(r.status).toBe(302);
+    expect(r.headers.get("location")).toBe("/zakazka/A1");
+    expect(r.headers.get("set-cookie")).toMatch(/^tema=dark; Max-Age=31536000; Path=\//);
+    const tmava = await (await fetch(`http://127.0.0.1:${port}/`, { headers: { ...hl, cookie: "x=1; tema=dark" } })).text();
+    expect(tmava).toContain('<html lang="cs" data-theme="dark">');
+    expect(tmava).toContain('href="/tema?t=light"');
+    const auto = await fetch(`http://127.0.0.1:${port}/tema?t=auto`, { redirect: "manual", headers: { ...hl, referer: "https://zly.web/x" } });
+    expect(auto.headers.get("location")).toBe("/");
+    expect(auto.headers.get("set-cookie")).toMatch(/^tema=; Max-Age=0/);
+    expect(await (await fetch(`http://127.0.0.1:${port}/`, { headers: hl })).text()).toContain('<html lang="cs">');
   });
 
   it("lokální vývoj přes DEV_USER bez IAP", async () => {

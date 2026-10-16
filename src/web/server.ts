@@ -123,7 +123,16 @@ async function uzivatel(req: IncomingMessage, n: NastaveniWebu): Promise<string 
   return email ?? n.devUser ?? null;
 }
 
+/** Vzhled zvolený přepínačem (cookie „tema“): light / dark; bez cookie podle systému */
+const temaOdpovedi = new WeakMap<ServerResponse, "light" | "dark">();
+export function temaZCookie(cookie: string | undefined): "light" | "dark" | null {
+  const v = (cookie ?? "").match(/(?:^|;\s*)tema=(light|dark)(?:;|$)/)?.[1];
+  return v === "light" || v === "dark" ? v : null;
+}
+
 function posli(res: ServerResponse, kod: number, html: string) {
+  const tema = temaOdpovedi.get(res);
+  if (tema) html = html.replace('<html lang="cs">', `<html lang="cs" data-theme="${tema}">`);
   res.writeHead(kod, {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
@@ -139,6 +148,8 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
   const ted = n.ted ?? (() => tedPraha());
   return async (req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    const tema = temaZCookie(req.headers.cookie);
+    if (tema) temaOdpovedi.set(res, tema);
     try {
       if (url.pathname === "/healthz") {
         res.writeHead(200, { "content-type": "text/plain" });
@@ -151,6 +162,22 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
       const email = await uzivatel(req, n);
       if (!email) return posli(res, 401, strankaChyby(401, "Nepřihlášený uživatel – aplikace se otevírá přes přihlášení Google."));
       if (!povolenUzivatel(email, n.povoleni)) return posli(res, 403, strankaChyby(403, `Účet ${email} nemá do aplikace přístup.`));
+
+      // přepínač světlý / tmavý / podle systému – uloží volbu do cookie a vrátí se na stránku, odkud přišel
+      if (url.pathname === "/tema") {
+        const t = url.searchParams.get("t");
+        const cookie = t === "light" || t === "dark" ? `tema=${t}; Max-Age=31536000` : "tema=; Max-Age=0";
+        let zpet = "/";
+        try {
+          const ref = new URL(String(req.headers.referer ?? ""));
+          if (ref.host === (req.headers["x-forwarded-host"] ?? req.headers.host)) zpet = ref.pathname + ref.search + ref.hash;
+        } catch {
+          /* bez platného Refereru zpět na úvod */
+        }
+        res.writeHead(302, { location: zpet, "set-cookie": `${cookie}; Path=/; SameSite=Lax; Secure; HttpOnly` });
+        res.end();
+        return;
+      }
 
       const now = ted();
       const stav = await nactiStavImportu(db, now);

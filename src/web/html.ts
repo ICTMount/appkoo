@@ -47,8 +47,7 @@ function stavKontaktu(p: PolozkaFronty, now: Date): string {
 const CSS = `
 :root{--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#e3e2dd;--accent:#1f5fbf;
 --p1:#c62828;--p2:#e07a00;--p3:#4a7a2c;--p0:#8a8a85;--warn-bg:#fff4e0;--warn:#8a5300}
-@media (prefers-color-scheme:dark){:root{--bg:#161615;--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#34332f;
---accent:#7fa8ff;--p1:#ff6b6b;--p2:#ffab40;--p3:#9ccc65;--p0:#9a9993;--warn-bg:#3a2c12;--warn:#ffcc80}}
+
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 header{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -79,9 +78,9 @@ h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);f
 a.btn,button.btn{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:6px 12px;border:0;font-weight:600}
 a.btn:hover{text-decoration:none;opacity:.9}button[disabled]{opacity:.45;cursor:not-allowed}
 .ok{background:#e6f4ea;color:#1e5e2e;padding:10px 12px;border-radius:6px;margin-bottom:12px}
-@media (prefers-color-scheme:dark){.ok{background:#173322;color:#a5d6a7}}
+
 .err{background:#fde8e8;color:#8a1c1c;padding:10px 12px;border-radius:6px;margin-bottom:12px}
-@media (prefers-color-scheme:dark){.err{background:#3b1717;color:#ff9e9e}}
+
 fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:0 0 12px}legend{font-weight:600;padding:0 4px}
 .pole{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 .pole label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
@@ -100,14 +99,14 @@ header .vpravo{margin-left:auto;display:flex;gap:16px;align-items:center;font-si
 form.hledani{display:flex;gap:8px;padding:8px 20px;border-top:1px solid var(--line)}form.hledani input{flex:1;font-size:15px;padding:8px 10px}
 .infra{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid currentColor;vertical-align:middle;white-space:nowrap}
 .i-TMCZ{color:#d1006b}.i-CETIN{color:#1769c2}.i-VDF{color:#d10000}.i-jin{color:var(--muted)}
-@media (prefers-color-scheme:dark){.i-TMCZ{color:#ff5fb0}.i-CETIN{color:#6fb0ff}.i-VDF{color:#ff6b6b}}
+
 h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid var(--line)}
 .card.scroll{max-height:360px;overflow:auto}
 .tyden{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
 .tyden .card{padding:10px}.tyden h3{font-size:13px;margin:0 0 6px}
 .ud{font-size:12px;padding:4px 0;border-top:1px solid var(--line)}.ud:first-of-type{border-top:0}.ud .cas{color:var(--muted);margin-right:4px}
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
-a.volny.vyb{outline:2px solid var(--accent)}@media (prefers-color-scheme:dark){a.volny{background:#173322;color:#a5d6a7}}
+a.volny.vyb{outline:2px solid var(--accent)}
 .card.kompakt{padding:8px 12px;font-size:12px}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
 .konec-detailu{margin:26px 0 18px;border-top:3px double var(--line)}
@@ -117,6 +116,13 @@ section.planovani .tbl{border-color:var(--accent)}
 iframe.mapa{width:100%;height:220px;border:1px solid var(--line);border-radius:6px;margin:8px 0}
 table.male{font-size:12px}table.male th,table.male td{padding:3px 6px}details summary{cursor:pointer;margin-top:6px}
 .uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
+/* tmavý režim: podle systému, nebo ručně přepínačem (atribut data-theme na <html>, cookie „tema“) */
+:root{color-scheme:light dark}:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#161615;--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#34332f;
+--accent:#7fa8ff;--p1:#ff6b6b;--p2:#ffab40;--p3:#9ccc65;--p0:#9a9993;--warn-bg:#3a2c12;--warn:#ffcc80}:root:not([data-theme=light]) .ok{background:#173322;color:#a5d6a7}:root:not([data-theme=light]) .err{background:#3b1717;color:#ff9e9e}:root:not([data-theme=light]) .i-TMCZ{color:#ff5fb0}:root:not([data-theme=light]) .i-CETIN{color:#6fb0ff}:root:not([data-theme=light]) .i-VDF{color:#ff6b6b}:root:not([data-theme=light]) a.volny{background:#173322;color:#a5d6a7}}
+:root[data-theme=dark]{--bg:#161615;--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#34332f;
+--accent:#7fa8ff;--p1:#ff6b6b;--p2:#ffab40;--p3:#9ccc65;--p0:#9a9993;--warn-bg:#3a2c12;--warn:#ffcc80}:root[data-theme=dark] .ok{background:#173322;color:#a5d6a7}:root[data-theme=dark] .err{background:#3b1717;color:#ff9e9e}:root[data-theme=dark] .i-TMCZ{color:#ff5fb0}:root[data-theme=dark] .i-CETIN{color:#6fb0ff}:root[data-theme=dark] .i-VDF{color:#ff6b6b}:root[data-theme=dark] a.volny{background:#173322;color:#a5d6a7}
+.tema{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}.tema a{padding:3px 9px;color:var(--muted);font-size:12px}.tema a:hover{text-decoration:none;background:var(--line)}:root:not([data-theme]) .tema .t-auto,:root[data-theme=light] .tema .t-light,:root[data-theme=dark] .tema .t-dark{background:var(--accent);color:#fff}
 `;
 
 export type Zalozka = "zakazka" | "technik";
@@ -139,7 +145,7 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
 <title>${esc(titulek)} – AppKoo</title><style>${CSS}</style></head><body>
 <header><div class="lista"><a class="logo" href="/">AppKoo</a>
 <nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a></nav>
-<div class="vpravo">${cerstvost(stav)}<div>${esc(uzivatel)}</div></div></div>
+<div class="vpravo">${cerstvost(stav)}<nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav><div>${esc(uzivatel)}</div></div></div>
 <form class="hledani" action="/" method="get"><input name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku"><button>Najít a plánovat</button></form></header>
 <main>${telo}</main></body></html>`;
 }
