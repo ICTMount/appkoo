@@ -93,7 +93,21 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
   return { blokace, upozorneni };
 }
 
+/** Soused v trase dne: zakázka před / po navrženém slotu, nebo výjezd / návrat na základnu */
+export interface Soused {
+  /** „08:00–09:59“ (u základny prázdné) */
+  cas: string;
+  popis: string;
+  /** přejezd mezi sousedem a navrženou zakázkou (km) */
+  km: number;
+  zakladna?: boolean;
+  /** adresa pro odkaz na trasu v mapě */
+  adresa?: string;
+}
+
 export interface MoznostSlotu extends Moznost {
+  /** jak slot zapadá do trasy dne: předchozí a následující zastávka, odhad příjezdu */
+  sousede?: { pred: Soused; po: Soused; prijezd: number };
   kalendar: string;
   nazevVKalendari: string;
   /** událost VOLNY, která se přepíše na zakázku */
@@ -204,6 +218,23 @@ export async function nabidniProZakazku(
   );
 
   const podleJmena = new Map(citelni.map((t) => [t.jmeno, t]));
+  const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(Math.round(min % 60)).padStart(2, "0")}`;
+  const popisUdalosti = (technik: string, id: string) => {
+    const u = udalosti.find((x) => x.technik === technik && (x.appkoo ?? x.id) === id);
+    if (!u) return { cas: "", popis: id };
+    const adresa = adresaZMwf(u) ?? u.location;
+    const text = [u.summary.replace(/^[^-]+-\s*/, ""), adresa].filter(Boolean).join(" · ");
+    return { cas: `${hm(minutesOfDay(u.od))}–${hm(minutesOfDay(u.do) - 1)}`, popis: text.length > 90 ? `${text.slice(0, 89)}…` : text, ...(adresa ? { adresa } : {}) };
+  };
+  const sousede = (m: Moznost): MoznostSlotu["sousede"] => {
+    const zs = m.trasa.zastavky;
+    const i = zs.findIndex((x) => x.id === z.idAktivity);
+    if (i < 0) return undefined;
+    const t = podleJmena.get(m.technik);
+    const pred: Soused = i === 0 ? { cas: "", popis: `výjezd z ${t?.vyjezd || "základny"}`, km: zs[0]!.kmPrejezd, zakladna: true, ...(t?.vyjezd ? { adresa: t.vyjezd } : {}) } : { ...popisUdalosti(m.technik, zs[i - 1]!.id), km: zs[i]!.kmPrejezd };
+    const po: Soused = i === zs.length - 1 ? { cas: "", popis: "návrat na základnu (konec dne)", km: m.trasa.kmZpet, zakladna: true, ...(t?.vyjezd ? { adresa: t.vyjezd } : {}) } : { ...popisUdalosti(m.technik, zs[i + 1]!.id), km: zs[i + 1]!.kmPrejezd };
+    return { pred, po, prijezd: zs[i]!.zacatek };
+  };
   const moznosti: MoznostSlotu[] = [];
   const videne = new Set<string>();
   for (const m of zakladni) {
@@ -214,7 +245,7 @@ export async function nabidniProZakazku(
     const t = podleJmena.get(m.technik)!;
     const slot = udalosti.find((u) => u.technik === m.technik && isoDate(u.od) === m.datum && minutesOfDay(u.od) === m.okno.od && jeVolneOkno(u));
     if (!slot) continue;
-    moznosti.push({ ...m, kalendar: t.kalendar, nazevVKalendari: t.nazevVKalendari, eventId: slot.id, od: slot.od, do: slot.do });
+    moznosti.push({ ...m, kalendar: t.kalendar, nazevVKalendari: t.nazevVKalendari, eventId: slot.id, od: slot.od, do: slot.do, sousede: sousede(m) });
   }
   return { moznosti, nedostupne, bezZakladny: [...bezZakladny], bezPolohy, technikuCelkem: vhodni.length };
 }

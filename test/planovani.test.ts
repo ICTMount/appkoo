@@ -155,6 +155,12 @@ describe("nabídka termínů", () => {
     expect(n.moznosti.map((m) => m.eventId)).toEqual(expect.arrayContaining(["v1", "v2"]));
     expect(n.moznosti.map((m) => m.eventId)).not.toContain("v0");
     expect(n.moznosti[0]!.technik).toBe("Hristov");
+    // sousedé v trase: 16.10. má Hristov 8–10 zakázku O-8559999999, po slotu už nic → návrat na základnu
+    const v1 = n.moznosti.find((m) => m.eventId === "v1")!;
+    expect(v1.sousede!.pred.popis).toContain("O-8559999999");
+    expect(v1.sousede!.pred.cas).toBe("08:00–09:59");
+    expect(v1.sousede!.po.zakladna).toBe(true);
+    expect(v1.sousede!.prijezd).toBeGreaterThanOrEqual(600);
   });
 
   it("adresa, kterou nejde najít, vrátí srozumitelnou chybu", async () => {
@@ -219,6 +225,8 @@ describe("web: nabídka a zápis termínu", () => {
     expect(html).toContain("Hristov");
     expect(html).toContain("Vybrat");
     expect(html).toContain("Nekdo");
+    expect(html).toContain("↑ před");
+    expect(html).toContain("tato zakázka – příjezd cca");
     const f = await w.get(`/zakazka/P1/zapis?${new URLSearchParams(vyber)}`);
     expect(await f.text()).toContain("Zapsat termín do kalendáře");
     const blok = await (await w.get("/zakazka/P2")).text();

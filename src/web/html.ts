@@ -119,6 +119,9 @@ section.planovani>h2{font-size:20px;margin:0 0 12px;color:var(--accent)}section.
 section.planovani .tbl{border-color:var(--accent)}
 iframe.mapa{width:100%;height:220px;border:1px solid var(--line);border-radius:6px;margin:8px 0}
 table.male{font-size:12px}table.male th,table.male td{padding:3px 6px}details summary{cursor:pointer;margin-top:6px}
+.trasa{margin-top:6px;font-size:12px;border-left:2px solid var(--line);padding-left:8px}.soused{padding:1px 0;color:var(--muted)}
+.soused .smer{display:inline-block;min-width:42px}.soused b{color:var(--text);font-weight:600}.soused .km{white-space:nowrap;font-weight:600;color:var(--text)}
+.soused.zakl{font-style:italic}.soused .km.dlouhy{color:var(--p1)}.soused.tato{color:var(--accent);font-weight:600}
 .uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
 /* tmavý režim: podle systému, nebo ručně přepínačem (atribut data-theme na <html>, cookie „tema“) */
 :root{color-scheme:light dark}:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
@@ -355,7 +358,19 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
   const radky = nabidka.moznosti.map((m: MoznostSlotu, i) => {
     const smi = zapis.zapnuty && zapis.smiTechnik(m.technik);
     const q = new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() });
-    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b></td><td>${esc(m.technik)}</td>
+    const so = m.sousede;
+    const radekSouseda = (smer: string, x: NonNullable<MoznostSlotu["sousede"]>["pred"]) =>
+      `<div class="soused${x.zakladna ? " zakl" : ""}"><span class="smer">${smer}</span> ${x.cas ? `<b>${esc(x.cas)}</b> ` : ""}${esc(x.popis)} <span class="km${x.km > DLOUHY_PREJEZD_KM ? " dlouhy" : ""}">${x.km.toFixed(1)} km</span></div>`;
+    const adresaZ = [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
+    const mapa = so && adresaZ
+      ? `https://www.google.com/maps/dir/${[so.pred.adresa ?? "", adresaZ, so.po.adresa ?? ""].filter(Boolean).map((a) => encodeURIComponent(a)).join("/")}`
+      : "";
+    const trasa = so
+      ? `${radekSouseda("↑ před", so.pred)}<div class="soused tato">● tato zakázka – příjezd cca ${esc(`${String(Math.floor(so.prijezd / 60)).padStart(2, "0")}:${String(Math.round(so.prijezd % 60)).padStart(2, "0")}`)}</div>${radekSouseda("↓ po", so.po)}${
+          mapa ? `<div class="soused"><a href="${esc(mapa)}" target="_blank" rel="noopener">trasa v mapě →</a></div>` : ""
+        }`
+      : "";
+    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${trasa ? `<div class="trasa">${trasa}</div>` : ""}</td><td>${esc(m.technik)}</td>
 <td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
 <td>${m.poSla ? `<span class="prio P1">po SLA</span>` : "v SLA"}</td>
 <td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
@@ -364,8 +379,11 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
 <div class="tbl"><table><thead><tr><th>#</th><th>Slot</th><th>Technik</th><th>Km navíc</th><th>Do splnění</th><th></th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="6" class="muted">${nabidka.chyba ? "" : "Žádný volný slot v dosahu (max 75 km zajížďky) v příštích 10 pracovních dnech."}</td></tr>`}</tbody></table></div>
-<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: zaplnění dne, SLA, km navíc oproti trase dne, preferované okno 10–14 h.</p>`;
+<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: zaplnění dne, SLA, km navíc oproti trase dne, preferované okno 10–14 h. U každého slotu je vidět, kam technik jede před ní a po ní (km = přejezd, odhad vzdušnou čarou × 1,3).</p>`;
 }
+
+/** přejezd nad tento limit se v nabídce zvýrazní (červeně) – na první pohled vidět nesmyslnou cestu */
+const DLOUHY_PREJEZD_KM = 30;
 
 const vyber = (name: string, moznosti: [string, string][], vybrano = "") =>
   `<select name="${name}">${moznosti.map(([v, t]) => `<option value="${esc(v)}"${v === vybrano ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
