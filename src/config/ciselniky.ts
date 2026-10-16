@@ -100,8 +100,6 @@ export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
       { klic: "jmeno", nazev: "Jméno", typ: "text", povinny: true },
       { klic: "inicialy", nazev: "Iniciály", typ: "text" },
       { klic: "role", nazev: "Role", typ: "vyber", hodnoty: ROLE_UZIVATELU, povinny: true },
-      { klic: "regiony", nazev: "Regiony", typ: "seznam", odkaz: "regiony" },
-      { klic: "routing", nazev: "Nedokončené", typ: "vyber", hodnoty: ["", "FTTH Praha", "FTTH mimo Prahu", "PIV / SAT"] },
       { klic: "aktivni", nazev: "Aktivní", typ: "anoNe" },
     ],
   },
