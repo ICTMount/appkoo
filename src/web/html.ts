@@ -7,6 +7,7 @@ import type { Detail, Filtr, Fronta, PolozkaFronty, StavImportu } from "./data.j
 import { pokusyZakazky } from "./data.js";
 import type { Brany, MoznostSlotu, Nabidka } from "../plan/planovac.js";
 import { POVINNA_POTVRZENI } from "./planovani.js";
+import type { Nalez, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
 
 export function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -151,7 +152,7 @@ ${fronta.polozky.length > MAX ? `<p class="muted">Zobrazeno prvních ${MAX} z ${
   return stranka("Fronta k volání", uzivatel, stav, telo);
 }
 
-export function strankaDetailu(d: Detail, stav: StavImportu, uzivatel: string, now: Date): string {
+export function strankaDetailu(d: Detail, stav: StavImportu, uzivatel: string, now: Date, zdroje: VysledekZdroje[] | null = null): string {
   const z = d.z;
   const pokusy = pokusyZakazky(z);
   const radek = (k: string, v: string) => (v ? `<dt>${esc(k)}</dt><dd>${v}</dd>` : "");
@@ -208,6 +209,7 @@ ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity se stejným O-ID</h2>${d.souvisejici
     .map((s) => `<div><a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> · ${esc(s.typ_aktivity)} · ${esc(s.stav_mwf)}${s.uzavreno ? " · uzavřeno" : ""}</div>`)
     .join("")}</div>` : ""}
+${sekceZdroju(zdroje)}
 <div class="grid" style="margin-top:12px">
 <div class="card"><h2>Poznámka MWF (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
 <div class="card"><h2>Historie změn mezi exporty</h2><div class="tbl" style="border:0"><table><thead><tr><th>Export</th><th>Stav</th><th>Parkování</th><th>Výsledek</th><th>Termín</th><th>Zdroj</th></tr></thead><tbody>${historie || `<tr><td colspan="6" class="muted">bez historie</td></tr>`}</tbody></table></div></div>
@@ -216,13 +218,46 @@ ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další 
   return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, telo);
 }
 
-export function strankaVysledkuHledani(dotaz: string, nalezene: { id: string }[], stav: StavImportu, uzivatel: string): string {
-  const telo = `<h1>Hledání „${esc(dotaz)}“</h1>${
-    nalezene.length
-      ? `<ul>${nalezene.map((n) => `<li><a href="/zakazka/${encodeURIComponent(n.id)}">${esc(n.id)}</a></li>`).join("")}</ul>`
-      : `<p>Nic nenalezeno. Zkuste celé O-ID (např. O-8553361721), S7 nebo ID aktivity, případně hledání ve <a href="/?hledat=${encodeURIComponent(dotaz)}">frontě</a>.</p>`
-  }`;
+export function strankaVysledkuHledani(
+  dotaz: string,
+  mwf: { id: string; popis: string }[],
+  zdroje: VysledekZdroje[] | null,
+  stav: StavImportu,
+  uzivatel: string,
+): string {
+  const telo = `<h1>Hledání „${esc(dotaz)}“</h1>
+<div class="card"><h2>MWF</h2>${
+    mwf.length
+      ? mwf.map((n) => `<div class="zaznam"><a href="/zakazka/${encodeURIComponent(n.id)}">${esc(n.popis)}</a></div>`).join("")
+      : `<span class="muted">V otevřených zakázkách MWF nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</span>`
+  }</div>
+${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo);
+}
+
+const NAZEV_ZDROJE: Record<Zdroj, string> = { email: "E-mail (koordinace)", kalendar: "Kalendáře techniků", chat: "Google Chat" };
+
+function nalez(n: Nalez): string {
+  return `<div class="zaznam${n.veVlakne ? " muted" : ""}"><div class="hl"><b>${esc(n.titulek)}</b>${n.cas ? ` · ${esc(dt(n.cas))}` : ""}${
+    n.kdo ? ` · ${esc(n.kdo)}` : ""
+  }${n.kde && n.kde !== n.titulek ? ` · ${esc(n.kde)}` : ""}${n.veVlakne ? " · ve vlákně" : ""}${
+    n.odkaz ? ` · <a href="${esc(n.odkaz)}" target="_blank" rel="noopener">otevřít</a>` : ""
+  }</div>${esc(n.text)}</div>`;
+}
+
+/** Nálezy z e-mailu, kalendářů a chatu – každý zdroj vlastní karta, chyba zdroje nezablokuje ostatní */
+export function sekceZdroju(zdroje: VysledekZdroje[] | null): string {
+  if (!zdroje) return `<div class="card" style="margin-top:12px"><h2>Ostatní zdroje</h2><span class="muted">Hledání v e-mailu, kalendářích a chatu zatím není zapnuté (chybí delegace účtu tmcz01).</span></div>`;
+  return `<div class="grid" style="margin-top:12px">${zdroje
+    .map((v) => {
+      const obsah = v.chyba
+        ? `<div class="err">Zdroj nedostupný: ${esc(v.chyba)}</div>`
+        : v.nalezy.length
+          ? v.nalezy.slice(0, 30).map(nalez).join("") + (v.nalezy.length > 30 ? `<p class="muted">… a dalších ${v.nalezy.length - 30}</p>` : "")
+          : `<span class="muted">nic nenalezeno</span>`;
+      return `<div class="card"><h2>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}</h2>${obsah}</div>`;
+    })
+    .join("")}</div>`;
 }
 
 export function strankaChyby(kod: number, zprava: string): string {

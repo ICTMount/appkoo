@@ -4,6 +4,7 @@ Aplikace pro koordinátorky Vegacom (instalační partner T-Mobile CZ). Nahrazuj
 v exportech z MWF: importuje zakázky, hlídá pravidla kontaktování, připravuje fráze do MWF
 a události do kalendáře techniků a pomocí Claude vytěžuje poznámky.
 
+Fáze 1 (tři pilíře): [`docs/faze1.md`](docs/faze1.md).
 Proces, ze kterého aplikace vychází: [`docs/proces-koordinace.md`](docs/proces-koordinace.md).
 Architektura systému: [`docs/architektura.md`](docs/architektura.md) · provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
 
@@ -29,6 +30,7 @@ Převzetí všech funkcí dashboardu není cíl.
 | Nasazení v Google Cloudu: projekt `appkoo`, Cloud SQL, servisní účty, přístup k Drive a kalendářům | – | hotovo (15.10.2026) |
 | Spouštěcí skript importu pro Cloud Run job + Dockerfile | `src/jobs/run.ts`, `Dockerfile` | hotovo, čeká na nasazení |
 | Webové rozhraní: fronta k volání + detail zakázky (přihlášení Google přes IAP) | `src/web/` | nasazeno (appkoo-web) |
+| Pilíř 1: hledání ve všech zdrojích (MWF, e-mail, kalendáře, Chat) na jedné stránce | `src/zdroje/`, `src/google/delegace.ts` | hotovo, čeká na delegaci a nasazení |
 | Nabídka termínů a zápis do kalendáře technika z webu | `src/plan/planovac.ts`, `src/web/planovani.ts` | hotovo, čeká na nasazení (pilot) |
 
 ## Spuštění

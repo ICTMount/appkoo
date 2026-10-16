@@ -14,6 +14,9 @@
 //   ZAPIS_KALENDARE      „ano“ = zápis termínů do kalendářů techniků zapnutý (jinak jen náhled nabídky)
 //   ZAPIS_TECHNICI       komu se smí zapisovat: jména techniků čárkami, nebo „vsichni“ (výchozí nikdo)
 //   GOOGLE_MAPS_API_KEY  geokódování adres (secret)
+//   DELEGACE_UZIVATEL    účet Workspace, jehož jménem se čte e-mail, kalendáře a chat (tmcz01@ictmount.com)
+//   SERVISNI_UCET        e-mail servisního účtu aplikace (appkoo-runner@appkoo.iam.gserviceaccount.com)
+//   CHAT_PROSTORY        chatové prostory k prohledání, čárkami (spaces/AAQA…)
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
@@ -28,6 +31,10 @@ import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
 import { slaKonec } from "../plan/kpi.js";
 import { kontrolaBran, nabidniProZakazku, textProMwf, type ZavislostiPlanovace } from "../plan/planovac.js";
+import { calendar as calendarApi } from "@googleapis/calendar";
+import { gmail as gmailApi } from "@googleapis/gmail";
+import { delegace } from "../google/delegace.js";
+import { hledejVsude, ocistitDotaz, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu, type Filtr } from "./data.js";
 import { strankaChyby, strankaDetailu, strankaFronty, strankaTerminu, strankaVysledkuHledani, strankaZapisu, strankaZapsano } from "./html.js";
 import { chybejiciPotvrzeni, inicialy, nactiKontext, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
@@ -41,6 +48,8 @@ export interface NastaveniWebu {
   /** kalendáře, geokódování a vzdálenosti pro nabídku termínů (vytvoří se při prvním použití) */
   planovac?: () => ZavislostiPlanovace;
   zapis?: { zapnuty: boolean; technici: string[] | "vsichni" };
+  /** e-mail, kalendáře a chat (pilíř 1 – hledání ve všech zdrojích) */
+  zdroje?: () => ZavislostiZdroju;
 }
 
 /** Formulář smí přijít jen z vlastní stránky (ochrana proti podvrženému odeslání z cizího webu) */
@@ -201,18 +210,26 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
       if (m) {
         const detail = await nactiDetail(db, decodeURIComponent(m[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
-        return posli(res, 200, strankaDetailu(detail, stav, email, now));
+        const zdroje = n.zdroje ? await hledejVsude(n.zdroje(), vyrazyZakazky(detail.z), now) : null;
+        return posli(res, 200, strankaDetailu(detail, stav, email, now, zdroje));
       }
 
       if (url.pathname === "/hledat") {
-        const q = url.searchParams.get("q") ?? "";
-        const nalezene = await najdiAktivitu(db, q);
-        if (nalezene.length === 1) {
-          res.writeHead(302, { location: `/zakazka/${encodeURIComponent(nalezene[0]!)}` });
+        const q = ocistitDotaz(url.searchParams.get("q") ?? "");
+        const presne = await najdiAktivitu(db, q);
+        const presmeruj = (id: string) => {
+          res.writeHead(302, { location: `/zakazka/${encodeURIComponent(id)}` });
           res.end();
-          return;
-        }
-        return posli(res, 200, strankaVysledkuHledani(q, nalezene.map((id) => ({ id })), stav, email));
+        };
+        if (presne.length === 1) return presmeruj(presne[0]!);
+        // telefon, jméno, adresa – v otevřených zakázkách
+        const volne = presne.length || q.length < 3 ? [] : (await nactiFrontu(db, now, { hledat: q })).polozky.slice(0, 20);
+        if (!presne.length && volne.length === 1) return presmeruj(volne[0]!.z.idAktivity);
+        const mwf = presne.length
+          ? presne.map((id) => ({ id, popis: id }))
+          : volne.map((p) => ({ id: p.z.idAktivity, popis: [p.z.idObjednavky, p.z.zakaznik, p.z.adresa].filter(Boolean).join(" · ") }));
+        const zdroje = n.zdroje && q.length >= 5 ? await hledejVsude(n.zdroje(), [q], now) : null;
+        return posli(res, 200, strankaVysledkuHledani(q, mwf, zdroje, stav, email));
       }
 
       return posli(res, 404, strankaChyby(404, "Stránka neexistuje."));
@@ -235,6 +252,19 @@ function main() {
       let zav: ZavislostiPlanovace | null = null;
       return () => (zav ??= { api: kalendarApi(), geokoder: sCache(db, googleGeokoder()), vzdalenosti: odhadVzdalenosti() });
     })(),
+    zdroje:
+      env.DELEGACE_UZIVATEL && env.SERVISNI_UCET
+        ? (() => {
+            const d = delegace(env.SERVISNI_UCET!, env.DELEGACE_UZIVATEL!);
+            const prostory = (env.CHAT_PROSTORY ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+            return () => ({
+              gmail: async () => gmailApi({ version: "v1", auth: (await d.klient()) as never }),
+              kalendar: async () => calendarApi({ version: "v3", auth: (await d.klient()) as never }),
+              chatToken: async () => (await (await d.klient()).getAccessToken()).token ?? "",
+              prostory,
+            });
+          })()
+        : undefined,
     zapis: {
       zapnuty: env.ZAPIS_KALENDARE === "ano",
       technici: env.ZAPIS_TECHNICI === "vsichni" ? "vsichni" : (env.ZAPIS_TECHNICI ?? "").split(",").map((s) => s.trim()).filter(Boolean),
