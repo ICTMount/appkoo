@@ -130,7 +130,7 @@ form.terminy{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bott
 .adr{color:var(--muted)}.pozn{font-size:12px;margin-top:4px;padding-left:6px;border-left:2px solid var(--line);color:var(--muted);max-width:520px}.pozn b{color:var(--text);font-weight:600}a.volny.radek{display:block;margin:3px 0}a.volny .cas{margin-right:4px}
 form.vyber-tech{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
 form.vyber-tech .pole{display:flex;flex-direction:column;gap:6px}
-form.vyber-tech label{font-size:12px;color:var(--muted);height:18px;line-height:18px}form.vyber-tech label b{color:var(--text)}
+form.vyber-tech .pole label{display:flex;flex-direction:row;align-items:center;gap:4px;white-space:nowrap;font-size:12px;color:var(--muted);height:18px;line-height:18px}form.vyber-tech label b{color:var(--text)}
 form.vyber-tech select,form.vyber-tech input,form.vyber-tech button{height:38px;box-sizing:border-box}form.vyber-tech select{min-width:320px}
 form.vyber-tech .radek{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .rychle{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
