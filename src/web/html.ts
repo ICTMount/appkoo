@@ -111,7 +111,8 @@ h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid
 .ud{font-size:12px;padding:4px 0;border-top:1px solid var(--line)}.ud:first-of-type{border-top:0}.ud .cas{color:var(--muted);margin-right:4px}
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
 a.volny.vyb{outline:2px solid var(--accent)}
-.card.kompakt{padding:8px 12px;font-size:12px}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:420px;overflow-y:auto}
+.grid>*{min-width:0}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
 .konec-detailu{margin:26px 0 18px;border-top:3px double var(--line)}
 section.planovani{border:2px solid var(--accent);border-radius:10px;padding:14px 16px 6px;background:color-mix(in srgb,var(--accent) 6%,var(--panel));box-shadow:0 2px 10px rgba(0,0,0,.06)}
@@ -313,8 +314,8 @@ ${radek("SMS", esc(`odesláno ${d.plan.sms.odeslano}${d.plan.sms.doporucena ? " 
 ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" : "nedovoláno"}${p.sms ? " + SMS" : ""}`).join("; ")))}
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div>
-<div class="card kompakt"><h2>Historie změn mezi exporty</h2>${historieHtml}</div>
-<div class="card kompakt"><h2>Realizovali jsme na lokalitě</h2>${sekceLokality(plan.lokalita)}</div>
+<div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun">${historieHtml}</div></div>
+<div class="card kompakt"><h2>Realizovali jsme na lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 </div>
 <div class="konec-detailu"></div>
 <section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
