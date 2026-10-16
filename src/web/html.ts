@@ -124,6 +124,10 @@ form.terminy{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bott
 .trasa{margin-top:6px;font-size:12px;border-left:2px solid var(--line);padding-left:8px}.soused{padding:1px 0;color:var(--muted)}
 .soused .smer{display:inline-block;min-width:42px}.soused b{color:var(--text);font-weight:600}.soused .km{white-space:nowrap;font-weight:600;color:var(--text)}
 .soused.zakl{font-style:italic}.soused .km.dlouhy{color:var(--p1)}.soused.tato{color:var(--accent);font-weight:600}
+.adr{color:var(--muted)}a.volny.radek{display:block;margin:3px 0}a.volny .cas{margin-right:4px}
+.rychle{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
+.rychle a.on{border-color:var(--accent);background:var(--accent);color:#fff}.rychle a:hover{text-decoration:none}
+form.filtr label b{color:var(--text);margin-left:4px}
 .uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
 /* tmavý režim: podle systému, nebo ručně přepínačem (atribut data-theme na <html>, cookie „tema“) */
 :root{color-scheme:light dark}:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
@@ -504,14 +508,17 @@ ${presun ? `<div class="${presun.ok ? "ok" : "err"}">${esc(presun.zprava)}</div>
 
 const hm = (d: Date) => fmtTime(d);
 const DNY_DLOUHE = (iso: string) => DNY[new Date(`${iso}T00:00:00Z`).getUTCDay()]!;
+const DNY_CELE = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
 
 const odkazSlotu = (u: UdalostTechnika, den: string) =>
   `/technik?${new URLSearchParams({ t: u.technik, den, k: u.kalendar, e: u.id, od: u.od.toISOString(), do: u.do.toISOString() })}`;
 
-/** Text události bez jména technika na začátku; O-ID jako odkaz na plánování zakázky */
-function textUdalosti(u: UdalostTechnika): string {
-  const t = esc(u.summary.replace(/^[^-]+-\s*/, ""));
-  return t.replace(/O-\d{6,}/g, (o) => `<a href="/?q=${o}">${o}</a>`);
+/** Text události bez jména technika na začátku; O-ID jako odkaz na plánování zakázky; adresa (MWF, jinak z kalendáře) */
+function textUdalosti(u: UdalostTechnika, adresy?: Map<string, string>): string {
+  const t = esc(u.summary.replace(/^[^-]+-\s*/, "")).replace(/O-\d{6,}/g, (o) => `<a href="/?q=${o}">${o}</a>`);
+  const o = u.summary.match(/O-\d{6,}/)?.[0];
+  const adresa = (o && adresy?.get(o)) || u.location;
+  return `${t}${adresa ? ` <span class="adr">· ${esc(adresa)}</span>` : ""}`;
 }
 
 export interface StrankaTechnika {
@@ -522,6 +529,10 @@ export interface StrankaTechnika {
   dalsi: string;
   /** dny vybraného technika (nahoře) */
   dny: { datum: string; udalosti: UdalostTechnika[] }[];
+  /** O-číslo → úplná adresa z MWF (jinak se bere místo z kalendáře) */
+  adresy?: Map<string, string>;
+  /** rychlá volba dne: nejbližší pracovní dny */
+  rychleDny: string[];
   /** bez vybraného technika: přehled všech techniků pro den */
   prehled: { dny: DenPrehledu[]; nedostupne: string[] } | null;
   slot: VybranySlot | null;
@@ -535,11 +546,15 @@ export function strankaTechnika(s: StrankaTechnika, stav: StavImportu, uzivatel:
     .map((t) => `<option value="${esc(t.jmeno)}"${s.technik?.jmeno === t.jmeno ? " selected" : ""}>${esc(t.jmeno)} – ${esc(t.skupiny.join(", "))} · ${esc(t.vyjezd)}</option>`)
     .join("");
   const navT = s.technik ? `&t=${encodeURIComponent(s.technik.jmeno)}` : "";
+  const krok = s.technik ? "o týden" : "o den";
   const formular = `<form class="filtr" method="get" action="/technik">
 <label>Technik<select name="t"><option value="">– všichni (přehled dne) –</option>${volby}</select></label>
-<label>Od dne<input type="date" name="den" value="${esc(s.den)}"></label><button>Zobrazit</button>
-${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← dřív</a>` : ""} <a href="/technik?den=${esc(s.dalsi)}${esc(navT)}">dál →</a>
-</form>`;
+<label>${s.technik ? "Od dne" : "Den"} <b>${esc(DNY_CELE[new Date(`${s.den}T00:00:00Z`).getUTCDay()]!)}</b><input type="date" name="den" value="${esc(s.den)}"></label><button>Zobrazit</button>
+${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← ${krok} zpět</a>` : ""} <a href="/technik?den=${esc(s.dalsi)}${esc(navT)}">${krok} dál →</a>
+</form>
+<div class="rychle">${s.rychleDny
+    .map((d) => `<a class="${d === s.den ? "on" : ""}" href="/technik?den=${esc(d)}${esc(navT)}">${esc(DNY_DLOUHE(d))} ${esc(fmtDate(d).slice(0, 6))}</a>`)
+    .join("")}</div>`;
 
   let horni = "";
   if (s.technik) {
@@ -553,22 +568,29 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
           .map((u) =>
             jeVolneOkno(u)
               ? `<a class="volny${s.slot?.eventId === u.id ? " vyb" : ""}" href="${esc(odkazSlotu(u, s.den))}">${esc(hm(u.od))}–${esc(hm(u.do))} volno → doplnit</a>`
-              : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u)}</div>`,
+              : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy)}</div>`,
           )
           .join("");
         return `<div class="card"><h3>${esc(DNY_DLOUHE(d.datum))} ${esc(fmtDate(d.datum))} <small class="muted">· ${zak.length} ${zak.length === 1 ? "událost" : "událostí"}</small></h3>${obsah || `<span class="muted">prázdný den</span>`}</div>`;
       })
       .join("")}</div>`;
   } else if (s.prehled) {
+    // den technika jako časová osa: zakázky a volné sloty VOLNY v pořadí podle času
     const radky = s.prehled.dny.map((d) => {
-      const zak = d.zakazky.map((u) => `<div><small>${esc(hm(u.od))}–${esc(hm(u.do))}</small> ${textUdalosti(u)}</div>`).join("");
-      const volne = d.volne.map((u) => `<a class="volny" style="display:inline-block" href="${esc(odkazSlotu(u, s.den))}">${esc(hm(u.od))}–${esc(hm(u.do))} doplnit</a>`).join(" ");
+      const osa = [...d.zakazky, ...d.volne]
+        .sort((a, b) => a.od.getTime() - b.od.getTime())
+        .map((u) =>
+          d.volne.includes(u)
+            ? `<a class="volny radek" href="${esc(odkazSlotu(u, s.den))}"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span> volno → doplnit</a>`
+            : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy)}</div>`,
+        )
+        .join("");
       return `<tr><td><a href="/technik?t=${encodeURIComponent(d.technik.jmeno)}&den=${esc(s.den)}"><b>${esc(d.technik.jmeno)}</b></a><br><small class="muted">${esc(d.technik.skupiny.join(", "))}</small></td>
-<td class="nowrap">${d.zakazky.length}</td><td>${zak || `<span class="muted">prázdný den</span>`}</td><td>${volne || `<span class="muted">bez volného slotu</span>`}</td></tr>`;
+<td class="nowrap">${d.zakazky.length}</td><td class="nowrap">${d.volne.length}</td><td>${osa || `<span class="muted">prázdný den</span>`}</td></tr>`;
     });
     horni = `<h1>Doplnit technika <small>přehled ${esc(DNY_DLOUHE(s.den))} ${esc(fmtDate(s.den))} – od nejméně vytížených</small></h1>
 ${s.prehled.nedostupne.length ? `<div class="warn">Kalendář nejde přečíst: ${esc(s.prehled.nedostupne.join(", "))}.</div>` : ""}
-<div class="tbl"><table><thead><tr><th>Technik</th><th>Zakázek</th><th>Den</th><th>Volné sloty</th></tr></thead>
+<div class="tbl"><table><thead><tr><th>Technik</th><th>Zakázek</th><th>Volných</th><th>Den – zakázky a volné sloty podle času</th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="4" class="muted">Žádný technik s čitelným kalendářem (zkontrolujte číselník Technici).</td></tr>`}</tbody></table></div>`;
   }
 

@@ -277,13 +277,18 @@ describe("web: nabídka a zápis termínu", () => {
     expect(den.status).toBe(200);
     const hd = await den.text();
     expect(hd).toContain("Hristov");
-    expect(hd).toContain("12:00–14:00 doplnit");
+    expect(hd).toContain('<span class="cas">12:00–14:00</span> volno → doplnit');
+    expect(hd).toContain("pondělí"); // den v týdnu u data
+    expect(hd).toContain('href="/technik?den=2026-10-20"'); // o den dál = další pracovní den
+    expect(hd.indexOf("O-8559999999")).toBe(-1); // jiný den se v přehledu 19.10. neukazuje
     expect(hd).toMatch(/Kalendář nejde přečíst: [^<]*Nekdo/);
 
     const slot = { k: "K1", e: "v2", t: "Hristov", od: local(2026, 10, 19, 12, 0).toISOString(), do: local(2026, 10, 19, 14, 0).toISOString() };
     const tyden = await (await w.get("/technik?t=Hristov&den=2026-10-19")).text();
     expect(tyden).toContain("12:00–14:00 volno → doplnit");
     expect(tyden).toContain('href="/?q=O-8560000004"'); // zakázka v kalendáři vede na plánování zakázky
+    expect(tyden).toContain("· Praha, Vysočanská 10"); // adresa zakázky
+    expect(tyden).toContain('href="/technik?den=2026-10-26&amp;t=Hristov"'); // o týden dál
     const ns = await w.get(`/technik?${new URLSearchParams({ ...slot, den: "2026-10-19" })}`);
     expect(ns.status).toBe(200);
     const hs = await ns.text();

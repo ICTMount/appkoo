@@ -40,6 +40,7 @@ import { googleGeokoder, sCache } from "../plan/geokod.js";
 import { slaKonec } from "../plan/kpi.js";
 import { kontrolaBran, nabidniProZakazku, nactiKalendare, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
 import { addDays, atTime, isoDate } from "../domain/time.js";
+import { isWorkday } from "../domain/workdays.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
 import { gmail as gmailApi } from "@googleapis/gmail";
 import { delegace, SCOPY_KALENDAR } from "../google/delegace.js";
@@ -350,13 +351,25 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const kontext = await nactiKontext(db);
         const zav = await n.planovac();
         const technik = kontext.technici.find((t) => t.jmeno === p.get("t")) ?? null;
-        const predchozi = den > dnes ? (addDays(den, -7) > dnes ? addDays(den, -7) : dnes) : null;
+        // posun: přehled po jednom pracovním dni, technik po týdnu (5 pracovních dní); ne do minulosti
+        const zpetDny = (d: string, n: number) => {
+          let x = d;
+          for (let i = 0; i < n; ) {
+            x = addDays(x, -1);
+            if (isWorkday(x)) i++;
+          }
+          return x;
+        };
+        const krok = technik ? 5 : 1;
+        const predchozi = den > dnes ? (zpetDny(den, krok) >= dnes ? zpetDny(den, krok) : pracovniDny(dnes, 1)[0]!) : null;
         const s: StrankaTechnika = {
           technici: [...kontext.technici].sort((a, b) => a.jmeno.localeCompare(b.jmeno, "cs")),
           technik,
           den,
           predchozi,
-          dalsi: addDays(den, 7),
+          dalsi: pracovniDny(den, krok + 1).at(-1)!,
+          rychleDny: pracovniDny(dnes, 6),
+          adresy: kontext.adresyZMwf,
           dny: [],
           prehled: null,
           slot: null,
