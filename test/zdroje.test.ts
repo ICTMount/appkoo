@@ -64,9 +64,34 @@ describe("zdroje", () => {
       },
     } as never;
     const n = await hledejEmaily(gmail, ["O-8550000001", "1-D4O3JTD"]);
-    expect(dotazy[0]).toBe('"O-8550000001" OR "1-D4O3JTD" newer_than:365d');
+    expect(dotazy[0]).toBe('"O-8550000001" OR "1-D4O3JTD" newer_than:365d -to:cml@ictmount.com -cc:cml@ictmount.com -list:cml@ictmount.com');
     expect(n.map((x) => x.titulek)).toEqual(["Re: O-8550000001 m2", "Re: O-8550000001 m1"]);
     expect(n[0]).toMatchObject({ zdroj: "email", kdo: "PEP <pep@t-mobile.cz>", text: "úryvek m2" });
+  });
+
+  it("e-mail: interní notifikace na skupinu cml@ictmount.com se nezobrazí", async () => {
+    const gmail = {
+      users: {
+        messages: {
+          list: async () => ({ data: { messages: [{ id: "m1" }, { id: "m2" }] } }),
+          get: async (p: { id: string }) => ({
+            data: {
+              internalDate: String(Date.parse("2026-10-15T08:00:00Z")),
+              snippet: p.id,
+              payload: {
+                headers: [
+                  { name: "Subject", value: `O-8550000001 ${p.id}` },
+                  { name: "From", value: "MWF <noreply@mwf.cz>" },
+                  { name: "To", value: p.id === "m1" ? "CML <cml@ictmount.com>" : "tmcz01@ictmount.com" },
+                ],
+              },
+            },
+          }),
+        },
+      },
+    } as never;
+    const n = await hledejEmaily(gmail, ["O-8550000001"]);
+    expect(n.map((x) => x.text)).toEqual(["m2"]);
   });
 
   it("kalendáře: všechny kalendáře kromě svátků, bez duplicit přes víc výrazů", async () => {

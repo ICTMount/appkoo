@@ -82,6 +82,7 @@ Dva pohledy (záložky nahoře), pod nimi hledání zakázky přes celou šířk
 - `/zakazka/<ID>/zapis` formulář podle call scriptu → přepis slotu VOLNY na zakázku (patička SHEET2CAL zůstane,
   obsazený slot se nepřepíše) → evidence v `gcal_udalost` → text „Zákazník: … (datum, čas)“ pro MWF.
   Zápis zapíná `ZAPIS_KALENDARE=ano` a `ZAPIS_TECHNICI` (jména čárkami nebo `vsichni`).
+  E-maily poslané na interní skupiny (`INTERNI_SKUPINY`, výchozí `cml@ictmount.com`) se v přehledu zakázky nezobrazují.
 - **Uživatelé a role** (číselník Uživatelé): správce = Konfigurace, koordinátorka = plánování a zápis, jen čtení.
   Správci ze `SPRAVCI` (výchozí davidh@ictmount.com) mají přístup vždy. Dokud je číselník prázdný, platí `POVOLENI_UZIVATELE`.
   IAP pouští celou doménu (`domain:ictmount.com`), o přístupu rozhoduje aplikace.

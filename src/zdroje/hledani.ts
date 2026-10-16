@@ -54,14 +54,32 @@ const zApi = (s: string | null | undefined) => (s ? tedPraha(new Date(s)) : null
 
 // ---------- E-mail ----------
 
-export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max = 15): Promise<Nalez[]> {
+/** Skupiny s interními notifikacemi – e-maily poslané na ně se v přehledu zakázky nezobrazují */
+export const INTERNI_SKUPINY = (process.env.INTERNI_SKUPINY ?? "cml@ictmount.com")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+/** Zpráva šla na interní skupinu (To/Cc nebo hlavičky skupiny Google Groups) */
+export function naInterniSkupinu(hlavicky: { name?: string | null; value?: string | null }[], skupiny = INTERNI_SKUPINY): boolean {
+  const text = hlavicky
+    .filter((x) => /^(to|cc|list-id|mailing-list|x-original-to)$/i.test(x.name ?? ""))
+    .map((x) => x.value ?? "")
+    .join(" ")
+    .toLowerCase();
+  return skupiny.some((s) => text.includes(s) || text.includes(s.replace("@", ".")));
+}
+
+export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max = 15, skupiny = INTERNI_SKUPINY): Promise<Nalez[]> {
   if (!vyrazy.length) return [];
-  const q = `${vyrazy.map((v) => `"${v}"`).join(" OR ")} newer_than:365d`;
+  const bezSkupin = skupiny.map((s) => ` -to:${s} -cc:${s} -list:${s}`).join("");
+  const q = `${vyrazy.map((v) => `"${v}"`).join(" OR ")} newer_than:365d${bezSkupin}`;
   const { data } = await gmail.users.messages.list({ userId: "me", q, maxResults: max });
-  const odkaz = `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(vyrazy.map((v) => `"${v}"`).join(" OR "))}`;
+  const odkaz = `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(`${vyrazy.map((v) => `"${v}"`).join(" OR ")}${bezSkupin}`)}`;
   const zpravy = await Promise.all(
     (data.messages ?? []).map(async ({ id }) => {
-      const m = (await gmail.users.messages.get({ userId: "me", id: id!, format: "metadata", metadataHeaders: ["Subject", "From", "Date"] })).data;
+      const m = (await gmail.users.messages.get({ userId: "me", id: id!, format: "metadata", metadataHeaders: ["Subject", "From", "Date", "To", "Cc", "List-Id", "Mailing-list", "X-Original-To"] })).data;
+      if (naInterniSkupinu(m.payload?.headers ?? [], skupiny)) return null;
       const h = (n: string) => m.payload?.headers?.find((x) => x.name?.toLowerCase() === n.toLowerCase())?.value ?? "";
       return {
         zdroj: "email" as const,
@@ -73,7 +91,7 @@ export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max 
       };
     }),
   );
-  return zpravy.sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0));
+  return zpravy.filter((z): z is NonNullable<typeof z> => z !== null).sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0));
 }
 
 // ---------- Kalendáře techniků ----------
