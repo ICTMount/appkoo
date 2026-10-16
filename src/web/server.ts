@@ -174,7 +174,7 @@ function posli(res: ServerResponse, kod: number, html: string) {
   if (tema) html = html.replace('<html lang="cs">', `<html lang="cs" data-theme="${tema}">`);
   const role = roleOdpovedi.get(res);
   html = html
-    .replace(/<!--konfigurace:(on|off)-->/, (_, on) => (role === "spravce" ? `<a href="/konfigurace" class="${on === "on" ? "on" : ""}">⚙ Konfigurace</a>` : ""))
+    .replace(/<!--konfigurace:(on|off)-->/, (_, on) => (role === "spravce" ? `<a href="/konfigurace" class="konfig${on === "on" ? " on" : ""}">⚙ Konfigurace</a>` : ""))
     .replace("<!--role-->", role ? ` · ${POPIS_ROLE[role]}` : "");
   res.writeHead(kod, {
     "content-type": "text/html; charset=utf-8",
