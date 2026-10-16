@@ -79,7 +79,10 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
   }
   if (z.termin && !opts.presun) blokace.push("Zakázka už má dohodnutý termín – přesunout lze jen zakázku s poznámkou „flex“ (režim doplnění slotu).");
   if (z.termin && opts.presun) upozorneni.push(`Přesun: zakázka má termín ${isoDate(z.termin.od).split("-").reverse().join(".")} – po zápisu se původní událost vrátí na VOLNY; změňte termín i v MWF.`);
-  if (z.predobjednavka && z.rfs && isoDate(z.rfs) > f.dnes) upozorneni.push(`Předobjednávka – RFS ${isoDate(z.rfs).split("-").reverse().join(".")}; termín až po RFS.`);
+  if (z.predobjednavka) {
+    const rfs = z.rfs ? ` (RFS ${isoDate(z.rfs).split("-").reverse().join(".")})` : "";
+    blokace.push(`Předobjednávka${rfs} – realizovat až po změně na standardní zakázku v MWF.`);
+  }
   if (z.pocetMv >= 2) upozorneni.push(`Už ${z.pocetMv} marné výjezdy – zvážit storno / eskalaci.`);
 
   const adresa = norm(`${z.adresa} ${z.psc}`);
