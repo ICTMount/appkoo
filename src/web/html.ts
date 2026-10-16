@@ -178,7 +178,7 @@ const s7 = (z: { idS7: string; predobjednavka?: boolean; typAktivity: string }) 
 
 /** Předobjednávka (Typ aktivity Predobjednavka_*) – realizovat až po změně na standardní zakázku */
 export const predobjStitek = (z: { predobjednavka?: boolean }) =>
-  z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – realizovat až po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
+  z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
 
 export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník sítě">${esc(i || "?")}</span>`;
 
@@ -293,7 +293,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
     : `<span class="muted">bez historie</span>`;
 
   const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
-${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – zakázku lze realizovat až po změně na standardní zakázku v MWF${z.rfs ? `, RFS ${esc(den(z.rfs))}` : ""}. Termín zatím neplánovat.</div>` : ""}
+${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
 <div class="card"><h2>Zákazník</h2><dl>
@@ -703,7 +703,7 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
     const smiZde = smi && (!p || zapis.smiTechnik(p.technik));
     return `<tr><td>${i + 1}</td>
 <td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${s7(z) ? `<br><small>${esc(s7(z))}</small>` : ""}</td>
-<td>${infraStitek(z.infrastruktura)}</td>
+<td>${infraStitek(z.infrastruktura)}${predobjStitek(z)}</td>
 <td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}${posledniPoznamky(z.zaznamy)}</td>
 <td><span class="prio ${n.kandidat.priorita}">${n.kandidat.priorita}</span></td>
 <td class="nowrap">${n.kandidat.slaKonec ? esc(dt(n.kandidat.slaKonec)) : ""}${n.poSla ? `<br><span class="prio P1">po SLA</span>` : ""}</td>

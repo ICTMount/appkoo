@@ -104,12 +104,12 @@ export function smiZapisovat(technik: string, povoleniTechnici: string[] | "vsic
 
 /**
  * Kandidáti pro režim B: otevřené zakázky, které projdou branami. Bez termínu jen s prioritou
- * P1–P3 (P0 = nevolat); s termínem jen jako možný přesun – „flex“ se ověří v plánovači.
+ * P1–P3 (P0 = nevolat; předobjednávka se plánovat smí – je označená); s termínem jen jako možný přesun – „flex“ se ověří v plánovači.
  */
 export async function kandidatiKDoplneni(db: Dotaz, now: Date, blokovane: Polozka[], exportAt: Date): Promise<ZakazkaKDoplneni[]> {
   const { polozky } = await nactiFrontu(db, now);
   return polozky
-    .filter((p) => (p.z.termin ? true : p.priorita !== "P0"))
+    .filter((p) => (p.z.termin || p.z.predobjednavka ? true : p.priorita !== "P0"))
     .filter((p) => !kontrolaBran(p.z, faktaZakazky(p.z, now), blokovane, { presun: !!p.z.termin }).blokace.length)
     .map((p) => ({ z: p.z, priorita: p.priorita, slaKonec: slaKonec(p.z, exportAt) }));
 }

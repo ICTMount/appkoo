@@ -81,7 +81,7 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
   if (z.termin && opts.presun) upozorneni.push(`Přesun: zakázka má termín ${isoDate(z.termin.od).split("-").reverse().join(".")} – po zápisu se původní událost vrátí na VOLNY; změňte termín i v MWF.`);
   if (z.predobjednavka) {
     const rfs = z.rfs ? ` (RFS ${isoDate(z.rfs).split("-").reverse().join(".")})` : "";
-    blokace.push(`Předobjednávka${rfs} – realizovat až po změně na standardní zakázku v MWF.`);
+    upozorneni.push(`Předobjednávka${rfs} – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF.`);
   }
   if (z.pocetMv >= 2) upozorneni.push(`Už ${z.pocetMv} marné výjezdy – zvážit storno / eskalaci.`);
 

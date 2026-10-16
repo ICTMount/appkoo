@@ -137,10 +137,12 @@ describe("brány plánování (zlatá pravidla)", () => {
     expect((await brana("P3")).blokace.join(" ")).toContain("30.11.2026");
   });
 
-  it("předobjednávka se neplánuje, dokud se v MWF nezmění na standardní zakázku", async () => {
+  it("předobjednávka se plánovat smí, jen se upozorní na realizaci po změně na standardní zakázku", async () => {
     const d = (await nactiDetail(db, "P1", TED))!;
     const z = { ...d.z, predobjednavka: true, typAktivity: "Predobjednavka_FTTH" };
-    expect(kontrolaBran(z, faktaZakazky(z, TED), []).blokace.join(" ")).toContain("Předobjednávka");
+    const b = kontrolaBran(z, faktaZakazky(z, TED), []);
+    expect(b.blokace).toEqual([]);
+    expect(b.upozorneni.join(" ")).toContain("Předobjednávka");
   });
 
   it("skupina zakázky a pracovní dny (víkend se přeskočí)", () => {
