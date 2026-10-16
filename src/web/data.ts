@@ -259,6 +259,10 @@ export interface StavImportu {
   posledniExport: Date | null;
   posledniBeh: Date | null;
   stariHodin: number | null;
+  /** poslední importovaný export: název souboru a odkud přišel */
+  soubor?: string | null;
+  zdroj?: string | null;
+  odesilatel?: string | null;
 }
 
 export async function nactiStavImportu(db: Dotaz, now: Date): Promise<StavImportu> {
@@ -270,7 +274,13 @@ export async function nactiStavImportu(db: Dotaz, now: Date): Promise<StavImport
     [ts(now)],
   );
   const r = rows[0];
+  const { rows: posl } = await db.query<{ soubor: string; zdroj: string; odesilatel: string | null }>(
+    `SELECT soubor, zdroj, odesilatel FROM import_run WHERE vysledek = 'importovano' ORDER BY export_at DESC NULLS LAST, prijato DESC LIMIT 1`,
+  );
   return {
+    soubor: posl[0]?.soubor ?? null,
+    zdroj: posl[0]?.zdroj ?? null,
+    odesilatel: posl[0]?.odesilatel ?? null,
     posledniExport: r?.posledni_export ?? null,
     posledniBeh: r?.posledni_beh ?? null,
     stariHodin: r?.hodin === null || r?.hodin === undefined ? null : Math.round(Number(r.hodin) * 10) / 10,
