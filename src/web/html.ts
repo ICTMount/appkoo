@@ -1,7 +1,7 @@
 // HTML stránky webového rozhraní (vykreslují se na serveru, bez JavaScriptu na klientu).
 // Zakázka se vždy označuje ID O- (ID obj. v ext. systému); S7 je doplňkové.
 
-import { fmtDate, fmtTime, isoDate } from "../domain/time.js";
+import { addDays, fmtDate, fmtTime, isoDate } from "../domain/time.js";
 import type { Priorita } from "../domain/priorita.js";
 import type { Detail, PolozkaFronty, StavImportu } from "./data.js";
 import { pokusyZakazky } from "./data.js";
@@ -119,6 +119,8 @@ section.planovani>h2{font-size:20px;margin:0 0 12px;color:var(--accent)}section.
 section.planovani .tbl{border-color:var(--accent)}
 iframe.mapa{width:100%;height:220px;border:1px solid var(--line);border-radius:6px;margin:8px 0}
 table.male{font-size:12px}table.male th,table.male td{padding:3px 6px}details summary{cursor:pointer;margin-top:6px}
+form.terminy{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px}form.terminy label{display:flex;gap:6px;align-items:center}
+.jiny-cas{margin-top:6px;font-size:12px;color:var(--muted)}.jiny-cas a{font-weight:600}
 .trasa{margin-top:6px;font-size:12px;border-left:2px solid var(--line);padding-left:8px}.soused{padding:1px 0;color:var(--muted)}
 .soused .smer{display:inline-block;min-width:42px}.soused b{color:var(--text);font-weight:600}.soused .km{white-space:nowrap;font-weight:600;color:var(--text)}
 .soused.zakl{font-style:italic}.soused .km.dlouhy{color:var(--p1)}.soused.tato{color:var(--accent);font-weight:600}
@@ -188,6 +190,8 @@ ${sekceZdroju(zdroje)}`;
 }
 
 export interface PlanovaniZakazky {
+  /** „jiné termíny“: hledá se od tohoto dne (YYYY-MM-DD) */
+  odData?: string;
   brany: Brany;
   nabidka: Nabidka | null;
   zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean };
@@ -370,15 +374,32 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
           mapa ? `<div class="soused"><a href="${esc(mapa)}" target="_blank" rel="noopener">trasa v mapě →</a></div>` : ""
         }`
       : "";
-    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${trasa ? `<div class="trasa">${trasa}</div>` : ""}</td><td>${esc(m.technik)}</td>
+    const odkazZapisu = (x: MoznostSlotu) =>
+      `/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${new URLSearchParams({ k: x.kalendar, e: x.eventId, t: x.technik, od: x.od.toISOString(), do: x.do.toISOString() })}`;
+    const jinyCas = m.alternativy?.length
+      ? `<div class="jiny-cas">jiný čas téhož dne: ${m.alternativy
+          .map((a) => (smi ? `<a href="${esc(odkazZapisu(a))}">${esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)}</a>` : esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)))
+          .join(" · ")}</div>`
+      : "";
+    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${trasa ? `<div class="trasa">${trasa}</div>` : ""}${jinyCas}</td><td>${esc(m.technik)}</td>
 <td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
 <td>${m.poSla ? `<span class="prio P1">po SLA</span>` : "v SLA"}</td>
 <td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
   });
-  return `${upoz}${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
+  // Jiné termíny: zákazník nemůže → posun dopředu (od dne po posledním nabídnutém), nebo od zvoleného data
+  const zakl = `/zakazka/${encodeURIComponent(z.idAktivity)}`;
+  const posledni = nabidka.moznosti.map((m) => isoDate(m.od)).sort().at(-1) ?? nabidka.obdobi?.do;
+  const pozdeji = posledni ? addDays(posledni, 1) : null;
+  const terminy = `<form class="terminy" method="get" action="${esc(zakl)}#planovani">
+${nabidka.obdobi ? `<span>Hledáno <b>${esc(fmtDate(nabidka.obdobi.od))} – ${esc(fmtDate(nabidka.obdobi.do))}</b></span>` : ""}
+${plan.odData ? `<a href="${esc(zakl)}#planovani">← nejbližší termíny</a>` : ""}
+${pozdeji ? `<a class="btn" href="${esc(`${zakl}?od=${pozdeji}#planovani`)}">Pozdější termíny →</a>` : ""}
+<label>od data <input type="date" name="od" value="${esc(plan.odData ?? "")}"></label><button>Hledat</button>
+</form>`;
+  return `${upoz}${terminy}${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
 <div class="tbl"><table><thead><tr><th>#</th><th>Slot</th><th>Technik</th><th>Km navíc</th><th>Do splnění</th><th></th></tr></thead>
-<tbody>${radky.join("") || `<tr><td colspan="6" class="muted">${nabidka.chyba ? "" : "Žádný volný slot v dosahu (max 75 km zajížďky) v příštích 10 pracovních dnech."}</td></tr>`}</tbody></table></div>
+<tbody>${radky.join("") || `<tr><td colspan="6" class="muted">${nabidka.chyba ? "" : "V tomto období žádný volný slot v dosahu – zkuste Pozdější termíny."}</td></tr>`}</tbody></table></div>
 <p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: zaplnění dne, SLA, km navíc oproti trase dne, preferované okno 10–14 h. U každého slotu je vidět, kam technik jede před ní a po ní (km = přejezd, odhad vzdušnou čarou × 1,3).</p>`;
 }
 

@@ -8,7 +8,7 @@ import { nahledImportu, nastaveniPlanovani } from "../src/config/ciselniky.js";
 import { nactiCiselnik, ulozImport } from "../src/db/ciselniky.js";
 import type { Db } from "../src/db/db.js";
 import { faktaZakazky } from "../src/domain/priorita.js";
-import { local } from "../src/domain/time.js";
+import { isoDate, local } from "../src/domain/time.js";
 import { paticka } from "../src/gcal/kalendar.js";
 import { prijmiSoubory } from "../src/jobs/importJob.js";
 import { odhadVzdalenosti } from "../src/plan/geo.js";
@@ -161,6 +161,11 @@ describe("nabídka termínů", () => {
     expect(v1.sousede!.pred.cas).toBe("08:00–09:59");
     expect(v1.sousede!.po.zakladna).toBe(true);
     expect(v1.sousede!.prijezd).toBeGreaterThanOrEqual(600);
+    // jeden řádek na technika a den; „jiné termíny“ od zvoleného data
+    expect(new Set(n.moznosti.map((m) => `${m.technik}|${isoDate(m.od)}`)).size).toBe(n.moznosti.length);
+    const pozdeji = await nabidniProZakazku(d.z, "P1", null, techniciZCiselniku(await nactiCiselnik(db, "technici")), { api: k.api, geokoder, vzdalenosti: odhadVzdalenosti() }, TED, { odData: "2026-10-19" });
+    expect(pozdeji.obdobi!.od).toBe("2026-10-19");
+    expect(pozdeji.moznosti.map((m) => m.eventId)).toEqual(["v2"]);
   });
 
   it("adresa, kterou nejde najít, vrátí srozumitelnou chybu", async () => {
@@ -227,6 +232,8 @@ describe("web: nabídka a zápis termínu", () => {
     expect(html).toContain("Nekdo");
     expect(html).toContain("↑ před");
     expect(html).toContain("tato zakázka – příjezd cca");
+    expect(html).toContain("Pozdější termíny →");
+    expect(await (await w.get("/zakazka/P1?od=2026-10-19")).text()).toContain("Hledáno <b>19.10.2026");
     const f = await w.get(`/zakazka/P1/zapis?${new URLSearchParams(vyber)}`);
     expect(await f.text()).toContain("Zapsat termín do kalendáře");
     const blok = await (await w.get("/zakazka/P2")).text();

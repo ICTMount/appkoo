@@ -106,6 +106,8 @@ export interface Soused {
 }
 
 export interface MoznostSlotu extends Moznost {
+  /** další volné sloty stejného technika ve stejný den (jiný čas, horší skóre) */
+  alternativy?: MoznostSlotu[];
   /** jak slot zapadá do trasy dne: předchozí a následující zastávka, odhad příjezdu */
   sousede?: { pred: Soused; po: Soused; prijezd: number };
   kalendar: string;
@@ -125,6 +127,8 @@ export interface Nabidka {
   /** zakázky v kalendářích, u kterých nejde zjistit poloha (v trase chybí) */
   bezPolohy: number;
   technikuCelkem: number;
+  /** prohledané pracovní dny (YYYY-MM-DD) */
+  obdobi?: { od: string; do: string };
   chyba?: string;
 }
 
@@ -170,7 +174,7 @@ export async function nabidniProZakazku(
   technici: TechnikPlanu[],
   zav: ZavislostiPlanovace,
   now: Date,
-  opts: { dni?: number; pocet?: number; trvaniMin?: number; nastaveni?: Partial<NastaveniPlanu>; adresyZMwf?: Map<string, string> } = {},
+  opts: { dni?: number; pocet?: number; trvaniMin?: number; nastaveni?: Partial<NastaveniPlanu>; adresyZMwf?: Map<string, string>; odData?: string } = {},
 ): Promise<Nabidka> {
   const skupina = skupinaZakazky(z.typAktivity);
   const vhodni = technici.filter((t) => t.skupiny.includes(skupina));
@@ -182,7 +186,8 @@ export async function nabidniProZakazku(
   if (!bod) return { ...prazdna, chyba: `Adresu „${adresa}“ se nepodařilo najít na mapě.` };
 
   const dnes = isoDate(now);
-  const dny = pracovniDny(dnes, opts.dni ?? 10);
+  // „jiné termíny“: hledat až od zvoleného dne (zákazník nemůže dřív)
+  const dny = pracovniDny(opts.odData && opts.odData > dnes ? opts.odData : dnes, opts.dni ?? 10);
   const od = atTime(dny[0]!, 0);
   const do_ = atTime(addDays(dny.at(-1)!, 1), 0);
 
@@ -214,7 +219,7 @@ export async function nabidniProZakazku(
     zav.vzdalenosti,
     dnes,
     opts.nastaveni,
-    (opts.pocet ?? 5) * 2,
+    (opts.pocet ?? 5) * 10,
   );
 
   const podleJmena = new Map(citelni.map((t) => [t.jmeno, t]));
@@ -235,19 +240,31 @@ export async function nabidniProZakazku(
     const po: Soused = i === zs.length - 1 ? { cas: "", popis: "návrat na základnu (konec dne)", km: m.trasa.kmZpet, zakladna: true, ...(t?.vyjezd ? { adresa: t.vyjezd } : {}) } : { ...popisUdalosti(m.technik, zs[i + 1]!.id), km: zs[i + 1]!.kmPrejezd };
     return { pred, po, prijezd: zs[i]!.zacatek };
   };
+  // Jeden řádek = technik + den (nejlepší slot); další volné sloty téhož dne jako alternativy „jiný čas“
   const moznosti: MoznostSlotu[] = [];
+  const skupiny = new Map<string, MoznostSlotu>();
   const videne = new Set<string>();
   for (const m of zakladni) {
     // technik se 2. adresou má den ve dvou variantách – stejný slot jen jednou (lepší varianta je první)
     const klic = `${m.technik}|${m.datum}|${m.okno.od}`;
-    if (videne.has(klic) || moznosti.length >= (opts.pocet ?? 5)) continue;
+    if (videne.has(klic)) continue;
     videne.add(klic);
     const t = podleJmena.get(m.technik)!;
     const slot = udalosti.find((u) => u.technik === m.technik && isoDate(u.od) === m.datum && minutesOfDay(u.od) === m.okno.od && jeVolneOkno(u));
     if (!slot) continue;
-    moznosti.push({ ...m, kalendar: t.kalendar, nazevVKalendari: t.nazevVKalendari, eventId: slot.id, od: slot.od, do: slot.do, sousede: sousede(m) });
+    const ms: MoznostSlotu = { ...m, kalendar: t.kalendar, nazevVKalendari: t.nazevVKalendari, eventId: slot.id, od: slot.od, do: slot.do };
+    const hlavni = skupiny.get(`${m.technik}|${m.datum}`);
+    if (hlavni) {
+      (hlavni.alternativy ??= []).push(ms);
+      continue;
+    }
+    if (moznosti.length >= (opts.pocet ?? 5)) continue;
+    ms.sousede = sousede(m);
+    skupiny.set(`${m.technik}|${m.datum}`, ms);
+    moznosti.push(ms);
   }
-  return { moznosti, nedostupne, bezZakladny: [...bezZakladny], bezPolohy, technikuCelkem: vhodni.length };
+  for (const m of moznosti) m.alternativy?.sort((a, b) => a.od.getTime() - b.od.getTime());
+  return { moznosti, nedostupne, bezZakladny: [...bezZakladny], bezPolohy, technikuCelkem: vhodni.length, obdobi: { od: dny[0]!, do: dny.at(-1)! } };
 }
 
 // ---------- Režim B: vybraný slot → zakázky, které ho doplní ----------

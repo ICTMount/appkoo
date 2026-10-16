@@ -314,6 +314,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const kontext = await nactiKontext(db);
         const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane);
         const planovac = n.planovac;
+        const odP = url.searchParams.get("od") ?? "";
+        const odData = /^\d{4}-\d{2}-\d{2}$/.test(odP) && !Number.isNaN(Date.parse(odP)) && odP > isoDate(now) ? odP : undefined;
         const spocitat = !brany.blokace.length && !detail.uzavreno && planovac;
         const [zdroje, nabidka] = await Promise.all([
           n.zdroje ? hledejVsude(n.zdroje(), vyrazyZakazky(detail.z), now) : Promise.resolve(null),
@@ -326,6 +328,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
                     nastaveni: kontext.nastaveni.plan,
                     dni: kontext.nastaveni.dniNabidky,
                     trvaniMin: kontext.nastaveni.delkaPraceMin,
+                    ...(odData ? { odData } : {}),
                   });
                 } catch (e) {
                   console.log(JSON.stringify({ severity: "ERROR", message: `Nabídka termínů: ${e instanceof Error ? e.message : String(e)}`, objednavka: detail.z.idObjednavky }));
@@ -334,7 +337,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
               })()
             : Promise.resolve(null),
         ]);
-        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac }));
+        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, ...(odData ? { odData } : {}) }));
       }
 
       // ---------- Doplnit technika: jeho dny nahoře, vhodné zakázky do vybraného slotu dole ----------
