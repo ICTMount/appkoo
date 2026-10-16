@@ -161,7 +161,7 @@ export function cerstvost(stav: StavImportu): string {
   const nazev = stav.soubor?.replace(/^.*[\\/]/, "") ?? "";
   return `<div class="export"><div>Export MWF <b>${esc(dt(stav.posledniExport) || "–")}</b> · <span class="c-${trida}">${esc(popis)}</span></div>${
     nazev || zdroj ? `<div class="soubor" title="${esc(nazev)}">${esc(nazev)}${nazev && zdroj ? " · " : ""}${zdroj ? `zdroj: ${esc(zdroj)}` : ""}</div>` : ""
-  }<div class="bar" title="do 1 h zelená, do 2 h oranžová, přes 2 h červená"><span style="left:${sirka.toFixed(0)}%"></span></div></div>`;
+  }<div class="bar" title="do 1 h zelená, do 2 h oranžová, přes 2 h červená"><span class="b-${trida}" style="left:${sirka.toFixed(0)}%"></span></div></div>`;
 }
 
 /** Městská část k adrese („Praha 4 – Krč“) – mapa adresa → část připravená serverem */
