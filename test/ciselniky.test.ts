@@ -46,8 +46,8 @@ describe("import číselníku z CSV", () => {
   });
 
   it("výběr nezávisí na velikosti písmen a diakritice", () => {
-    const n = nahledImportu("koordinatorky", "E-mail;Jméno;Role\na@ictmount.com;Adéla;operatorka", []);
-    expect(n.nove[0]!.role).toBe("operátorka");
+    const n = nahledImportu("koordinatorky", "E-mail;Jméno;Role\na@ictmount.com;Adéla;koordinatorka", []);
+    expect(n.nove[0]!.role).toBe("koordinátorka");
     expect(n.lzeUlozit).toBe(true);
   });
 
