@@ -112,7 +112,7 @@ h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
 a.volny.vyb{outline:2px solid var(--accent)}
 .vyhrazeny{font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;border:1px dashed var(--line);color:var(--muted)}
-.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:420px;overflow-y:auto}.posun.zdroj{max-height:340px}
+.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:210px;overflow-y:auto}.posun.zdroj{max-height:340px}
 .grid>*{min-width:0}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
 .konec-detailu{margin:26px 0 18px;border-top:3px double var(--line)}
@@ -319,14 +319,14 @@ ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další 
 <div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
 ${sekceZdroju(zdroje)}
 <div class="grid" style="margin-top:12px">
-<div class="card kompakt"><h2>Kontaktování</h2><dl>
+<div class="card kompakt"><h2>Kontaktování</h2><div class="posun"><dl>
 ${radek("Stav", esc(stavKontaktu(d, now)))}
 ${radek("Další kontakt", esc(denIso(d.dalsiKontakt)))}
 ${radek("Navolané dny", esc(`${d.plan.navolaneDny} (cíl ${d.plan.pokusuDenne} pokus/y denně)`))}
 ${radek("SMS", esc(`odesláno ${d.plan.sms.odeslano}${d.plan.sms.doporucena ? " · doporučena další" : ""}${d.plan.sms.nejdrive ? ` · nejdřív ${dt(d.plan.sms.nejdrive)}` : ""}`))}
 ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" : "nedovoláno"}${p.sms ? " + SMS" : ""}`).join("; ")))}
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
-</dl></div>
+</dl></div></div>
 <div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun">${historieHtml}</div></div>
 <div class="card kompakt"><h2>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 </div>
