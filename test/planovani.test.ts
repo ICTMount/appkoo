@@ -212,7 +212,8 @@ describe("web: nabídka a zápis termínu", () => {
 
   it("nabídka termínů a formulář", async () => {
     const w = await spust();
-    const n = await w.get("/zakazka/P1/terminy");
+    expect((await w.get("/zakazka/P1/terminy")).headers.get("location")).toBe("/zakazka/P1#planovani");
+    const n = await w.get("/zakazka/P1");
     expect(n.status).toBe(200);
     const html = await n.text();
     expect(html).toContain("Hristov");
@@ -220,7 +221,7 @@ describe("web: nabídka a zápis termínu", () => {
     expect(html).toContain("Nekdo");
     const f = await w.get(`/zakazka/P1/zapis?${new URLSearchParams(vyber)}`);
     expect(await f.text()).toContain("Zapsat termín do kalendáře");
-    const blok = await (await w.get("/zakazka/P2/terminy")).text();
+    const blok = await (await w.get("/zakazka/P2")).text();
     expect(blok).toContain("Termín teď nelze naplánovat");
   });
 
@@ -257,7 +258,7 @@ describe("web: nabídka a zápis termínu", () => {
 
   it("režim B: přehled dne, návrhy pro slot (vč. flex) a přesun s vrácením původní události na VOLNY", async () => {
     const w = await spust();
-    const den = await w.get("/planovani?den=2026-10-19");
+    const den = await w.get("/technik?den=2026-10-19");
     expect(den.status).toBe(200);
     const hd = await den.text();
     expect(hd).toContain("Hristov");
@@ -265,12 +266,16 @@ describe("web: nabídka a zápis termínu", () => {
     expect(hd).toMatch(/Kalendář nejde přečíst: [^<]*Nekdo/);
 
     const slot = { k: "K1", e: "v2", t: "Hristov", od: local(2026, 10, 19, 12, 0).toISOString(), do: local(2026, 10, 19, 14, 0).toISOString() };
-    const ns = await w.get(`/planovani/slot?${new URLSearchParams(slot)}`);
+    const tyden = await (await w.get("/technik?t=Hristov&den=2026-10-19")).text();
+    expect(tyden).toContain("12:00–14:00 volno → doplnit");
+    expect(tyden).toContain('href="/?q=O-8560000004"'); // zakázka v kalendáři vede na plánování zakázky
+    const ns = await w.get(`/technik?${new URLSearchParams({ ...slot, den: "2026-10-19" })}`);
     expect(ns.status).toBe(200);
     const hs = await ns.text();
     expect(hs).toContain("O-8560000001");
     expect(hs).toContain("O-8560000004");
     expect(hs).toContain("přesun dopředu (flex)");
+    expect(hs).toContain('class="infra i-');
     expect(hs).not.toContain("O-8560000002"); // blokovaná lokalita / ZAK
     expect(hs).not.toContain("O-8560000003"); // PIV + smlouva s JP
 

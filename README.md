@@ -72,12 +72,13 @@ Job píše řádky JSON pro Cloud Logging. Výpadek zdroje = `severity: ERROR` a
 DATABASE_URL=… DEV_USER=ja@ictmount.com npm run web   # lokálně na http://localhost:8080
 ```
 
-- `/` fronta k volání: priorita P1–P0 podle pravidel z Konfigurace, filtr podle fronty / technika, subregionu a hledání.
-- `/zakazka/<ID aktivity>` detail: zákazník, stav, kontaktování, poznámka MWF po záznamech, historie mezi exporty.
-- `/hledat?q=O-…` přímý skok na zakázku podle O-ID, S7 nebo ID aktivity.
-- `/zakazka/<ID>/terminy` nabídka termínů: brány podle zlatých pravidel (ZAK, smlouva s JP, blacklist lokalit,
-  už dohodnutý termín), kalendáře techniků s dovedností pro typ zakázky na 10 pracovních dní, nejlepší volné sloty VOLNY
-  podle trasy dne (km navíc, SLA, priorita, okno 10–14 h, vytížení).
+Dva pohledy (záložky nahoře), pod nimi hledání zakázky přes celou šířku; vpravo stáří exportu MWF
+(zelená do 1 h, oranžová do 2 h, červená přes 2 h).
+- **Plánovat zakázku** – `/?q=O-…` najde zakázku (O-ID, S7, telefon, jméno, adresa) → `/zakazka/<ID>`: nahoře detail
+  se všemi podklady (vlastník infrastruktury, MWF, poznámky, historie, e-mail, kalendáře, chat), dole „Kam naplánovat“ –
+  nejlepší volné sloty VOLNY podle zaplnění dne, SLA a trasy; brány podle zlatých pravidel (ZAK, smlouva s JP, blacklist lokalit).
+- **Doplnit technika** – `/technik`: bez výběru přehled dne (technici od nejméně vytížených); po výběru technika jeho
+  5 pracovních dní, klik na volný slot → dole zakázky, které ho nejlépe doplní (vč. přesunu „flex“).
 - `/zakazka/<ID>/zapis` formulář podle call scriptu → přepis slotu VOLNY na zakázku (patička SHEET2CAL zůstane,
   obsazený slot se nepřepíše) → evidence v `gcal_udalost` → text „Zákazník: … (datum, čas)“ pro MWF.
   Zápis zapíná `ZAPIS_KALENDARE=ano` a `ZAPIS_TECHNICI` (jména čárkami nebo `vsichni`).

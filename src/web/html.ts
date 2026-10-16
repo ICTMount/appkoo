@@ -2,11 +2,11 @@
 // Zakázka se vždy označuje ID O- (ID obj. v ext. systéme); S7 je doplňkové.
 
 import { fmtDate, fmtTime, isoDate } from "../domain/time.js";
-import { PRIORITY, type Priorita } from "../domain/priorita.js";
-import type { Detail, Filtr, Fronta, PolozkaFronty, StavImportu } from "./data.js";
+import type { Priorita } from "../domain/priorita.js";
+import type { Detail, PolozkaFronty, StavImportu } from "./data.js";
 import { pokusyZakazky } from "./data.js";
-import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, VybranySlot } from "../plan/planovac.js";
-import type { UdalostTechnika } from "../gcal/kontrola.js";
+import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, TechnikPlanu, VybranySlot } from "../plan/planovac.js";
+import { jeVolneOkno, type UdalostTechnika } from "../gcal/kontrola.js";
 import { POVINNA_POTVRZENI } from "./planovani.js";
 import type { Nalez, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
 
@@ -21,7 +21,6 @@ const dt = (d: Date | null | undefined) => (d ? `${fmtDate(d)} ${fmtTime(d)}` : 
 const den = (d: Date | null | undefined) => (d ? fmtDate(d) : "");
 const denIso = (d: string | null) => (d ? fmtDate(d) : "");
 
-const POPIS_PRIORITY: Record<Priorita, string> = { P1: "volat dnes", P2: "volat", P3: "později", P0: "nevolat" };
 
 const STAV_KONTAKTU: Record<PolozkaFronty["plan"]["stav"], string> = {
   novy: "bez pokusu",
@@ -89,71 +88,91 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .pole input,.pole select,textarea{color:var(--text)}textarea{width:100%;min-height:90px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
 .check{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
 pre.mwf{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:15px;user-select:all;white-space:pre-wrap}
+header{display:block;padding:0;position:sticky;top:0;z-index:5}
+header .lista{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:8px 20px}
+nav.zalozky{display:flex;gap:4px}nav.zalozky a{padding:7px 14px;border-radius:6px;color:var(--text);font-weight:600}
+nav.zalozky a.on{background:var(--accent);color:#fff}nav.zalozky a:hover{text-decoration:none;background:var(--line)}nav.zalozky a.on:hover{background:var(--accent)}
+header .vpravo{margin-left:auto;display:flex;gap:16px;align-items:center;font-size:12px;color:var(--muted)}
+.export{display:flex;flex-direction:column;gap:3px;min-width:230px}.export b{color:var(--text)}
+.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}.bar span{display:block;height:100%}
+.b-zel{background:#2e9d4b}.b-oranz{background:#e08a00}.b-cerv{background:#d32f2f}
+.c-zel{color:#2e9d4b;font-weight:600}.c-oranz{color:#e08a00;font-weight:600}.c-cerv{color:#d32f2f;font-weight:600}
+form.hledani{display:flex;gap:8px;padding:8px 20px;border-top:1px solid var(--line)}form.hledani input{flex:1;font-size:15px;padding:8px 10px}
+.infra{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid currentColor;vertical-align:middle;white-space:nowrap}
+.i-TMCZ{color:#d1006b}.i-CETIN{color:#1769c2}.i-VDF{color:#d10000}.i-jin{color:var(--muted)}
+@media (prefers-color-scheme:dark){.i-TMCZ{color:#ff5fb0}.i-CETIN{color:#6fb0ff}.i-VDF{color:#ff6b6b}}
+h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid var(--line)}
+.card.scroll{max-height:360px;overflow:auto}
+.tyden{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+.tyden .card{padding:10px}.tyden h3{font-size:13px;margin:0 0 6px}
+.ud{font-size:12px;padding:4px 0;border-top:1px solid var(--line)}.ud:first-of-type{border-top:0}.ud .cas{color:var(--muted);margin-right:4px}
+a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
+a.volny.vyb{outline:2px solid var(--accent)}@media (prefers-color-scheme:dark){a.volny{background:#173322;color:#a5d6a7}}
+.uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
 `;
 
-export function stranka(titulek: string, uzivatel: string, stav: StavImportu, telo: string): string {
-  const stary = stav.stariHodin !== null && stav.stariHodin > 6;
+export type Zalozka = "zakazka" | "technik";
+
+/** Stáří posledního exportu MWF: do 1 h zelená, do 2 h oranžová, déle červená */
+export function cerstvost(stav: StavImportu): string {
+  const h = stav.stariHodin;
+  const trida = h === null || h > 2 ? "cerv" : h > 1 ? "oranz" : "zel";
+  const sirka = h === null ? 100 : Math.min(100, Math.max(4, (h / 3) * 100));
+  const popis = h === null ? "zatím žádný export" : `před ${String(h).replace(".", ",")} h`;
+  return `<div class="export"><div>Export MWF <b>${esc(dt(stav.posledniExport) || "–")}</b> · <span class="c-${trida}">${esc(popis)}</span></div><div class="bar" title="do 1 h zelená, do 2 h oranžová, přes 2 h červená"><span class="b-${trida}" style="width:${sirka.toFixed(0)}%"></span></div></div>`;
+}
+
+/** Vlastník infrastruktury (TMCZ / CETIN / VDF) – štítek všude, kde je zakázka */
+export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="Vlastník infrastruktury">${esc(i || "?")}</span>`;
+
+export function stranka(titulek: string, uzivatel: string, stav: StavImportu, telo: string, o: { zalozka?: Zalozka; dotaz?: string } = {}): string {
+  const zal = o.zalozka ?? "zakazka";
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulek)} – AppKoo</title><style>${CSS}</style></head><body>
-<header><a class="logo" href="/">AppKoo</a><a href="/">Fronta k volání</a><a href="/planovani">Plánování</a>
-<form action="/hledat" method="get" style="display:flex;gap:6px"><input name="q" placeholder="O-…, S7, ID aktivity" aria-label="Najít zakázku"><button>Najít</button></form>
-<div class="info">${esc(uzivatel)}<br>Export MWF: ${esc(dt(stav.posledniExport) || "zatím žádný")}${stav.stariHodin !== null ? ` (před ${esc(stav.stariHodin)} h)` : ""}</div></header>
-<main>${stary ? `<div class="warn">Poslední importovaný export MWF je starý ${esc(stav.stariHodin)} h – data nemusí být aktuální.</div>` : ""}${telo}</main></body></html>`;
+<header><div class="lista"><a class="logo" href="/">AppKoo</a>
+<nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a></nav>
+<div class="vpravo">${cerstvost(stav)}<div>${esc(uzivatel)}</div></div></div>
+<form class="hledani" action="/" method="get"><input name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku"><button>Najít a plánovat</button></form></header>
+<main>${telo}</main></body></html>`;
 }
 
-function odkazFiltru(f: Filtr, zmena: Partial<Filtr>): string {
-  const p = new URLSearchParams();
-  for (const [k, v] of Object.entries({ ...f, ...zmena })) if (v) p.set(k, String(v));
-  const s = p.toString();
-  return s ? `/?${s}` : "/";
+export function strankaUvod(stav: StavImportu, uzivatel: string): string {
+  const telo = `<div class="uvod"><h1>Plánovat zakázku</h1>
+<p>Zadejte nahoře O-ID zakázky (nebo S7, telefon, příjmení). Nahoře uvidíte detail zakázky se všemi podklady – MWF, e-mail, kalendáře, chat –
+a dole nabídku, kam ji ideálně naplánovat.</p>
+<p>Chcete naopak doplnit volný čas technika? Přepněte na <a href="/technik">Doplnit technika</a>.</p></div>`;
+  return stranka("Plánovat zakázku", uzivatel, stav, telo);
 }
 
-function moznosti(hodnoty: string[], vybrano: string | undefined, prazdna: string): string {
-  return [`<option value="">${esc(prazdna)}</option>`, ...hodnoty.map((h) => `<option${h === vybrano ? " selected" : ""}>${esc(h)}</option>`)].join("");
+export function strankaVysledku(
+  dotaz: string,
+  polozky: { z: PolozkaFronty["z"]; priorita: Priorita }[],
+  zdroje: VysledekZdroje[] | null,
+  stav: StavImportu,
+  uzivatel: string,
+): string {
+  const radky = polozky.map(
+    ({ z, priorita }) => `<tr><td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
+<td>${infraStitek(z.infrastruktura)}</td><td>${esc(z.zakaznik)}<br><small>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</small></td>
+<td>${esc(z.typAktivity)}</td><td>${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
+  );
+  const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${polozky.length} zakázek</small></h1>
+<div class="tbl"><table><thead><tr><th>ID O- / S7</th><th>Infra</th><th>Zákazník / adresa</th><th>Typ</th><th>Stav MWF</th><th>Priorita</th></tr></thead>
+<tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
+${sekceZdroju(zdroje)}`;
+  return stranka("Hledání", uzivatel, stav, telo, { dotaz });
 }
 
-export function strankaFronty(fronta: Fronta, filtr: Filtr, stav: StavImportu, uzivatel: string, now: Date): string {
-  const soucet = PRIORITY.reduce((n, p) => n + fronta.pocty[p], 0);
-  const tabs = [
-    `<a href="${esc(odkazFiltru(filtr, { priorita: undefined }))}" class="${filtr.priorita ? "" : "on"}">Vše<b>${soucet}</b></a>`,
-    ...PRIORITY.map(
-      (p) =>
-        `<a href="${esc(odkazFiltru(filtr, { priorita: p }))}" class="${filtr.priorita === p ? "on" : ""}"><span class="prio ${p}">${p}</span> ${esc(POPIS_PRIORITY[p])}<b>${fronta.pocty[p]}</b></a>`,
-    ),
-  ].join("");
-
-  const MAX = 500;
-  const radky = fronta.polozky.slice(0, MAX).map((p) => {
-    const z = p.z;
-    const tel = z.telefony[0];
-    return `<tr>
-<td><span class="prio ${p.priorita}">${p.priorita}</span></td>
-<td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
-<td>${esc(z.zakaznik)}${z.adresa ? `<br><small>${esc(z.adresa)}${bezRovna(z.psc) ? `, ${esc(bezRovna(z.psc))}` : ""}</small>` : ""}</td>
-<td class="nowrap">${tel ? `<a href="tel:${esc(tel.replace(/\s/g, ""))}">${esc(tel)}</a>` : ""}</td>
-<td>${esc(z.typAktivity)}<br><small>${esc(z.infrastruktura)}</small></td>
-<td>${esc(z.subregion)}<br><small>${esc(z.technik)}</small></td>
-<td>${esc(stavKontaktu(p, now))}${p.dalsiKontakt ? `<br><small>kontakt ${esc(denIso(p.dalsiKontakt))}</small>` : ""}</td>
-<td>${esc(z.parkovani ?? "")}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td>
-<td><small>${esc(p.duvod)}</small></td></tr>`;
-  });
-
-  const telo = `<h1>Fronta k volání <small>${fronta.polozky.length} zakázek${fronta.polozky.length !== fronta.celkem ? ` z ${fronta.celkem} otevřených` : ""}</small></h1>
-<form class="filtr" method="get" action="/">
-<label>Fronta / technik<select name="zdroj">${moznosti(fronta.zdroje, filtr.zdroj, "všichni")}</select></label>
-<label>Subregión<select name="subregion">${moznosti(fronta.subregiony, filtr.subregion, "všechny")}</select></label>
-<label>Hledat<input name="hledat" value="${esc(filtr.hledat ?? "")}" placeholder="O-ID, jméno, adresa, telefon"></label>
-${filtr.priorita ? `<input type="hidden" name="priorita" value="${esc(filtr.priorita)}">` : ""}
-<button>Filtrovat</button>${filtr.zdroj || filtr.subregion || filtr.hledat || filtr.priorita ? ` <a href="/">zrušit filtr</a>` : ""}</form>
-<div class="tabs">${tabs}</div>
-<div class="tbl"><table><thead><tr><th>Priorita</th><th>ID O- / S7</th><th>Zákazník / adresa</th><th>Telefon</th><th>Typ</th><th>Subregión / zdroj</th><th>Kontakt</th><th>Parkování / termín</th><th>Proč</th></tr></thead>
-<tbody>${radky.join("") || `<tr><td colspan="9" class="muted">Žádná zakázka neodpovídá filtru.</td></tr>`}</tbody></table></div>
-${fronta.polozky.length > MAX ? `<p class="muted">Zobrazeno prvních ${MAX} z ${fronta.polozky.length} – zužte filtr.</p>` : ""}`;
-
-  return stranka("Fronta k volání", uzivatel, stav, telo);
+export interface PlanovaniZakazky {
+  brany: Brany;
+  nabidka: Nabidka | null;
+  zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean };
+  /** plánovač není zapnutý (chybí kalendáře) */
+  nedostupne?: boolean;
 }
 
-export function strankaDetailu(d: Detail, stav: StavImportu, uzivatel: string, now: Date, zdroje: VysledekZdroje[] | null = null): string {
+/** Zakázka: nahoře detail se všemi podklady, dole kam ji naplánovat */
+export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, now: Date, zdroje: VysledekZdroje[] | null, plan: PlanovaniZakazky): string {
   const z = d.z;
   const pokusy = pokusyZakazky(z);
   const radek = (k: string, v: string) => (v ? `<dt>${esc(k)}</dt><dd>${v}</dd>` : "");
@@ -173,8 +192,7 @@ export function strankaDetailu(d: Detail, stav: StavImportu, uzivatel: string, n
     )
     .join("");
 
-  const telo = `<p><a href="/">← Fronta</a> · <a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/terminy">Navrhnout termín</a></p>
-<h1>${esc(z.idObjednavky || z.idAktivity)} <small>${esc(z.zakaznik)}${bezRovna(z.idS7) ? ` · S7 ${esc(bezRovna(z.idS7))}` : ""} · aktivita ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${bezRovna(z.idS7) ? ` · S7 ${esc(bezRovna(z.idS7))}` : ""} · aktivita ${esc(z.idAktivity)}</small></h1>
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
 <div class="card"><h2>Zákazník</h2><dl>
@@ -185,8 +203,9 @@ ${radek("Subregión", esc(z.subregion))}
 ${radek("Balík / produkt", esc([z.balik, z.produkt].filter(Boolean).join(" · ")))}
 </dl></div>
 <div class="card"><h2>Zakázka</h2><dl>
+${radek("Vlastník infrastruktury", infraStitek(z.infrastruktura))}
+${radek("Typ", esc(`${z.typAktivity}${z.predobjednavka ? " · předobjednávka" : ""}`))}
 ${radek("Priorita", `<span class="prio ${d.priorita}">${d.priorita}</span> ${esc(d.duvod)}`)}
-${radek("Typ", esc(`${z.typAktivity} · ${z.infrastruktura}${z.predobjednavka ? " · předobjednávka" : ""}`))}
 ${radek("Stav MWF", esc(z.stavMwf))}
 ${radek("Zdroj", esc(z.technik))}
 ${radek("Přiděleno", esc(dt(z.prideleno)))}
@@ -210,30 +229,15 @@ ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity se stejným O-ID</h2>${d.souvisejici
     .map((s) => `<div><a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> · ${esc(s.typ_aktivity)} · ${esc(s.stav_mwf)}${s.uzavreno ? " · uzavřeno" : ""}</div>`)
     .join("")}</div>` : ""}
-${sekceZdroju(zdroje)}
 <div class="grid" style="margin-top:12px">
-<div class="card"><h2>Poznámka MWF (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
-<div class="card"><h2>Historie změn mezi exporty</h2><div class="tbl" style="border:0"><table><thead><tr><th>Export</th><th>Stav</th><th>Parkování</th><th>Výsledek</th><th>Termín</th><th>Zdroj</th></tr></thead><tbody>${historie || `<tr><td colspan="6" class="muted">bez historie</td></tr>`}</tbody></table></div></div>
-</div>`;
+<div class="card scroll"><h2>Poznámka MWF (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
+<div class="card scroll"><h2>Historie změn mezi exporty</h2><div class="tbl" style="border:0"><table><thead><tr><th>Export</th><th>Stav</th><th>Parkování</th><th>Výsledek</th><th>Termín</th><th>Zdroj</th></tr></thead><tbody>${historie || `<tr><td colspan="6" class="muted">bez historie</td></tr>`}</tbody></table></div></div>
+</div>
+${sekceZdroju(zdroje)}
+<h2 class="sekce" id="planovani">Kam naplánovat</h2>
+${sekcePlanovani(d, plan)}`;
 
-  return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, telo);
-}
-
-export function strankaVysledkuHledani(
-  dotaz: string,
-  mwf: { id: string; popis: string }[],
-  zdroje: VysledekZdroje[] | null,
-  stav: StavImportu,
-  uzivatel: string,
-): string {
-  const telo = `<h1>Hledání „${esc(dotaz)}“</h1>
-<div class="card"><h2>MWF</h2>${
-    mwf.length
-      ? mwf.map((n) => `<div class="zaznam"><a href="/zakazka/${encodeURIComponent(n.id)}">${esc(n.popis)}</a></div>`).join("")
-      : `<span class="muted">V otevřených zakázkách MWF nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</span>`
-  }</div>
-${sekceZdroju(zdroje)}`;
-  return stranka("Hledání", uzivatel, stav, telo);
+  return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, telo, { dotaz: z.idObjednavky || z.idAktivity });
 }
 
 const NAZEV_ZDROJE: Record<Zdroj, string> = { email: "E-mail (koordinace)", kalendar: "Kalendáře techniků", chat: "Google Chat" };
@@ -276,45 +280,39 @@ const slot = (od: Date, do_: Date) => `${denTydne(od)} ${fmtDate(od)} ${fmtTime(
 function hlavickaZakazky(d: Detail): string {
   const z = d.z;
   return `<p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← ${esc(z.idObjednavky || z.idAktivity)}</a></p>
-<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
+<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
 }
 
-export function strankaTerminu(
-  d: Detail,
-  brany: Brany,
-  nabidka: Nabidka | null,
-  zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean },
-  stav: StavImportu,
-  uzivatel: string,
-): string {
+
+function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
   const z = d.z;
+  const { brany, nabidka, zapis } = plan;
   const blok = brany.blokace.length
     ? `<div class="err"><b>Termín teď nelze naplánovat:</b><ul>${brany.blokace.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div>`
     : "";
   const upoz = brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join("<br>")}</div>` : "";
+  if (blok) return blok + upoz;
+  if (d.uzavreno) return `<div class="warn">Uzavřená zakázka se neplánuje.</div>`;
+  if (!nabidka) return `${upoz}<div class="warn">${plan.nedostupne ? "Kalendáře techniků nejsou v této instalaci zapnuté." : "Nabídku se nepodařilo spočítat."}</div>`;
 
-  let obsah = "";
-  if (nabidka) {
-    const info = [
-      nabidka.nedostupne.length ? `Kalendář nejde přečíst (není nasdílený aplikaci): ${nabidka.nedostupne.join(", ")}.` : "",
-      nabidka.bezZakladny.length ? `Technik bez adresy výjezdu v číselníku: ${nabidka.bezZakladny.join(", ")}.` : "",
-      nabidka.bezPolohy ? `${nabidka.bezPolohy} zakázek v kalendářích nemá dohledatelnou adresu – v trasách chybí.` : "",
-    ].filter(Boolean);
-    const radky = nabidka.moznosti.map((m: MoznostSlotu, i) => {
-      const smi = zapis.zapnuty && zapis.smiTechnik(m.technik);
-      const q = new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() });
-      return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b></td><td>${esc(m.technik)}</td>
+  const info = [
+    nabidka.nedostupne.length ? `Kalendář nejde přečíst: ${nabidka.nedostupne.join(", ")}.` : "",
+    nabidka.bezZakladny.length ? `Technik bez adresy výjezdu v číselníku: ${nabidka.bezZakladny.join(", ")}.` : "",
+    nabidka.bezPolohy ? `${nabidka.bezPolohy} zakázek v kalendářích nemá dohledatelnou adresu – v trasách chybí.` : "",
+  ].filter(Boolean);
+  const radky = nabidka.moznosti.map((m: MoznostSlotu, i) => {
+    const smi = zapis.zapnuty && zapis.smiTechnik(m.technik);
+    const q = new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() });
+    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b></td><td>${esc(m.technik)}</td>
 <td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
 <td>${m.poSla ? `<span class="prio P1">po SLA</span>` : "v SLA"}</td>
 <td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
-    });
-    obsah = `${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
+  });
+  return `${upoz}${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
 <div class="tbl"><table><thead><tr><th>#</th><th>Slot</th><th>Technik</th><th>Km navíc</th><th>SLA</th><th></th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="6" class="muted">${nabidka.chyba ? "" : "Žádný volný slot v dosahu (max 75 km zajížďky) v příštích 10 pracovních dnech."}</td></tr>`}</tbody></table></div>
-<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: km navíc oproti trase dne, SLA, priorita, preferované okno 10–14 h, vytížení technika.</p>`;
-  }
-  return stranka("Termín", uzivatel, stav, `${hlavickaZakazky(d)}${blok}${upoz}${obsah}`);
+<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: zaplnění dne, SLA, km navíc oproti trase dne, preferované okno 10–14 h.</p>`;
 }
 
 const vyber = (name: string, moznosti: [string, string][], vybrano = "") =>
@@ -406,49 +404,89 @@ export function strankaZapsano(
 ${presun ? `<div class="${presun.ok ? "ok" : "err"}">${esc(presun.zprava)}</div>` : ""}
 <div class="card"><h2>Teď zapište do MWF (Dojednávania)</h2><p class="muted">MWF zůstává hlavní evidencí – zkopírujte řádek a uložte termín v MWF. Po dalším importu aplikace zkontroluje shodu MWF ↔ kalendář.</p>
 <pre class="mwf">${esc(mwf)}</pre></div>
-<p><a href="/">← Zpět na frontu</a></p>`;
+<p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← Zpět na zakázku</a> · <a href="/technik">Doplnit technika</a></p>`;
   return stranka("Termín zapsán", uzivatel, stav, telo);
 }
 
-// ---------- Režim B: doplnění slotu ----------
+
+// ---------- Doplnit technika ----------
 
 const hm = (d: Date) => fmtTime(d);
-const odkazSlotu = (u: UdalostTechnika) =>
-  `/planovani/slot?${new URLSearchParams({ k: u.kalendar, e: u.id, t: u.technik, od: u.od.toISOString(), do: u.do.toISOString() })}`;
+const DNY_DLOUHE = (iso: string) => DNY[new Date(`${iso}T00:00:00Z`).getUTCDay()]!;
 
-export function strankaPlanovani(datum: string, dny: DenPrehledu[], nedostupne: string[], dalsiDny: string[], predchozi: string | null, stav: StavImportu, uzivatel: string): string {
-  const nav = `<form class="filtr" method="get" action="/planovani">
-${predchozi ? `<a href="/planovani?den=${esc(predchozi)}">← ${esc(fmtDate(predchozi))}</a>` : ""}
-<input type="date" name="den" value="${esc(datum)}"><button>Zobrazit</button>
-${dalsiDny.map((d) => `<a href="/planovani?den=${esc(d)}">${esc(DNY[new Date(`${d}T00:00:00Z`).getUTCDay()]!)} ${esc(fmtDate(d))}</a>`).join(" ")}
-</form>`;
-  const radky = dny.map((d) => {
-    const zak = d.zakazky.map((u) => `<div><small>${esc(hm(u.od))}–${esc(hm(u.do))}</small> ${esc(u.summary.replace(/^[^-]+-\s*/, ""))}</div>`).join("");
-    const volne = d.volne.map((u) => `<a class="btn" href="${esc(odkazSlotu(u))}">${esc(hm(u.od))}–${esc(hm(u.do))} doplnit</a>`).join(" ");
-    return `<tr><td><b>${esc(d.technik.jmeno)}</b><br><small class="muted">${esc(d.technik.skupiny.join(", "))}</small></td>
-<td class="nowrap">${d.zakazky.length}</td><td>${zak || `<span class="muted">prázdný den</span>`}</td><td>${volne || `<span class="muted">bez volného slotu</span>`}</td></tr>`;
-  });
-  const telo = `<h1>Plánování – doplnění slotů <small>${esc(DNY[new Date(`${datum}T00:00:00Z`).getUTCDay()]!)} ${esc(fmtDate(datum))}</small></h1>
-${nav}
-${nedostupne.length ? `<div class="warn">Kalendář nejde přečíst: ${esc(nedostupne.join(", "))}.</div>` : ""}
-<p class="muted">Technici seřazení od nejméně vytížených. Vyberte volný slot (VOLNY) – aplikace nabídne zakázky, které ho nejlépe doplní.</p>
-<div class="tbl"><table><thead><tr><th>Technik</th><th>Zakázek</th><th>Den</th><th>Volné sloty</th></tr></thead>
-<tbody>${radky.join("") || `<tr><td colspan="4" class="muted">Žádný technik s čitelným kalendářem (zkontrolujte číselník Technici).</td></tr>`}</tbody></table></div>`;
-  return stranka("Plánování", uzivatel, stav, telo);
+const odkazSlotu = (u: UdalostTechnika, den: string) =>
+  `/technik?${new URLSearchParams({ t: u.technik, den, k: u.kalendar, e: u.id, od: u.od.toISOString(), do: u.do.toISOString() })}`;
+
+/** Text události bez jména technika na začátku; O-ID jako odkaz na plánování zakázky */
+function textUdalosti(u: UdalostTechnika): string {
+  const t = esc(u.summary.replace(/^[^-]+-\s*/, ""));
+  return t.replace(/O-\d{6,}/g, (o) => `<a href="/?q=${o}">${o}</a>`);
 }
 
-export function strankaSlotu(
-  vyb: VybranySlot,
-  v: NavrhySlotu,
-  zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean },
-  stav: StavImportu,
-  uzivatel: string,
-): string {
-  const datum = isoDate(vyb.od);
-  const smi = zapis.zapnuty && zapis.smiTechnik(vyb.technik.jmeno);
-  const den = v.den
-    .map((u) => `<div${u.id === vyb.eventId ? ` style="font-weight:600"` : ""}><small>${esc(hm(u.od))}–${esc(hm(u.do))}</small> ${esc(u.summary)}${u.id === vyb.eventId ? " ← doplňuje se" : ""}</div>`)
+export interface StrankaTechnika {
+  technici: TechnikPlanu[];
+  technik: TechnikPlanu | null;
+  den: string;
+  predchozi: string | null;
+  dalsi: string;
+  /** dny vybraného technika (nahoře) */
+  dny: { datum: string; udalosti: UdalostTechnika[] }[];
+  /** bez vybraného technika: přehled všech techniků pro den */
+  prehled: { dny: DenPrehledu[]; nedostupne: string[] } | null;
+  slot: VybranySlot | null;
+  navrhy: NavrhySlotu | null;
+  chyba?: string;
+  zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean };
+}
+
+export function strankaTechnika(s: StrankaTechnika, stav: StavImportu, uzivatel: string): string {
+  const volby = s.technici
+    .map((t) => `<option value="${esc(t.jmeno)}"${s.technik?.jmeno === t.jmeno ? " selected" : ""}>${esc(t.jmeno)} – ${esc(t.skupiny.join(", "))} · ${esc(t.vyjezd)}</option>`)
     .join("");
+  const navT = s.technik ? `&t=${encodeURIComponent(s.technik.jmeno)}` : "";
+  const formular = `<form class="filtr" method="get" action="/technik">
+<label>Technik<select name="t"><option value="">– všichni (přehled dne) –</option>${volby}</select></label>
+<label>Od dne<input type="date" name="den" value="${esc(s.den)}"></label><button>Zobrazit</button>
+${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← dřív</a>` : ""} <a href="/technik?den=${esc(s.dalsi)}${esc(navT)}">dál →</a>
+</form>`;
+
+  let horni = "";
+  if (s.technik) {
+    const t = s.technik;
+    horni = `<h1>${esc(t.jmeno)} <small>${esc(t.skupiny.join(", "))} · výjezd ${esc(t.vyjezd)}${t.vyjezd2 ? ` / ${esc(t.vyjezd2)}` : ""}</small></h1>
+${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
+<div class="tyden">${s.dny
+      .map((d) => {
+        const zak = d.udalosti.filter((u) => !jeVolneOkno(u));
+        const obsah = d.udalosti
+          .map((u) =>
+            jeVolneOkno(u)
+              ? `<a class="volny${s.slot?.eventId === u.id ? " vyb" : ""}" href="${esc(odkazSlotu(u, s.den))}">${esc(hm(u.od))}–${esc(hm(u.do))} volno → doplnit</a>`
+              : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u)}</div>`,
+          )
+          .join("");
+        return `<div class="card"><h3>${esc(DNY_DLOUHE(d.datum))} ${esc(fmtDate(d.datum))} <small class="muted">· ${zak.length} ${zak.length === 1 ? "událost" : "událostí"}</small></h3>${obsah || `<span class="muted">prázdný den</span>`}</div>`;
+      })
+      .join("")}</div>`;
+  } else if (s.prehled) {
+    const radky = s.prehled.dny.map((d) => {
+      const zak = d.zakazky.map((u) => `<div><small>${esc(hm(u.od))}–${esc(hm(u.do))}</small> ${textUdalosti(u)}</div>`).join("");
+      const volne = d.volne.map((u) => `<a class="volny" style="display:inline-block" href="${esc(odkazSlotu(u, s.den))}">${esc(hm(u.od))}–${esc(hm(u.do))} doplnit</a>`).join(" ");
+      return `<tr><td><a href="/technik?t=${encodeURIComponent(d.technik.jmeno)}&den=${esc(s.den)}"><b>${esc(d.technik.jmeno)}</b></a><br><small class="muted">${esc(d.technik.skupiny.join(", "))}</small></td>
+<td class="nowrap">${d.zakazky.length}</td><td>${zak || `<span class="muted">prázdný den</span>`}</td><td>${volne || `<span class="muted">bez volného slotu</span>`}</td></tr>`;
+    });
+    horni = `<h1>Doplnit technika <small>přehled ${esc(DNY_DLOUHE(s.den))} ${esc(fmtDate(s.den))} – od nejméně vytížených</small></h1>
+${s.prehled.nedostupne.length ? `<div class="warn">Kalendář nejde přečíst: ${esc(s.prehled.nedostupne.join(", "))}.</div>` : ""}
+<div class="tbl"><table><thead><tr><th>Technik</th><th>Zakázek</th><th>Den</th><th>Volné sloty</th></tr></thead>
+<tbody>${radky.join("") || `<tr><td colspan="4" class="muted">Žádný technik s čitelným kalendářem (zkontrolujte číselník Technici).</td></tr>`}</tbody></table></div>`;
+  }
+
+  const dolni = s.slot && s.navrhy ? sekceNavrhu(s.slot, s.navrhy, s.zapis) : s.technik ? `<p class="muted">Vyberte nahoře volný slot (zelený) – dole se nabídnou zakázky, které ho nejlépe doplní.</p>` : "";
+  return stranka("Doplnit technika", uzivatel, stav, `${formular}${horni}${dolni}`, { zalozka: "technik" });
+}
+
+function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean }): string {
+  const smi = zapis.zapnuty && zapis.smiTechnik(vyb.technik.jmeno);
   const radky = v.navrhy.map((n, i) => {
     const z = n.kandidat.z;
     const q = new URLSearchParams({ k: vyb.technik.kalendar, e: vyb.eventId, t: vyb.technik.jmeno, od: vyb.od.toISOString(), do: vyb.do.toISOString() });
@@ -461,6 +499,7 @@ export function strankaSlotu(
     const smiZde = smi && (!p || zapis.smiTechnik(p.technik));
     return `<tr><td>${i + 1}</td>
 <td class="oid"><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a>${bezRovna(z.idS7) ? `<br><small>${esc(bezRovna(z.idS7))}</small>` : ""}</td>
+<td>${infraStitek(z.infrastruktura)}</td>
 <td>${esc(z.zakaznik)}<br><small>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</small></td>
 <td><span class="prio ${n.kandidat.priorita}">${n.kandidat.priorita}</span></td>
 <td class="nowrap">${n.kandidat.slaKonec ? esc(dt(n.kandidat.slaKonec)) : ""}${n.poSla ? `<br><span class="prio P1">po SLA</span>` : ""}</td>
@@ -473,13 +512,10 @@ export function strankaSlotu(
     v.bezPolohy ? `${v.bezPolohy} kandidátů nemá adresu dohledatelnou na mapě.` : "",
     v.bezPolohyVeDni ? `${v.bezPolohyVeDni} zakázek ve dni technika nemá dohledatelnou adresu – v trase chybí.` : "",
   ].filter(Boolean);
-  const telo = `<p><a href="/planovani?den=${esc(datum)}">← Přehled dne</a></p>
-<h1>Doplnit slot <small>${esc(vyb.technik.jmeno)} · ${esc(slot(vyb.od, vyb.do))}</small></h1>
+  return `<h2 class="sekce">Zakázky do slotu ${esc(slot(vyb.od, vyb.do))} · ${esc(vyb.technik.jmeno)}</h2>
 ${v.chyba ? `<div class="err">${esc(v.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
-<div class="grid"><div class="card"><h2>Den technika</h2>${den || `<span class="muted">bez událostí</span>`}</div></div>
-<div class="tbl" style="margin-top:12px"><table><thead><tr><th>#</th><th>ID O- / S7</th><th>Zákazník / adresa</th><th>Priorita</th><th>SLA</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>
-<tbody>${radky.join("") || `<tr><td colspan="8" class="muted">${v.chyba ? "" : "Žádná vhodná zakázka v dosahu (max 75 km zajížďky)."}</td></tr>`}</tbody></table></div>
+<div class="tbl"><table><thead><tr><th>#</th><th>ID O- / S7</th><th>Infra</th><th>Zákazník / adresa</th><th>Priorita</th><th>SLA</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>
+<tbody>${radky.join("") || `<tr><td colspan="9" class="muted">${v.chyba ? "" : "Žádná vhodná zakázka v dosahu (max 75 km zajížďky)."}</td></tr>`}</tbody></table></div>
 <p class="muted">Kandidátů ${v.kandidatu} (z toho flex k přesunu ${v.flex}). Pořadí: naléhavost SLA a priorita, pak km navíc oproti trase dne. Zákazníkovi je vždy potřeba zavolat a termín potvrdit.</p>`;
-  return stranka("Doplnit slot", uzivatel, stav, telo);
 }

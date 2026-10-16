@@ -105,22 +105,29 @@ describe("data pro web", () => {
 });
 
 describe("webový server", () => {
-  it("bez přihlášení 401, cizí doména 403, povolený uživatel vidí frontu", async () => {
+  it("bez přihlášení 401, cizí doména 403; úvod se záložkami, stáří exportu a hledání s vlastníkem infrastruktury", async () => {
     const get = await spust();
     expect((await get("/")).status).toBe(401);
     expect((await get("/", "nekdo@gmail.com")).status).toBe(403);
     const r = await get("/", "davidh@ictmount.com");
     expect(r.status).toBe(200);
     const html = await r.text();
-    expect(html).toContain("O-8550000001");
+    expect(html).toContain("Plánovat zakázku");
+    expect(html).toContain("Doplnit technika");
     expect(html).toContain("davidh@ictmount.com");
-    expect(html.indexOf("O-8550000001")).toBeLessThan(html.indexOf("O-8550000002")); // P1 před P0
+    expect(html).toMatch(/class="b-(zel|oranz|cerv)"/);
+    expect(html).not.toContain("Fronta k volání");
     expect(r.headers.get("content-security-policy")).toContain("default-src 'none'");
+
+    const vysledky = await (await get("/?q=O-85500000", "davidh@ictmount.com")).text();
+    expect(vysledky).toContain("O-8550000001");
+    expect(vysledky).toContain("O-8550000002");
+    expect(vysledky).toContain('class="infra i-CETIN"');
   });
 
   it("escapuje data z MWF (žádné HTML z poznámek a jmen)", async () => {
     const get = await spust();
-    const html = await (await get("/?zdroj=Mark%C3%A9ta%20Kraitlov%C3%A1", "davidh@ictmount.com")).text();
+    const html = await (await get("/zakazka/A3", "davidh@ictmount.com")).text();
     expect(html).toContain("Černá, &lt;Eva&gt;");
     expect(html).not.toContain("<Eva>");
     expect(esc(`"<a>'&`)).toBe("&quot;&lt;a&gt;&#39;&amp;");
@@ -130,10 +137,14 @@ describe("webový server", () => {
     const get = await spust(["davidh@ictmount.com"]);
     const detail = await get("/zakazka/A2", "davidh@ictmount.com");
     expect(detail.status).toBe(200);
-    expect(await detail.text()).toContain("Dvořák, Petr");
-    const hledani = await get("/hledat?q=O-8550000003", "davidh@ictmount.com");
+    const hd = await detail.text();
+    expect(hd).toContain("Dvořák, Petr");
+    expect(hd).toContain("Vlastník infrastruktury");
+    expect(hd).toContain("Kam naplánovat");
+    const hledani = await get("/?q=O-8550000003", "davidh@ictmount.com");
     expect(hledani.status).toBe(302);
     expect(hledani.headers.get("location")).toBe("/zakazka/A3");
+    expect((await get("/hledat?q=O-8550000003", "davidh@ictmount.com")).headers.get("location")).toBe("/?q=O-8550000003");
     expect((await get("/zakazka/NIC", "davidh@ictmount.com")).status).toBe(404);
     expect((await get("/", "jina@ictmount.com")).status).toBe(403); // jen vyjmenovaní uživatelé
     expect(await (await get("/healthz")).text()).toBe("ok");
