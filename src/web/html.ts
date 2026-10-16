@@ -127,7 +127,12 @@ form.terminy{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bott
 .soused.zakl{font-style:italic}.soused .km.dlouhy{color:var(--p1)}.soused.tato{color:var(--accent);font-weight:600}
 .mc{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;margin-left:4px;border-radius:4px;background:var(--line);color:var(--text);white-space:nowrap}
 .adr{color:var(--muted)}.pozn{font-size:12px;margin-top:4px;padding-left:6px;border-left:2px solid var(--line);color:var(--muted);max-width:520px}.pozn b{color:var(--text);font-weight:600}a.volny.radek{display:block;margin:3px 0}a.volny .cas{margin-right:4px}
-.rychle{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
+form.vyber-tech{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px}
+form.vyber-tech .pole{display:flex;flex-direction:column;gap:6px}
+form.vyber-tech label{font-size:12px;color:var(--muted);height:18px;line-height:18px}form.vyber-tech label b{color:var(--text)}
+form.vyber-tech select,form.vyber-tech input,form.vyber-tech button{height:38px;box-sizing:border-box}form.vyber-tech select{min-width:320px}
+form.vyber-tech .radek{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rychle{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
 .rychle a.on{border-color:var(--accent);background:var(--accent);color:#fff}.rychle a:hover{text-decoration:none}
 form.filtr label b{color:var(--text);margin-left:4px}
 .uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
@@ -586,14 +591,17 @@ export function strankaTechnika(s: StrankaTechnika, stav: StavImportu, uzivatel:
     .join("");
   const navT = s.technik ? `&t=${encodeURIComponent(s.technik.jmeno)}` : "";
   const krok = s.technik ? "o týden" : "o den";
-  const formular = `<form class="filtr" method="get" action="/technik">
-<label>Technik<select name="t"><option value="">– všichni (přehled dne) –</option>${volby}</select></label>
-<label>${s.technik ? "Od dne" : "Den"} <b>${esc(DNY_CELE[new Date(`${s.den}T00:00:00Z`).getUTCDay()]!)}</b><input type="date" name="den" value="${esc(s.den)}"></label><button>Zobrazit</button>
-${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← ${krok} zpět</a>` : ""} <a href="/technik?den=${esc(s.dalsi)}${esc(navT)}">${krok} dál →</a>
-</form>
+  // Technik vlevo, Den vpravo: popisky na stejné výšce, pod Dnem posun a rychlá volba dnů
+  const formular = `<form class="vyber-tech" method="get" action="/technik">
+<div class="pole"><label for="vt">Technik</label><select id="vt" name="t"><option value="">– všichni (přehled dne) –</option>${volby}</select></div>
+<div class="pole"><label for="vd">${s.technik ? "Od dne" : "Den"} · <b>${esc(DNY_CELE[new Date(`${s.den}T00:00:00Z`).getUTCDay()]!)}</b></label>
+<div class="radek"><input id="vd" type="date" name="den" value="${esc(s.den)}"><button>Zobrazit</button>
+${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← ${krok} zpět</a>` : ""}<a href="/technik?den=${esc(s.dalsi)}${esc(navT)}">${krok} dál →</a></div>
 <div class="rychle">${s.rychleDny
     .map((d) => `<a class="${d === s.den ? "on" : ""}" href="/technik?den=${esc(d)}${esc(navT)}">${esc(DNY_DLOUHE(d))} ${esc(fmtDate(d).slice(0, 6))}</a>`)
-    .join("")}</div>`;
+    .join("")}</div>
+</div>
+</form>`;
 
   let horni = "";
   if (s.technik) {
