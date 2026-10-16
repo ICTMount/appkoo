@@ -37,6 +37,8 @@ const ZAKAZKY: Record<string, string>[] = [
   { "ID aktivity": "P2", "ID objednávky": "2", "ID obj. v ext. systéme": "O-8560000002", "Pracovný zdroj": "Jana Hadravová (Vegacom)", "Stav": "Zaparkovaná", "Typ aktivity": "Inst_Pristupu_FTTH", "Zákazník": "Malá, Eva", "Adresa": "Praha, Pravá 245/19", "Subregión": "CZ_V_PHA_2004", "Dôvod parkovania": "Zákazník - nedostupný" },
   { "ID aktivity": "P3", "ID objednávky": "3", "ID obj. v ext. systéme": "O-8560000003", "Pracovný zdroj": "Ludmila Havlíčková (Vegacom)", "Stav": "Riešená dodávateľom - odovzdaná", "Typ aktivity": "PIV_Instalacia", "Zákazník": "Dlouhý, Petr", "Adresa": "Brno, Neznámá 1", "Subregión": "CZ_M_BR_1001",
     "Poznámka": "[Dojednávania] 14.10.2026 9:07, Ludmila Havlíčková (Vegacom): zkz. má smlouvu s JP, ověřuje si výpovědní dobu, přeje si kontaktovat 30.11.2026 r_2" },
+  { "ID aktivity": "P4", "ID objednávky": "4", "ID obj. v ext. systéme": "O-8560000004", "Pracovný zdroj": "Hristov Anton (Vegacom)", "Stav": "Riešená dodávateľom - odovzdaná", "Typ aktivity": "Inst_Pristupu_FTTH", "Zákazník": "Rychlá, Ivana", "Adresa": "Praha, Vysočanská 10", "Subregión": "CZ_V_PHA_2002",
+    "Poznámka": "[Dojednávania] 14.10.2026 9:07, Jana Hadravová (Vegacom): Zákazník: Rychlá, Ivana (22.10.2026, 10:00 - 11:59), flex – může i dřív", "Dohodnutý termín": "22.10.2026 10:00 / 22.10.2026 11:59" },
 ];
 
 const TECHNICI_CSV = [
@@ -60,7 +62,7 @@ const geokoder: Geokoder = {
   },
 };
 
-interface Udalost { id: string; summary: string; description: string; location?: string; colorId?: string; start: { dateTime: string }; end: { dateTime: string }; status: string }
+interface Udalost { id: string; summary: string; description: string; location?: string; colorId?: string; start: { dateTime: string }; end: { dateTime: string }; status: string; extendedProperties?: { private: Record<string, string> } }
 
 /** Napodobený Google Calendar: K1 = Hristov (sloty VOLNY), K2 = nenasdílený kalendář */
 function kalendar() {
@@ -70,6 +72,7 @@ function kalendar() {
       { id: "v1", summary: "Hristov - VOLNY", colorId: "10", description: "Šablona\n\n[SHEET2CAL] K1", start: { dateTime: "2026-10-16T10:00:00+02:00" }, end: { dateTime: "2026-10-16T12:00:00+02:00" }, status: "confirmed" },
       { id: "v2", summary: "Hristov - VOLNY", colorId: "10", description: "Šablona\n\n[SHEET2CAL] K1", start: { dateTime: "2026-10-19T12:00:00+02:00" }, end: { dateTime: "2026-10-19T14:00:00+02:00" }, status: "confirmed" },
       { id: "v0", summary: "Hristov - VOLNY", colorId: "10", description: "[SHEET2CAL] K1", start: { dateTime: "2026-10-15T08:00:00+02:00" }, end: { dateTime: "2026-10-15T10:00:00+02:00" }, status: "confirmed" },
+      { id: "f1", summary: "Hristov - FTTH O-8560000004 Rychlá, Ivana (JH)", description: "flex", location: "Praha, Vysočanská 10", start: { dateTime: "2026-10-22T10:00:00+02:00" }, end: { dateTime: "2026-10-22T12:00:00+02:00" }, status: "confirmed", extendedProperties: { private: { appkoo: "P4" } } },
     ],
   };
   const patche: { calendarId: string; eventId: string; requestBody: Record<string, unknown> }[] = [];
@@ -83,7 +86,7 @@ function kalendar() {
       patch: async (p: { calendarId: string; eventId: string; requestBody: Record<string, unknown> }) => {
         patche.push(p);
         const e = ud[p.calendarId]!.find((x) => x.id === p.eventId)!;
-        Object.assign(e, { summary: p.requestBody.summary, description: p.requestBody.description, colorId: undefined });
+        Object.assign(e, { summary: p.requestBody.summary, description: p.requestBody.description, colorId: (p.requestBody.colorId as string | null) ?? undefined });
         return { data: { id: e.id, htmlLink: `https://calendar.test/${e.id}` } };
       },
     },
@@ -250,5 +253,40 @@ describe("web: nabídka a zápis termínu", () => {
     const w2 = await spust({ zapnuty: true, technici: ["Nekdo"] });
     expect((await w2.post("/zakazka/P1/zapis", { ...vyber, ...potvrzeno })).status).toBe(403);
     expect((await w2.post("/zakazka/P1/zapis", { ...vyber, k: "K9" })).status).toBe(400);
+  });
+
+  it("režim B: přehled dne, návrhy pro slot (vč. flex) a přesun s vrácením původní události na VOLNY", async () => {
+    const w = await spust();
+    const den = await w.get("/planovani?den=2026-10-19");
+    expect(den.status).toBe(200);
+    const hd = await den.text();
+    expect(hd).toContain("Hristov");
+    expect(hd).toContain("12:00–14:00 doplnit");
+    expect(hd).toMatch(/Kalendář nejde přečíst: [^<]*Nekdo/);
+
+    const slot = { k: "K1", e: "v2", t: "Hristov", od: local(2026, 10, 19, 12, 0).toISOString(), do: local(2026, 10, 19, 14, 0).toISOString() };
+    const ns = await w.get(`/planovani/slot?${new URLSearchParams(slot)}`);
+    expect(ns.status).toBe(200);
+    const hs = await ns.text();
+    expect(hs).toContain("O-8560000001");
+    expect(hs).toContain("O-8560000004");
+    expect(hs).toContain("přesun dopředu (flex)");
+    expect(hs).not.toContain("O-8560000002"); // blokovaná lokalita / ZAK
+    expect(hs).not.toContain("O-8560000003"); // PIV + smlouva s JP
+
+    // zakázka s termínem bez přesunu se plánovat nesmí
+    expect((await w.post("/zakazka/P4/zapis", { ...slot, ...potvrzeno })).status).toBe(403);
+
+    const presun = { pk: "K1", pe: "f1", pt: "Hristov" };
+    const f = await w.get(`/zakazka/P4/zapis?${new URLSearchParams({ ...slot, ...presun })}`);
+    expect(await f.text()).toContain("původní událost se vrátí na VOLNY");
+    const r = await w.post("/zakazka/P4/zapis", { ...slot, ...presun, ...potvrzeno });
+    expect(r.status).toBe(200);
+    const hr = await r.text();
+    expect(hr).toContain("vrácen v kalendáři na VOLNY");
+    expect(hr).toContain("Zákazník: Rychlá, Ivana (19.10.2026, 12:00 - 13:59)");
+    expect(w.k.patche.map((p) => p.eventId)).toEqual(["v2", "f1"]);
+    expect(String(w.k.patche[0]!.requestBody.summary)).toContain("O-8560000004");
+    expect(w.k.patche[1]!.requestBody).toMatchObject({ summary: "Hristov - VOLNY", colorId: "10", description: "[SHEET2CAL] K1" });
   });
 });

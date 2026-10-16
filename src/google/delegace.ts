@@ -26,6 +26,9 @@ export interface Delegace {
 
 type Fetch = typeof fetch;
 
+/** Plánování: čtení a zápis událostí v kalendářích techniků (v adminu musí být povolený i tento rozsah) */
+export const SCOPY_KALENDAR = ["https://www.googleapis.com/auth/calendar.events"];
+
 export function delegace(
   servisniUcet: string,
   uzivatel: string,

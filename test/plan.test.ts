@@ -113,11 +113,12 @@ describe("KPI zakázek", () => {
 });
 
 describe("pravidla plánování ze SKILLS v5", () => {
-  it("při stejné vzdálenosti dá přednost oknu 10–14 a méně vytíženému technikovi", () => {
+  it("přednost má zaplnění rozpracovaného dne, pak okno 10–14 (zadání fáze 1)", () => {
     const tech = (jmeno: string, navstevy: Navsteva[]): DenSOkny => ({ den: den(jmeno, B.hloubetin!, navstevy), volnaOkna: [{ od: h(8), do: h(9, 59) }, { od: h(10), do: h(11, 59) }] });
     const z = { id: "N", bod: B.strasnice!, trvani: 90, priorita: "P2" as const, slaKonec: null };
     const m = nabidniTerminy(z, [tech("Plny", [nv("A", B.hloubetin!, h(14), h(15, 59)), nv("B", B.hloubetin!, h(16), h(17))]), tech("Volny", [])], v, "2026-10-15", {}, 4);
-    expect(m[0]).toMatchObject({ technik: "Volny", okno: { od: h(10) } });
+    expect(m[0]).toMatchObject({ technik: "Plny", okno: { od: h(10) } });
+    expect(m.at(-1)!.technik).toBe("Volny"); // prázdný den až nakonec
   });
 });
 

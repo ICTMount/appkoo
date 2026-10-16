@@ -12,7 +12,7 @@ a aplikace jim navrhne, kam zakázku umístit (nebo čím doplnit kalendář tec
 | Export MWF (CSV) | 3 cesty: složka na Google Drive, e-mail na schránku, nahrání přímo v aplikaci | Drive hotovo a běží (každých 15 min); e-mail hotovo v kódu (čeká na delegaci); **nahrání v aplikaci chybí** |
 | E-mail (schránka koordinace) | čtení jménem tmcz01 (delegace) | hotovo v kódu – hledá se živě v Gmailu |
 | Google Chat | čtení jménem tmcz01 (delegace), vybrané prostory | hotovo v kódu – hledá se živě |
-| Google Kalendář techniků | čtení (a pro plánování zápis) jménem tmcz01 | čtení hotovo v kódu |
+| Google Kalendář techniků | čtení a zápis jménem tmcz01 (delegace, rozsah `calendar.events`) | hotovo v kódu |
 
 ## 2. Hledání (horní lišta)
 
@@ -41,7 +41,14 @@ Koordinátorka zadá **jednu konkrétní zakázku**. Aplikace nabídne **ideáln
 - na **zaplnění kalendáře** (doplnit rozpracované dny, ne otevírat prázdné),
 - zdroj: export MWF (zakázky, adresy, SLA) **spárovaný** s Google Kalendářem (volné sloty VOLNY, naplánované zakázky).
 
-Stav: výpočet hotový v kódu (`src/plan/planovac.ts`), čeká na upřesnění detailů a čtení kalendářů přes delegaci.
+Pořadí kritérií (odpověď 16.10.): **zaplnit den** > SLA > km. Prázdný den technika má penalizaci 100 km,
+každá zakázka, kterou už technik ten den má, slot zvýhodní o 6 km (nejvýš za 4 zakázky).
+
+Aplikace **navrhne technika i slot**, koordinátorka vybere z nabídky, zavolá zákazníkovi, vyplní call script
+a po potvrzení aplikace **přepíše slot VOLNY** na zakázku (patička SHEET2CAL zůstane). Termín pak koordinátorka
+zapíše do MWF (aplikace připraví text „Zákazník: …“).
+
+Stav: hotovo v kódu (`src/plan/planovac.ts`, `src/plan/sloty.ts`, stránka „Navrhnout termín“ u zakázky).
 
 ## 5. Plánování – režim B: slot → zakázky (doplnění technika)
 
@@ -49,8 +56,30 @@ Vidíme, že technik má na nejbližší den(y) v kalendáři málo zakázek. Ko
 (technik + den + okno) a aplikace **doplní zakázky, které se do něj ideálně hodí** – opačný pohled k režimu A,
 ze stejných zdrojů a podle stejných kritérií (trasa dne, SLA, priorita, zaplnění).
 
-Stav: připravuje se.
+Postup v aplikaci: **Plánování** (horní lišta) → den → technici seřazení od nejméně vytížených → u volného
+slotu „doplnit“ → seznam vhodných zakázek → „Vybrat“ → call script → zápis.
 
-## Otevřené otázky
+Kandidáti:
+- otevřené zakázky **bez termínu**, které projdou branami (ZAK, smlouva s JP, blokovaná lokalita, adresa) a mají prioritu P1–P3,
+- **už naplánované zakázky s poznámkou „flex“** (pozitivní – „flex“, „flexibilní“; „ne flex“, „není flex“ se nepočítá)
+  v poznámce MWF nebo v události kalendáře, jen **přesun dopředu** (slot je dřív než současný termín).
+  Po zápisu se původní událost vrátí na **VOLNY** (patička SHEET2CAL zůstane) a koordinátorka změní termín v MWF.
+- dovednost technika (FTTH / PIV / SAT/TV) musí odpovídat typu zakázky.
 
-Viz konverzace 16.10.2026 – doplní se sem s odpověďmi.
+Řazení: naléhavost SLA (prošlé +60, do 48 h +40, do 5 dní +20) a priorita (P1 +20, P2 +10), pak km navíc
+oproti trase dne. Zajížďka nad **75 km** se nenabízí (limit se bude zpřesňovat).
+
+Stav: hotovo v kódu (`src/plan/doplneni.ts`, `navrhyProSlot` v `src/plan/planovac.ts`, stránky `/planovani`).
+
+## Rozhodnutí (16.10.2026)
+
+1. Aplikace přepíše slot VOLNY v kalendáři po potvrzení koordinátorkou – **ano**.
+2. Aplikace navrhne technika a slot, koordinátorka vybírá z nabídky – **ano**.
+3. Režim B nabízí i naplánované zakázky s pozitivní poznámkou „flex“ (jdou přeplánovat) – **ano**.
+4. Limit zajížďky 75 km na začátek, bude se zpřesňovat.
+5. Pořadí kritérií: **zaplnit den** jako první.
+
+## Zbývá
+
+- Nahrání exportu MWF přímo v aplikaci.
+- Fulltext přes všechna data (e-mail a chat ukládat do DB každých 15 min) – návrh, čeká na potvrzení.

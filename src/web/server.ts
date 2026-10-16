@@ -1,5 +1,7 @@
 // Webové rozhraní AppKoo (Cloud Run služba za Identity-Aware Proxy).
-// Fronta k volání, detail zakázky, nabídka termínů a zápis do kalendáře technika. Bez externích knihoven – node:http.
+// Fronta k volání, detail zakázky s hledáním ve všech zdrojích, plánování – režim A (zakázka → slot,
+// /zakazka/:id/terminy) a režim B (slot → zakázky, /planovani) – a zápis do kalendáře technika.
+// Bez externích knihoven – node:http.
 //
 // Přihlášení: IAP pustí jen účty, které mají v projektu roli „IAP-secured Web App User“,
 // a pošle e-mail uživatele v hlavičce x-goog-authenticated-user-email. Aplikace navíc
@@ -25,19 +27,21 @@ import type { Dotaz } from "../db/db.js";
 import { pgDb } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
 import { faktaZakazky, PRIORITY, type Priorita } from "../domain/priorita.js";
-import { kalendarApi, obsadVolnySlot, SlotObsazen } from "../gcal/kalendar.js";
+import { kalendarApi, obsadVolnySlot, SlotObsazen, udalostZakazky, vratitNaVolny } from "../gcal/kalendar.js";
 import { sestavUdalost } from "../gcal/udalost.js";
 import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
 import { slaKonec } from "../plan/kpi.js";
-import { kontrolaBran, nabidniProZakazku, textProMwf, type ZavislostiPlanovace } from "../plan/planovac.js";
+import { kontrolaBran, nabidniProZakazku, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type ZavislostiPlanovace } from "../plan/planovac.js";
+import { addDays, isoDate } from "../domain/time.js";
+import { isWorkday } from "../domain/workdays.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
 import { gmail as gmailApi } from "@googleapis/gmail";
-import { delegace } from "../google/delegace.js";
+import { delegace, SCOPY_KALENDAR } from "../google/delegace.js";
 import { hledejVsude, ocistitDotaz, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu, type Filtr } from "./data.js";
-import { strankaChyby, strankaDetailu, strankaFronty, strankaTerminu, strankaVysledkuHledani, strankaZapisu, strankaZapsano } from "./html.js";
-import { chybejiciPotvrzeni, inicialy, nactiKontext, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
+import { strankaChyby, strankaDetailu, strankaFronty, strankaPlanovani, strankaSlotu, strankaTerminu, strankaVysledkuHledani, strankaZapisu, strankaZapsano } from "./html.js";
+import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, nactiKontext, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 
 export interface NastaveniWebu {
   povoleni: string[];
@@ -46,7 +50,7 @@ export interface NastaveniWebu {
   devUser?: string;
   ted?: () => Date;
   /** kalendáře, geokódování a vzdálenosti pro nabídku termínů (vytvoří se při prvním použití) */
-  planovac?: () => ZavislostiPlanovace;
+  planovac?: () => ZavislostiPlanovace | Promise<ZavislostiPlanovace>;
   zapis?: { zapnuty: boolean; technici: string[] | "vsichni" };
   /** e-mail, kalendáře a chat (pilíř 1 – hledání ve všech zdrojích) */
   zdroje?: () => ZavislostiZdroju;
@@ -168,23 +172,27 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
         const detail = await nactiDetail(db, decodeURIComponent(mp[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
         const kontext = await nactiKontext(db);
-        const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane);
         const zapis = n.zapis ?? { zapnuty: false, technici: [] };
         const smiTechnik = (t: string) => smiZapisovat(t, zapis.technici);
 
         if (mp[2] === "terminy") {
+          const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane);
           if (brany.blokace.length || !n.planovac) return posli(res, 200, strankaTerminu(detail, brany, null, { zapnuty: zapis.zapnuty, smiTechnik }, stav, email));
           const sla = slaKonec(detail.z, stav.posledniExport ?? now);
-          const nabidka = await nabidniProZakazku(detail.z, detail.priorita, sla, kontext.technici, n.planovac(), now, { adresyZMwf: kontext.adresyZMwf });
+          const nabidka = await nabidniProZakazku(detail.z, detail.priorita, sla, kontext.technici, await n.planovac(), now, { adresyZMwf: kontext.adresyZMwf });
           return posli(res, 200, strankaTerminu(detail, brany, nabidka, { zapnuty: zapis.zapnuty, smiTechnik }, stav, email));
         }
 
         // zapis: GET = formulář, POST = zápis do kalendáře
         const formular = req.method === "POST" ? await ctiFormular(req) : url.searchParams;
-        const vyb = vybranySlot(formular);
+        const vyb0 = vybranySlot(formular);
+        const presun = presunZParametru(formular);
+        const vyb = vyb0 && { ...vyb0, presun };
         const technik = vyb && kontext.technici.find((t) => t.jmeno === vyb.t && t.kalendar === vyb.k);
-        if (!vyb || !technik) return posli(res, 400, strankaChyby(400, "Neplatný výběr slotu – vyberte termín znovu z nabídky."));
-        const povolen = zapis.zapnuty && smiTechnik(technik.jmeno) && !brany.blokace.length;
+        const puvodni = presun && kontext.technici.find((t) => t.jmeno === presun.pt && t.kalendar === presun.pk);
+        if (!vyb || !technik || (presun && (!puvodni || !detail.z.termin))) return posli(res, 400, strankaChyby(400, "Neplatný výběr slotu – vyberte termín znovu z nabídky."));
+        const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presun });
+        const povolen = zapis.zapnuty && smiTechnik(technik.jmeno) && (!puvodni || smiTechnik(puvodni.jmeno)) && !brany.blokace.length;
         if (req.method === "GET") return posli(res, 200, strankaZapisu(detail, vyb, brany, povolen, stav, email));
 
         if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
@@ -195,15 +203,56 @@ export function vytvorHandler(db: Dotaz, n: NastaveniWebu) {
 
         const sla = slaKonec(detail.z, stav.posledniExport ?? now);
         const udalost = sestavUdalost(detail.z, technik.nazevVKalendari, vyb.od, vyb.do, udajeZFormulare(formular), sla, inicialy(kontext.koordinatorky, email));
+        const { api } = await n.planovac();
         try {
-          const r = await obsadVolnySlot(n.planovac().api, technik.kalendar, vyb.e, udalost, vyb.od);
+          // přesun: nejdřív ověřit, že původní událost opravdu patří zakázce (nic se zatím nezměnilo)
+          if (presun && !udalostZakazky((await api.events.get({ calendarId: presun.pk, eventId: presun.pe })).data, detail.z)) {
+            throw new SlotObsazen("Původní termín zakázky v kalendáři nenalezen (mezitím změněn?). Načtěte návrhy znovu.");
+          }
+          const r = await obsadVolnySlot(api, technik.kalendar, vyb.e, udalost, vyb.od);
           await ulozUdalost(db, detail.z.idAktivity, technik.kalendar, r.eventId, vyb.od, vyb.do);
-          console.log(JSON.stringify({ severity: "INFO", message: `Termín zapsán: ${detail.z.idObjednavky} → ${technik.jmeno} ${vyb.od.toISOString()}`, uzivatel: email, objednavka: detail.z.idObjednavky, technik: technik.jmeno, eventId: r.eventId }));
-          return posli(res, 200, strankaZapsano(detail, technik.jmeno, vyb.od, vyb.do, textProMwf(detail.z.zakaznik, vyb.od, vyb.do), r.htmlLink, stav, email));
+          let vysledekPresunu: { ok: boolean; zprava: string } | null = null;
+          if (presun && puvodni) {
+            try {
+              await vratitNaVolny(api, presun.pk, presun.pe, puvodni.nazevVKalendari, detail.z);
+              await smazUdalost(db, presun.pk, presun.pe);
+              vysledekPresunu = { ok: true, zprava: `Původní termín (${puvodni.jmeno}) vrácen v kalendáři na VOLNY.` };
+            } catch (e) {
+              vysledekPresunu = { ok: false, zprava: `Původní termín (${puvodni.jmeno}) se nepodařilo vrátit na VOLNY – upravte ho v kalendáři ručně: ${e instanceof Error ? e.message : String(e)}` };
+            }
+          }
+          console.log(JSON.stringify({ severity: "INFO", message: `Termín zapsán: ${detail.z.idObjednavky} → ${technik.jmeno} ${vyb.od.toISOString()}${presun ? " (přesun flex)" : ""}`, uzivatel: email, objednavka: detail.z.idObjednavky, technik: technik.jmeno, eventId: r.eventId, presun }));
+          return posli(res, 200, strankaZapsano(detail, technik.jmeno, vyb.od, vyb.do, textProMwf(detail.z.zakaznik, vyb.od, vyb.do), r.htmlLink, stav, email, vysledekPresunu));
         } catch (e) {
           if (e instanceof SlotObsazen) return posli(res, 409, strankaZapisu(detail, vyb, brany, povolen, stav, email, [e.message], formular));
           throw e;
         }
+      }
+
+      if (url.pathname === "/planovani") {
+        if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendáře techniků nejsou dostupné."));
+        const dnes = isoDate(now);
+        const p = url.searchParams.get("den") ?? "";
+        const datum = /^\d{4}-\d{2}-\d{2}$/.test(p) && !Number.isNaN(Date.parse(p)) ? p : pracovniDny(dnes, 1)[0]!;
+        const kontext = await nactiKontext(db);
+        const { dny, nedostupne } = await prehledDne((await n.planovac()).api, kontext.technici, datum);
+        let predchozi: string | null = addDays(datum, -1);
+        while (!isWorkday(predchozi)) predchozi = addDays(predchozi, -1);
+        if (predchozi < dnes) predchozi = null;
+        return posli(res, 200, strankaPlanovani(datum, dny, nedostupne, pracovniDny(addDays(datum, 1), 4), predchozi, stav, email));
+      }
+
+      if (url.pathname === "/planovani/slot") {
+        if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendáře techniků nejsou dostupné."));
+        const vyb = vybranySlot(url.searchParams);
+        const kontext = await nactiKontext(db);
+        const technik = vyb && kontext.technici.find((t) => t.jmeno === vyb.t && t.kalendar === vyb.k);
+        if (!vyb || !technik) return posli(res, 400, strankaChyby(400, "Neplatný výběr slotu – vyberte slot znovu z přehledu dne."));
+        const slot = { technik, eventId: vyb.e, od: vyb.od, do: vyb.do };
+        const kandidati = await kandidatiKDoplneni(db, now, kontext.blokovane, stav.posledniExport ?? now);
+        const v = await navrhyProSlot(slot, kandidati, kontext.technici, await n.planovac(), { adresyZMwf: kontext.adresyZMwf });
+        const zapis = n.zapis ?? { zapnuty: false, technici: [] };
+        return posli(res, 200, strankaSlotu(slot, v, { zapnuty: zapis.zapnuty, smiTechnik: (t) => smiZapisovat(t, zapis.technici) }, stav, email));
       }
 
       const m = url.pathname.match(/^\/zakazka\/([^/]+)$/);
@@ -249,8 +298,16 @@ function main() {
     overIap: env.IAP_AUDIENCE ? overovacIap(env.IAP_AUDIENCE) : undefined,
     devUser: env.DEV_USER,
     planovac: (() => {
-      let zav: ZavislostiPlanovace | null = null;
-      return () => (zav ??= { api: kalendarApi(), geokoder: sCache(db, googleGeokoder()), vzdalenosti: odhadVzdalenosti() });
+      // Kalendáře techniků jménem tmcz01 (delegace) – odpadá sdílení každého kalendáře servisnímu účtu.
+      // Bez delegace čte a zapisuje servisní účet sám (kalendáře mu musí být nasdílené).
+      const geokoder = sCache(db, googleGeokoder());
+      const vzdalenosti = odhadVzdalenosti();
+      if (env.DELEGACE_UZIVATEL && env.SERVISNI_UCET) {
+        const d = delegace(env.SERVISNI_UCET, env.DELEGACE_UZIVATEL, SCOPY_KALENDAR);
+        return async () => ({ api: calendarApi({ version: "v3", auth: (await d.klient()) as never }), geokoder, vzdalenosti });
+      }
+      const zav: ZavislostiPlanovace = { api: kalendarApi(), geokoder, vzdalenosti };
+      return () => zav;
     })(),
     zdroje:
       env.DELEGACE_UZIVATEL && env.SERVISNI_UCET

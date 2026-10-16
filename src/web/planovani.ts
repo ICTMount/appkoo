@@ -4,7 +4,10 @@ import { nactiCiselnik } from "../db/ciselniky.js";
 import type { Dotaz } from "../db/db.js";
 import { ts } from "../db/db.js";
 import type { UdajeHovoru } from "../gcal/udalost.js";
-import { techniciZCiselniku, type TechnikPlanu } from "../plan/planovac.js";
+import { kontrolaBran, techniciZCiselniku, type TechnikPlanu, type ZakazkaKDoplneni } from "../plan/planovac.js";
+import { faktaZakazky } from "../domain/priorita.js";
+import { slaKonec } from "../plan/kpi.js";
+import { nactiFrontu } from "./data.js";
 import type { Polozka } from "../config/ciselniky.js";
 
 export interface KontextPlanovani {
@@ -92,4 +95,28 @@ export async function ulozUdalost(db: Dotaz, idAktivity: string, kalendar: strin
 
 export function smiZapisovat(technik: string, povoleniTechnici: string[] | "vsichni"): boolean {
   return povoleniTechnici === "vsichni" || povoleniTechnici.some((t) => t.toLowerCase() === technik.toLowerCase());
+}
+
+/**
+ * Kandidáti pro režim B: otevřené zakázky, které projdou branami. Bez termínu jen s prioritou
+ * P1–P3 (P0 = nevolat); s termínem jen jako možný přesun – „flex“ se ověří v plánovači.
+ */
+export async function kandidatiKDoplneni(db: Dotaz, now: Date, blokovane: Polozka[], exportAt: Date): Promise<ZakazkaKDoplneni[]> {
+  const { polozky } = await nactiFrontu(db, now);
+  return polozky
+    .filter((p) => (p.z.termin ? true : p.priorita !== "P0"))
+    .filter((p) => !kontrolaBran(p.z, faktaZakazky(p.z, now), blokovane, { presun: !!p.z.termin }).blokace.length)
+    .map((p) => ({ z: p.z, priorita: p.priorita, slaKonec: slaKonec(p.z, exportAt) }));
+}
+
+/** Přesun z parametrů (pk = kalendář, pe = událost, pt = technik současného termínu) */
+export function presunZParametru(p: URLSearchParams): { pk: string; pe: string; pt: string } | null {
+  const pk = p.get("pk") ?? "";
+  const pe = p.get("pe") ?? "";
+  const pt = p.get("pt") ?? "";
+  return pk && pe && pt ? { pk, pe, pt } : null;
+}
+
+export async function smazUdalost(db: Dotaz, kalendar: string, eventId: string) {
+  await db.query("DELETE FROM gcal_udalost WHERE kalendar = $1 AND event_id = $2", [kalendar, eventId]);
 }

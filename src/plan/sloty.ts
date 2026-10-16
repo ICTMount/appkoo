@@ -41,8 +41,14 @@ export interface NastaveniPlanu {
   /** preferované okno pro termíny (SKILLS v5: primárně 10:00–14:00), mimo něj penalizace */
   preferovaneOkno: Okno;
   penalizaceMimoPreferovaneKm: number;
-  /** vyrovnané vytížení techniků: penalizace za každou zakázku, kterou už technik ten den má */
-  penalizaceZakazkyVeDniKm: number;
+  /**
+   * Zaplnění kalendáře (zadání fáze 1: „zaplnit den“ má přednost): otevřít prázdný den technika
+   * je drahé, každá zakázka, kterou už technik ten den má, slot zvýhodní.
+   */
+  penalizacePrazdnyDenKm: number;
+  bonusZaZakazkuVeDniKm: number;
+  /** bonus se počítá nejvýš pro tolik zakázek */
+  maxZakazekProBonus: number;
 }
 
 export const NASTAVENI_PLANU: NastaveniPlanu = {
@@ -51,8 +57,16 @@ export const NASTAVENI_PLANU: NastaveniPlanu = {
   penalizaceDneKm: { P1: 15, P2: 8, P3: 3, P0: 0 },
   preferovaneOkno: { od: 10 * 60, do: 14 * 60 },
   penalizaceMimoPreferovaneKm: 8,
-  penalizaceZakazkyVeDniKm: 4,
+  // pořadí kritérií: zaplnit den > SLA > km (prázdný den je dražší než okno po SLA)
+  penalizacePrazdnyDenKm: 100,
+  bonusZaZakazkuVeDniKm: 6,
+  maxZakazekProBonus: 4,
 };
+
+/** Kolik „km“ stojí (záporné = zvýhodní) obsadit slot v dni, kde technik už má `pocet` zakázek */
+export function cenaZaplneni(pocet: number, n: Pick<NastaveniPlanu, "penalizacePrazdnyDenKm" | "bonusZaZakazkuVeDniKm" | "maxZakazekProBonus">): number {
+  return pocet === 0 ? n.penalizacePrazdnyDenKm : -Math.min(pocet, n.maxZakazekProBonus) * n.bonusZaZakazkuVeDniKm;
+}
 
 export interface Moznost {
   technik: string;
@@ -98,7 +112,7 @@ export function nabidniTerminy(
         (poSla ? nast.penalizacePoSlaKm : 0) +
         dniOdkladu * nast.penalizaceDneKm[z.priorita] +
         (mimoPreferovane ? nast.penalizaceMimoPreferovaneKm : 0) +
-        den.navstevy.length * nast.penalizaceZakazkyVeDniKm;
+        cenaZaplneni(den.navstevy.length, nast);
       moznosti.push({ technik: den.technik, datum: den.datum, okno, kmNavic, kmDne: t.km, poSla, skore, trasa: t });
     }
   }

@@ -9,7 +9,7 @@
 import type { calendar_v3 } from "@googleapis/calendar";
 import type { Polozka } from "../config/ciselniky.js";
 import { nactiUdalosti } from "../gcal/kalendar.js";
-import { jeVolneOkno, type UdalostTechnika } from "../gcal/kontrola.js";
+import { jeBlok, jeVolneOkno, type UdalostTechnika } from "../gcal/kontrola.js";
 import type { Zakazka } from "../import/mwfExport.js";
 import type { Fakta, Priorita } from "../domain/priorita.js";
 import { addDays, atTime, isoDate, minutesOfDay } from "../domain/time.js";
@@ -18,6 +18,8 @@ import { sestavDny } from "./dny.js";
 import type { Vzdalenosti } from "./geo.js";
 import type { Geokoder } from "./geokod.js";
 import { nabidniTerminy, type DenSOkny, type Moznost, type NastaveniPlanu } from "./sloty.js";
+import { doplnSlot, jeFlex, type Kandidat, type NastaveniDoplneni, type NavrhDoplneni } from "./doplneni.js";
+import type { Bod } from "./geo.js";
 
 export type Skupina = "FTTH" | "PIV" | "SAT/TV" | "ZAFUK";
 
@@ -62,7 +64,7 @@ export interface Brany {
 }
 
 /** Zlatá pravidla koordinace (SKILLS v5) – kdy se termín plánovat nesmí */
-export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[]): Brany {
+export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: { presun?: boolean } = {}): Brany {
   const blokace: string[] = [];
   const upozorneni: string[] = [];
   if (!z.adresa) blokace.push("Zakázka nemá adresu – nelze spočítat trasu.");
@@ -70,7 +72,8 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[]): Brany 
   if (f.posledniKodR === "r_2" && f.dalsiKontakt && f.dalsiKontakt > f.dnes) {
     blokace.push(`Smlouva s jiným poskytovatelem (r_2) – neplánovat před ${f.dalsiKontakt.split("-").reverse().join(".")}.`);
   }
-  if (z.termin) blokace.push("Zakázka už má dohodnutý termín – přeplánování zatím ručně v kalendáři a MWF.");
+  if (z.termin && !opts.presun) blokace.push("Zakázka už má dohodnutý termín – přesunout lze jen zakázku s poznámkou „flex“ (režim doplnění slotu).");
+  if (z.termin && opts.presun) upozorneni.push(`Přesun: zakázka má termín ${isoDate(z.termin.od).split("-").reverse().join(".")} – po zápisu se původní událost vrátí na VOLNY; změňte termín i v MWF.`);
   if (z.predobjednavka && z.rfs && isoDate(z.rfs) > f.dnes) upozorneni.push(`Předobjednávka – RFS ${isoDate(z.rfs).split("-").reverse().join(".")}; termín až po RFS.`);
   if (z.pocetMv >= 2) upozorneni.push(`Už ${z.pocetMv} marné výjezdy – zvážit storno / eskalaci.`);
 
@@ -119,6 +122,28 @@ export function pracovniDny(dnes: string, pocet: number): string[] {
   return dny;
 }
 
+/**
+ * Události techniků v rozsahu dní (od–do jsou „Praha v UTC“). Kalendáře se čtou souběžně a po jednom –
+ * nečitelný kalendář (nenasdílený, chybí delegace) nesmí shodit ostatní.
+ */
+export async function nactiKalendare(api: calendar_v3.Calendar, technici: TechnikPlanu[], od: Date, do_: Date) {
+  const vysledky = await Promise.all(
+    technici.map(async (t) => {
+      try {
+        // API chce skutečný čas (UTC); „Praha v UTC“ posuneme o 3 h – rezerva, filtruje se podle dne
+        return { t, u: await nactiUdalosti(api, [{ technik: t.jmeno, kalendar: t.kalendar }], new Date(od.getTime() - 3 * 3_600_000), do_) };
+      } catch {
+        return { t, u: null };
+      }
+    }),
+  );
+  return {
+    udalosti: vysledky.flatMap((r) => r.u ?? []),
+    citelni: vysledky.filter((r) => r.u).map((r) => r.t),
+    nedostupne: vysledky.filter((r) => !r.u).map((r) => r.t.jmeno),
+  };
+}
+
 export async function nabidniProZakazku(
   z: Zakazka,
   priorita: Priorita,
@@ -142,19 +167,7 @@ export async function nabidniProZakazku(
   const od = atTime(dny[0]!, 0);
   const do_ = atTime(addDays(dny.at(-1)!, 1), 0);
 
-  // Kalendáře po jednom – nenasdílený kalendář nesmí shodit celou nabídku
-  const udalosti: UdalostTechnika[] = [];
-  const nedostupne: string[] = [];
-  const citelni: TechnikPlanu[] = [];
-  for (const t of vhodni) {
-    try {
-      // API chce skutečný čas (UTC); „Praha v UTC“ posuneme o 2 h – rezerva stačí, filtruje se podle dne
-      udalosti.push(...(await nactiUdalosti(zav.api, [{ technik: t.jmeno, kalendar: t.kalendar }], new Date(od.getTime() - 3 * 3_600_000), new Date(do_.getTime()))));
-      citelni.push(t);
-    } catch {
-      nedostupne.push(t.jmeno);
-    }
-  }
+  const { udalosti, nedostupne, citelni } = await nactiKalendare(zav.api, vhodni, od, do_);
 
   // Volné sloty, které už začaly nebo začnou do hodiny, se nenabízejí
   const nejdrive = minutesOfDay(now) + 60;
@@ -194,6 +207,161 @@ export async function nabidniProZakazku(
     moznosti.push({ ...m, kalendar: t.kalendar, nazevVKalendari: t.nazevVKalendari, eventId: slot.id, od: slot.od, do: slot.do });
   }
   return { moznosti, nedostupne, bezZakladny: [...bezZakladny], bezPolohy, technikuCelkem: vhodni.length };
+}
+
+// ---------- Režim B: vybraný slot → zakázky, které ho doplní ----------
+
+export interface ZakazkaKDoplneni {
+  z: Zakazka;
+  priorita: Priorita;
+  slaKonec: Date | null;
+}
+
+export interface VybranySlot {
+  technik: TechnikPlanu;
+  eventId: string;
+  od: Date;
+  do: Date;
+}
+
+export interface NavrhySlotu {
+  navrhy: NavrhDoplneni[];
+  /** kandidátů s dovedností technika (bez termínu + flex) */
+  kandidatu: number;
+  /** z toho naplánovaných s poznámkou „flex“, u kterých se našla událost v kalendáři */
+  flex: number;
+  /** kandidáti, jejichž adresu nejde najít na mapě */
+  bezPolohy: number;
+  /** zakázky ve dni technika bez dohledatelné adresy (v trase chybí) */
+  bezPolohyVeDni: number;
+  /** události dne technika (pro přehled) */
+  den: UdalostTechnika[];
+  nedostupne: string[];
+  chyba?: string;
+}
+
+/** Geokódování po dávkách (cache v DB; poprvé může trvat déle) */
+export async function geokodujVse(geokoder: Geokoder, adresy: string[], soubeh = 8): Promise<Map<string, Bod | null>> {
+  const vysledek = new Map<string, Bod | null>();
+  const fronta = [...new Set(adresy)];
+  await Promise.all(
+    Array.from({ length: Math.min(soubeh, fronta.length) }, async () => {
+      for (let a = fronta.shift(); a !== undefined; a = fronta.shift()) {
+        try {
+          vysledek.set(a, (await geokoder.najdi(a)).bod);
+        } catch {
+          vysledek.set(a, null);
+        }
+      }
+    }),
+  );
+  return vysledek;
+}
+
+const adresaZakazky = (z: Zakazka) => [z.adresa, z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
+const oCislo = (u: UdalostTechnika) => `${u.summary} ${u.appkoo ?? ""}`.match(/O-\d{6,}/)?.[0];
+
+/**
+ * Režim B (zadání fáze 1): koordinátorka vybere volný slot technika a aplikace nabídne zakázky,
+ * které ho nejlépe doplní – otevřené bez termínu a naplánované s pozitivní poznámkou „flex“
+ * (přesun dopředu; po zápisu se jejich původní událost vrátí na VOLNY).
+ */
+export async function navrhyProSlot(
+  slot: VybranySlot,
+  zakazky: ZakazkaKDoplneni[],
+  technici: TechnikPlanu[],
+  zav: ZavislostiPlanovace,
+  opts: { adresyZMwf?: Map<string, string>; pocet?: number; nastaveni?: Partial<NastaveniDoplneni>; flexDni?: number } = {},
+): Promise<NavrhySlotu> {
+  const t = slot.technik;
+  const datum = isoDate(slot.od);
+  const prazdne: NavrhySlotu = { navrhy: [], kandidatu: 0, flex: 0, bezPolohy: 0, bezPolohyVeDni: 0, den: [], nedostupne: [] };
+
+  const denKal = await nactiKalendare(zav.api, [t], atTime(datum, 0), atTime(addDays(datum, 1), 0));
+  if (denKal.nedostupne.length) return { ...prazdne, nedostupne: denKal.nedostupne, chyba: `Kalendář technika ${t.jmeno} nejde přečíst.` };
+  const den = denKal.udalosti.filter((u) => isoDate(u.od) === datum).sort((a, b) => a.od.getTime() - b.od.getTime());
+  const vybrany = den.find((u) => u.id === slot.eventId);
+  if (!vybrany || !jeVolneOkno(vybrany) || vybrany.od.getTime() !== slot.od.getTime()) {
+    return { ...prazdne, den, chyba: "Slot už není volný nebo se změnil jeho čas – vyberte slot znovu." };
+  }
+
+  const adresaZMwf = (u: UdalostTechnika) => {
+    const o = oCislo(u);
+    return o ? opts.adresyZMwf?.get(o) : undefined;
+  };
+  const s = await sestavDny([{ jmeno: t.jmeno, vyjezd: t.vyjezd }], den, datum, zav.geokoder, opts.nastaveni?.trvaniMin ?? 110, adresaZMwf);
+  const denTechnika = s.dny[0];
+  if (!denTechnika) return { ...prazdne, den, chyba: `Technik ${t.jmeno} nemá v číselníku adresu výjezdu (nebo ji nejde najít na mapě).` };
+
+  // Kandidáti se správnou dovedností; naplánované jen s termínem po slotu (přesun dopředu)
+  const vhodne = zakazky.filter((k) => t.skupiny.includes(skupinaZakazky(k.z.typAktivity)) && (!k.z.termin || k.z.termin.od > slot.od));
+  const bezTerminu = vhodne.filter((k) => !k.z.termin);
+  const sTerminem = vhodne.filter((k) => k.z.termin);
+
+  // Flex: událost zakázky v kalendářích techniků (do flexDni dní dopředu) + „flex“ v poznámce MWF nebo v události
+  const flexKandidati: { k: ZakazkaKDoplneni; presun: NonNullable<Kandidat["presun"]> }[] = [];
+  let nedostupne: string[] = [];
+  if (sTerminem.length) {
+    const doData = addDays(datum, opts.flexDni ?? 21);
+    const kal = await nactiKalendare(zav.api, technici, atTime(datum, 0), atTime(doData, 0));
+    nedostupne = kal.nedostupne;
+    const podleO = new Map<string, UdalostTechnika>();
+    for (const u of kal.udalosti) {
+      if (jeVolneOkno(u) || jeBlok(u)) continue;
+      const o = oCislo(u);
+      if (o) podleO.set(o, u);
+    }
+    for (const k of sTerminem) {
+      const u = podleO.get(k.z.idObjednavkyZaklad);
+      if (!u || u.od <= slot.od) continue;
+      if (!jeFlex(k.z.poznamka) && !jeFlex(`${u.summary} ${u.description}`)) continue;
+      const tu = technici.find((x) => x.jmeno === u.technik);
+      if (!tu) continue;
+      flexKandidati.push({ k, presun: { kalendar: u.kalendar, eventId: u.id, technik: tu.jmeno, od: u.od } });
+    }
+  }
+
+  const vsichni = [...bezTerminu.map((k) => ({ k, presun: undefined })), ...flexKandidati];
+  const body = await geokodujVse(zav.geokoder, vsichni.map((x) => adresaZakazky(x.k.z)).filter(Boolean));
+  const kandidati: Kandidat[] = [];
+  let bezPolohy = 0;
+  for (const { k, presun } of vsichni) {
+    const bod = body.get(adresaZakazky(k.z));
+    if (!bod) {
+      bezPolohy++;
+      continue;
+    }
+    kandidati.push({ z: k.z, priorita: k.priorita, slaKonec: k.slaKonec, bod, ...(presun ? { presun } : {}) });
+  }
+
+  const okno = { od: minutesOfDay(slot.od), do: minutesOfDay(slot.do) - 1 };
+  const navrhy = doplnSlot(denTechnika, okno, kandidati, zav.vzdalenosti, opts.nastaveni, opts.pocet ?? 10);
+  return {
+    navrhy,
+    kandidatu: vsichni.length,
+    flex: flexKandidati.length,
+    bezPolohy,
+    bezPolohyVeDni: s.bezPolohy.length,
+    den,
+    nedostupne,
+  };
+}
+
+/** Přehled dne pro režim B: technici seřazení od nejméně vytížených, jejich zakázky a volné sloty */
+export interface DenPrehledu {
+  technik: TechnikPlanu;
+  zakazky: UdalostTechnika[];
+  volne: UdalostTechnika[];
+}
+
+export async function prehledDne(api: calendar_v3.Calendar, technici: TechnikPlanu[], datum: string) {
+  const kal = await nactiKalendare(api, technici, atTime(datum, 0), atTime(addDays(datum, 1), 0));
+  const dny: DenPrehledu[] = kal.citelni.map((t) => {
+    const jeho = kal.udalosti.filter((u) => u.technik === t.jmeno && isoDate(u.od) === datum).sort((a, b) => a.od.getTime() - b.od.getTime());
+    return { technik: t, zakazky: jeho.filter((u) => !jeVolneOkno(u) && !jeBlok(u)), volne: jeho.filter((u) => jeVolneOkno(u)) };
+  });
+  dny.sort((a, b) => Number(!a.volne.length) - Number(!b.volne.length) || a.zakazky.length - b.zakazky.length || a.technik.jmeno.localeCompare(b.technik.jmeno, "cs"));
+  return { dny, nedostupne: kal.nedostupne };
 }
 
 /** Text termínu do MWF: „Zákazník: Novák, Jan (05.05.2026, 10:00 - 11:59)“ */

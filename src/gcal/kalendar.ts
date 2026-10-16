@@ -174,3 +174,27 @@ export async function obsadVolnySlot(
   });
   return { eventId: data.id ?? eventId, htmlLink: data.htmlLink ?? null };
 }
+
+/** Patří událost zakázce? Skryté ID zakázky (appkoo) nebo O-číslo v názvu události */
+export function udalostZakazky(e: calendar_v3.Schema$Event, z: { idAktivity: string; idObjednavkyZaklad: string }): boolean {
+  if (e.status === "cancelled") return false;
+  if (e.extendedProperties?.private?.appkoo === z.idAktivity) return true;
+  return !!z.idObjednavkyZaklad && (e.summary ?? "").includes(z.idObjednavkyZaklad);
+}
+
+/**
+ * Přesun zakázky: původní událost se vrátí na volný slot VOLNY (SKILLS v5: „původní volný slot nesmí
+ * být ztracen“). Patička SHEET2CAL zůstane, aby slot dál spravoval SHEET2CAL.
+ */
+export async function vratitNaVolny(
+  api: calendar_v3.Calendar,
+  kalendar: string,
+  eventId: string,
+  nazevTechnika: string,
+  z: { idAktivity: string; idObjednavkyZaklad: string },
+): Promise<void> {
+  const { data: e } = await api.events.get({ calendarId: kalendar, eventId });
+  if (!udalostZakazky(e, z)) throw new SlotObsazen("Původní událost už zakázce nepatří – v kalendáři ji vraťte na VOLNY ručně.");
+  const pat = paticka(zHtml(e.description ?? "")) ?? `[SHEET2CAL] ${kalendar}`;
+  await api.events.patch({ calendarId: kalendar, eventId, requestBody: { ...volnySlot(nazevTechnika), description: pat } });
+}
