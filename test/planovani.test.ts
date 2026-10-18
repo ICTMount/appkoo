@@ -357,6 +357,23 @@ describe("uživatelé a Konfigurace", () => {
     expect((await w.get("/")).status).toBe(200); // správce i bez řádku v číselníku
   });
 
+  it("historie uživatelů: hledání, zakázka a odepřený přístup se zapíšou; vidí jen správce", async () => {
+    const w = await web(["davidh@ictmount.com"]);
+    await w.get("/?q=Nov%C3%A1k", "jana@ictmount.com");
+    await w.get("/zakazka/P1", "jana@ictmount.com");
+    await w.get("/konfigurace", "jana@ictmount.com"); // 403
+    await new Promise((r) => setTimeout(r, 300)); // zápis logu běží po odeslání odpovědi
+    expect((await w.get("/konfigurace/log", "jana@ictmount.com")).status).toBe(403);
+    const log = await (await w.get("/konfigurace/log?u=jana@ictmount.com&dni=7")).text();
+    expect(log).toContain("Historie uživatelů");
+    expect(log).toContain("jana@ictmount.com");
+    expect(log).toContain("hledání");
+    expect(log).toContain("Novák");
+    expect(log).toContain("detail zakázky");
+    expect(log).toContain("přístup odepřen");
+    expect(await (await w.get("/konfigurace")).text()).toContain('href="/konfigurace/log"');
+  });
+
   it("CSV: stažení, nahrání souboru → náhled → uložení s historií", async () => {
     const w = await web(["davidh@ictmount.com"]);
     const prehled = await (await w.get("/konfigurace")).text();

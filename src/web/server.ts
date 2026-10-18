@@ -29,6 +29,7 @@ import { CISELNIKY, nahledImportu, VYCHOZI_POLOZKY, exportCsv, type CiselnikId }
 import { nactiCiselnik, ulozImport } from "../db/ciselniky.js";
 import { decodeExport } from "../import/csv.js";
 import { nactiHistorii, nactiPolozky, nactiPrehled, strankaCiselniku, strankaKonfigurace, strankaNahledu } from "./konfigurace.js";
+import { akcePozadavku, nactiLog, strankaLogu, zaznamenej } from "./log.js";
 import { POPIS_ROLE, roleUzivatele, type Role } from "./uzivatele.js";
 import { pgDb } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
@@ -212,6 +213,13 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       if (req.method !== "GET" && !(req.method === "POST" && postCesta)) return posli(res, 405, strankaChyby(405, "Nepovolená operace."));
 
       const email = await uzivatel(req, n);
+      // historie uživatelů: po odeslání odpovědi zapsat, co požadavek znamenal (chyba logu nevadí)
+      if (email) {
+        res.once("finish", () => {
+          const a = akcePozadavku(req.method ?? "GET", url, res.statusCode);
+          if (a) void zaznamenej(db, { email, ...a });
+        });
+      }
       if (!email) return posli(res, 401, strankaChyby(401, "Nepřihlášený uživatel – aplikace se otevírá přes přihlášení Google."));
       const role = await roleUzivatele(db, email, n.spravci ?? [], (e) => povolenUzivatel(e, n.povoleni));
       if (!role) return posli(res, 403, strankaChyby(403, `Účet ${email} nemá do aplikace přístup – požádejte správce o přidání do Konfigurace → Uživatelé.`));
@@ -434,6 +442,11 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       if (url.pathname === "/konfigurace" || url.pathname.startsWith("/konfigurace/")) {
         if (role !== "spravce") return posli(res, 403, strankaChyby(403, "Konfiguraci může měnit jen správce."));
         if (url.pathname === "/konfigurace") return posli(res, 200, strankaKonfigurace(await nactiPrehled(db), stav, email));
+        if (url.pathname === "/konfigurace/log") {
+          const dni = [1, 7, 30, 90, 180].includes(Number(url.searchParams.get("dni"))) ? Number(url.searchParams.get("dni")) : 7;
+          const filtr = { email: url.searchParams.get("u")?.trim().toLowerCase() || undefined, akce: url.searchParams.get("a") || undefined, dni };
+          return posli(res, 200, strankaLogu(await nactiLog(db, filtr), filtr, stav, email));
+        }
         const mk = url.pathname.match(/^\/konfigurace\/([A-Za-z]+)(?:\/(csv|nahled|ulozit))?$/);
         const id = mk?.[1] as CiselnikId | undefined;
         if (!mk || !id || !(id in CISELNIKY)) return posli(res, 404, strankaChyby(404, "Číselník neexistuje."));

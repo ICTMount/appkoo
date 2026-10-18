@@ -93,6 +93,7 @@ export function strankaKonfigurace(prehled: PrehledCiselniku[], stav: StavImport
   });
   const telo = `<h1>Konfigurace <small>číselníky a uživatelé – změny přes CSV s náhledem, každá změna se zapisuje do historie</small></h1>
 <div class="tbl"><table><thead><tr><th>Číselník</th><th>Položek</th><th>Poslední změna</th><th></th></tr></thead><tbody>${radky.join("")}</tbody></table></div>
+<p><a href="/konfigurace/log"><b>Historie uživatelů →</b></a> <span class="muted">kdo co v aplikaci dělal (hledání, zakázky, zápisy do kalendáře, Konfigurace)</span></p>
 <p class="muted">Postup: stáhněte CSV → upravte v Excelu (uložit jako „CSV UTF-8 (oddělený středníkem)“) → nahrajte → zkontrolujte náhled → Uložit.</p>`;
   return stranka("Konfigurace", uzivatel, stav, telo, { zalozka: "konfigurace" });
 }

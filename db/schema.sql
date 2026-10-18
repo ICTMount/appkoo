@@ -144,3 +144,15 @@ CREATE TABLE gcal_udalost (
   PRIMARY KEY (kalendar, event_id)
 );
 CREATE INDEX ON gcal_udalost (id_aktivity);
+
+-- Historie aktivit uživatelů (Konfigurace → Historie uživatelů); záznamy starší 180 dní se mažou
+CREATE TABLE IF NOT EXISTS uzivatel_log (
+  id      bigserial PRIMARY KEY,
+  kdy     timestamptz NOT NULL DEFAULT now(),
+  email   text NOT NULL,
+  akce    text NOT NULL,                     -- hledani | detail | terminy | formular | zapis | technik | konfigurace | ulozeni | odepreno | uvod
+  objekt  text,                              -- ID aktivity zakázky
+  detail  text,
+  stav    integer NOT NULL                   -- HTTP stav odpovědi
+);
+CREATE INDEX IF NOT EXISTS uzivatel_log_email_kdy ON uzivatel_log (email, kdy DESC);
