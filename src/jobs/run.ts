@@ -15,6 +15,7 @@ import type { Db } from "../db/db.js";
 import { pgDb, ts } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
 import { driveZdroj, gmailZdroj, type ZdrojExportu } from "../ingest/google.js";
+import { casExportu } from "../ingest/prijem.js";
 import { spustImport, type ZaznamBehu } from "./importJob.js";
 
 export type Zavaznost = "INFO" | "WARNING" | "ERROR";
@@ -73,6 +74,25 @@ export interface VysledekBehu {
   kod: 0 | 1;
 }
 
+/**
+ * Oprava času dřívějších importů: ranní exporty s jednocifernou hodinou v názvu („20261019 8_59.csv“)
+ * se dřív uložily s časem přijetí v UTC (o 2 h dřív). Čas se přepočítá z názvu souboru; opravené řádky se zalogují.
+ */
+export async function opravCasyExportu(db: Db, log: Logger = jsonLog): Promise<number> {
+  const { rows } = await db.query<{ id: number; soubor: string; export_at: Date | null }>(
+    "SELECT id, soubor, export_at FROM import_run WHERE vysledek = 'importovano' AND soubor ~ '[ _-][0-9][_:.-][0-9]{2}[^0-9]'",
+  );
+  let opraveno = 0;
+  for (const r of rows) {
+    const { at, zNazvu } = casExportu(r.soubor, new Date(0));
+    if (!zNazvu || (r.export_at && new Date(r.export_at).getTime() === at.getTime())) continue;
+    await db.query("UPDATE import_run SET export_at = $1 WHERE id = $2", [ts(at), r.id]);
+    opraveno++;
+    log("INFO", `Opraven čas exportu podle názvu: ${r.soubor}`, { soubor: r.soubor });
+  }
+  return opraveno;
+}
+
 /** Jeden běh importu: načte zdroje, uloží exporty, zkontroluje stáří posledního exportu. */
 export async function behImportu(
   db: Db,
@@ -83,6 +103,11 @@ export async function behImportu(
   const chyby: string[] = [];
   const sledovane = zdroje.map(({ nazev, zdroj }) => sledovanyZdroj(nazev, zdroj, chyby));
 
+  try {
+    await opravCasyExportu(db, log);
+  } catch (e) {
+    log("WARNING", `Oprava časů exportů selhala: ${popisChyby(e)}`);
+  }
   const vysledky = await spustImport(db, sledovane, opts.povoleniOdesilatele?.length ? opts.povoleniOdesilatele : undefined);
   for (const v of vysledky) {
     log(v.vysledek === "odmitnout" ? "WARNING" : "INFO", `${v.vysledek}: ${v.soubor}`, {
