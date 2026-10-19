@@ -9,7 +9,10 @@ export async function nactiStavPrijmu(db: Dotaz): Promise<StavPrijmu> {
   const { rows } = await db.query<{ posledni: Date | null }>(
     "SELECT max(export_at) AS posledni FROM import_run WHERE vysledek = 'importovano'",
   );
-  const hashe = await db.query<{ hash: string }>("SELECT DISTINCT hash FROM import_run WHERE vysledek <> 'odmitnuto'");
+  // soubor přeskočený jako „starší“ se smí posoudit znovu (špatné datum v názvu, ověří se vznikem souboru)
+  const hashe = await db.query<{ hash: string }>(
+    "SELECT DISTINCT hash FROM import_run WHERE vysledek = 'importovano' OR (vysledek = 'preskoceno' AND duvod NOT LIKE 'Export je starší%')",
+  );
   return { posledniExportAt: rows[0]?.posledni ?? null, zpracovane: new Set(hashe.rows.map((r) => r.hash)) };
 }
 

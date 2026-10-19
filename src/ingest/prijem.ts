@@ -21,6 +21,8 @@ export interface DoslyExport {
   odesilatel?: string;
   /** ID zprávy v Gmailu / ID souboru na Drive – aby se stejný zdroj nečetl dvakrát */
   zdrojId?: string;
+  /** skutečný okamžik vzniku souboru (Drive createdTime, čas e-mailu) – druhé ověření času z názvu */
+  vznik?: Date;
 }
 
 export interface StavPrijmu {
@@ -31,7 +33,7 @@ export interface StavPrijmu {
 }
 
 export type Posouzeni =
-  | { akce: "importovat"; hash: string; exportAt: Date; import: VysledekImportu }
+  | { akce: "importovat"; hash: string; exportAt: Date; import: VysledekImportu; upozorneni?: string }
   | { akce: "preskocit"; hash: string; duvod: string }
   | { akce: "odmitnout"; hash: string; duvod: string };
 
@@ -55,6 +57,24 @@ export function casExportu(nazev: string, prijato: Date): { at: Date; zNazvu: bo
   return { at: local(y!, mo!, d!, h!, mi!), zNazvu: true };
 }
 
+/** Největší povolený rozdíl mezi časem v názvu souboru a vznikem souboru */
+export const MAX_ROZDIL_NAZEV_VZNIK_H = 3;
+
+/**
+ * Čas exportu s dvojím ověřením: čas z názvu souboru se porovná se vznikem souboru (Drive / e-mail).
+ * Když se liší o víc než 3 h (např. „20261016 12_10.csv“ vytvořený 19.10. ve 12:10), platí vznik souboru.
+ */
+export function casDosleho(d: Pick<DoslyExport, "nazev" | "prijato" | "vznik">): { at: Date; upozorneni?: string } {
+  const { at, zNazvu } = casExportu(d.nazev, d.prijato);
+  if (!d.vznik) return { at };
+  const vznik = tedPraha(d.vznik);
+  if (!zNazvu) return { at: vznik };
+  const rozdilH = Math.abs(at.getTime() - vznik.getTime()) / 3_600_000;
+  if (rozdilH <= MAX_ROZDIL_NAZEV_VZNIK_H) return { at };
+  const f = (x: Date) => `${x.toISOString().slice(8, 10)}.${x.toISOString().slice(5, 7)}.${x.toISOString().slice(0, 4)} ${x.toISOString().slice(11, 16)}`;
+  return { at: vznik, upozorneni: `Čas v názvu (${f(at)}) nesedí se vznikem souboru (${f(vznik)}) – použit čas vzniku souboru.` };
+}
+
 export function otisk(obsah: Buffer): string {
   return createHash("sha256").update(obsah).digest("hex");
 }
@@ -65,7 +85,7 @@ export function posudExport(d: DoslyExport, stav: StavPrijmu): Posouzeni {
   if (d.obsah.length > MAX_VELIKOST) return { akce: "odmitnout", hash, duvod: "Soubor je větší než 20 MB." };
   if (stav.zpracovane.has(hash)) return { akce: "preskocit", hash, duvod: "Stejný export už byl zpracován (přišel jinou cestou nebo podruhé)." };
 
-  const { at } = casExportu(d.nazev, d.prijato);
+  const { at, upozorneni } = casDosleho(d);
   const vysledek = importExport(d.obsah, at);
   const chybi = KLICOVE_SLOUPCE.filter((s) => vysledek.chybejiciSloupce.includes(s));
   if (chybi.length) return { akce: "odmitnout", hash, duvod: `V exportu chybí sloupce: ${chybi.join(", ")}. Zkontrolujte uložené nastavení tabulky v MWF.` };
@@ -73,7 +93,7 @@ export function posudExport(d: DoslyExport, stav: StavPrijmu): Posouzeni {
   if (stav.posledniExportAt && at <= stav.posledniExportAt) {
     return { akce: "preskocit", hash, duvod: "Export je starší než poslední importovaný – novější stav se nepřepisuje." };
   }
-  return { akce: "importovat", hash, exportAt: at, import: vysledek };
+  return { akce: "importovat", hash, exportAt: at, import: vysledek, ...(upozorneni ? { upozorneni } : {}) };
 }
 
 /**
@@ -85,7 +105,7 @@ export function zpracujDosle(
   stav: StavPrijmu,
   povoleniOdesilatele: string[] = ["@ictmount.com"],
 ): { export: DoslyExport; posouzeni: Posouzeni }[] {
-  const serazene = [...dosle].sort((a, b) => casExportu(a.nazev, a.prijato).at.getTime() - casExportu(b.nazev, b.prijato).at.getTime());
+  const serazene = [...dosle].sort((a, b) => casDosleho(a).at.getTime() - casDosleho(b).at.getTime());
   return serazene.map((d) => {
     const posouzeni: Posouzeni =
       d.zdroj === "email" && !povolenyOdesilatel(d.odesilatel ?? "", povoleniOdesilatele)

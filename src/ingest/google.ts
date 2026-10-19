@@ -55,7 +55,7 @@ export function driveZdroj(slozkaId: string, api: drive_v3.Drive = driveApi({ ve
         }
         try {
           const res = await api.files.get({ fileId: f.id!, alt: "media" }, { responseType: "arraybuffer" });
-          vysledek.push({ zdroj: "drive", nazev: f.name!, obsah: Buffer.from(res.data as ArrayBuffer), prijato: new Date(f.createdTime!), zdrojId: f.id! });
+          vysledek.push({ zdroj: "drive", nazev: f.name!, obsah: Buffer.from(res.data as ArrayBuffer), prijato: new Date(f.createdTime!), zdrojId: f.id!, vznik: new Date(f.createdTime!) });
         } catch (e) {
           // Jeden nečitelný soubor nesmí zablokovat ostatní exporty
           varovani(`Drive: „${f.name}“ nejde stáhnout – přeskočeno (${e instanceof Error ? e.message : String(e)}).`, { soubor: f.name, zdrojId: f.id });
@@ -110,6 +110,7 @@ export function gmailZdroj(n: NastaveniEmailu, api?: gmail_v1.Gmail): ZdrojExpor
             nazev: cast.filename!,
             obsah: Buffer.from(a.data.data!, "base64url"),
             prijato: new Date(Number(msg.internalDate)),
+            vznik: new Date(Number(msg.internalDate)),
             odesilatel: od,
             zdrojId: id!,
           });

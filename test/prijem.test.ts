@@ -24,6 +24,18 @@ describe("příjem exportu", () => {
     expect(casExportu("export.csv", new Date("2026-10-19T06:59:00Z")).at).toEqual(local(2026, 10, 19, 8, 59));
   });
 
+  it("dvojí ověření: čas z názvu proti vzniku souboru", async () => {
+    const { casDosleho } = await import("../src/ingest/prijem.js");
+    // název sedí se vznikem (do 3 h) → čas z názvu
+    expect(casDosleho({ nazev: "zakazky paw-grid-export-csv 20261019 11_00.csv", prijato: new Date(), vznik: new Date("2026-10-19T09:01:00Z") }).at).toEqual(local(2026, 10, 19, 11, 0));
+    // špatné datum v názvu (16.10. místo 19.10.) → čas vzniku souboru + upozornění
+    const r = casDosleho({ nazev: "zakazky paw-grid-export-csv 20261016 12_10.csv", prijato: new Date(), vznik: new Date("2026-10-19T10:10:42Z") });
+    expect(r.at).toEqual(local(2026, 10, 19, 12, 10));
+    expect(r.upozorneni).toContain("nesedí");
+    // bez vzniku (nahrání v aplikaci) → jen název
+    expect(casDosleho({ nazev: "zakazky paw-grid-export-csv 20261016 12_10.csv", prijato: new Date() }).at).toEqual(local(2026, 10, 16, 12, 10));
+  });
+
   it("importuje platný export", () => {
     const p = posudExport(dosly({}), stav());
     expect(p.akce).toBe("importovat");

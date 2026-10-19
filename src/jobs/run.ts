@@ -85,7 +85,10 @@ export async function opravCasyExportu(db: Db, log: Logger = jsonLog): Promise<n
   let opraveno = 0;
   for (const r of rows) {
     const { at, zNazvu } = casExportu(r.soubor, new Date(0));
-    if (!zNazvu || (r.export_at && new Date(r.export_at).getTime() === at.getTime())) continue;
+    if (!zNazvu || !r.export_at) continue;
+    // opravit jen přesně tu starou chybu: uložený čas = UTC, tj. o 1 h (zima) / 2 h (léto) dřív než v názvu
+    const posun = at.getTime() - new Date(r.export_at).getTime();
+    if (posun !== 3_600_000 && posun !== 7_200_000) continue;
     await db.query("UPDATE import_run SET export_at = $1 WHERE id = $2", [ts(at), r.id]);
     opraveno++;
     log("INFO", `Opraven čas exportu podle názvu: ${r.soubor}`, { soubor: r.soubor });

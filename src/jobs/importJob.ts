@@ -24,7 +24,7 @@ export async function prijmiSoubory(db: Db, dosle: DoslyExport[], povoleniOdesil
       soubor: d.nazev,
       zdroj: d.zdroj,
       vysledek: posouzeni.akce,
-      ...(posouzeni.akce === "importovat" ? { ulozeno } : { duvod: posouzeni.duvod }),
+      ...(posouzeni.akce === "importovat" ? { ulozeno, ...(posouzeni.upozorneni ? { duvod: posouzeni.upozorneni } : {}) } : { duvod: posouzeni.duvod }),
     });
   }
   return vysledky;
@@ -37,7 +37,13 @@ export async function spustImport(db: Db, zdroje: ZdrojExportu[], povoleniOdesil
 
   // Soubory, které už příjmem prošly (jakkoli) – zdroj je znovu nestahuje
   const znama = new Set(
-    (await db.query<{ zdroj_id: string }>("SELECT DISTINCT zdroj_id FROM import_run WHERE zdroj_id IS NOT NULL")).rows.map((r) => r.zdroj_id),
+    // výjimka: soubor přeskočený jako „starší“ se posoudí znovu – mohl mít v názvu špatné datum (ověří se vznikem souboru)
+    (
+      await db.query<{ zdroj_id: string }>(
+        `SELECT DISTINCT zdroj_id FROM import_run WHERE zdroj_id IS NOT NULL
+            AND NOT (vysledek = 'preskoceno' AND duvod LIKE 'Export je starší%' AND prijato > now() - interval '3 days')`,
+      )
+    ).rows.map((r) => r.zdroj_id),
   );
 
   const dosle: { d: DoslyExport; z: ZdrojExportu }[] = [];
