@@ -18,6 +18,10 @@ describe("příjem exportu", () => {
   it("čas exportu z názvu souboru, jinak čas přijetí", () => {
     expect(casExportu("zakazky paw-grid-export-csv 20261014 18_01.csv", new Date(0))).toEqual({ at: local(2026, 10, 14, 18, 1), zNazvu: true });
     expect(casExportu("export.csv", local(2026, 10, 15, 9, 0)).zNazvu).toBe(false);
+    // ráno jednociferná hodina; bez času v názvu → čas přijetí (UTC okamžik) převedený na čas Praha
+    expect(casExportu("zakazky paw-grid-export-csv 20261019 8_59.csv", new Date(0)).at).toEqual(local(2026, 10, 19, 8, 59));
+    expect(casExportu("zakazky_20261014_1801.csv", new Date(0)).at).toEqual(local(2026, 10, 14, 18, 1));
+    expect(casExportu("export.csv", new Date("2026-10-19T06:59:00Z")).at).toEqual(local(2026, 10, 19, 8, 59));
   });
 
   it("importuje platný export", () => {

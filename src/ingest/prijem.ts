@@ -6,7 +6,7 @@
 
 import { createHash } from "node:crypto";
 import { basename } from "node:path";
-import { local } from "../domain/time.js";
+import { local, tedPraha } from "../domain/time.js";
 import { importExport, type VysledekImportu } from "../import/mwfExport.js";
 
 export type Zdroj = "email" | "upload" | "drive";
@@ -41,13 +41,17 @@ export const MAX_VELIKOST = 20 * 1024 * 1024;
 const KLICOVE_SLOUPCE = ["ID aktivity", "ID obj. v ext. systéme", "Stav", "Typ aktivity", "Poznámka"];
 
 /**
- * Čas exportu z názvu souboru „zakazky paw-grid-export-csv 20261014 18_01.csv“.
- * MWF ho při exportu nedává do obsahu, proto: název souboru, jinak čas přijetí.
+ * Čas exportu z názvu souboru „zakazky paw-grid-export-csv 20261014 18_01.csv“ (místní čas Praha).
+ * Ráno MWF píše hodinu jednocifernou: „20261019 8_59.csv“.
+ * MWF čas do obsahu nedává, proto: název souboru, jinak čas přijetí (skutečný okamžik → převod na čas Praha).
  */
 export function casExportu(nazev: string, prijato: Date): { at: Date; zNazvu: boolean } {
-  const m = basename(nazev).match(/(20\d{2})(\d{2})(\d{2})[ _-]?(\d{2})[_:.-]?(\d{2})/);
-  if (!m) return { at: prijato, zNazvu: false };
-  const [, y, mo, d, h, mi] = m.map(Number) as number[];
+  // „20261019 8_59“ / „20261014 18_01“ / „20261014_1801“
+  const m = basename(nazev).match(/(20\d{2})(\d{2})(\d{2})[ _-]?(?:(\d{1,2})[_:.-](\d{2})|(\d{2})(\d{2}))(?!\d)/);
+  if (!m) return { at: tedPraha(prijato), zNazvu: false };
+  const [y, mo, d] = [m[1], m[2], m[3]].map(Number);
+  const h = Number(m[4] ?? m[6]);
+  const mi = Number(m[5] ?? m[7]);
   return { at: local(y!, mo!, d!, h!, mi!), zNazvu: true };
 }
 

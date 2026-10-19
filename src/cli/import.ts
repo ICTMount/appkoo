@@ -4,7 +4,7 @@
 
 import { readFileSync } from "node:fs";
 import { lhutaZak, planKontaktu } from "../domain/contact.js";
-import { fmtDate, fmtTime, tedPraha } from "../domain/time.js";
+import { fmtDate, fmtTime } from "../domain/time.js";
 import { casExportu } from "../ingest/prijem.js";
 import { faktaZakazky, urciPrioritu } from "../domain/priorita.js";
 import { importExport } from "../import/mwfExport.js";
@@ -17,7 +17,7 @@ const count = <T>(xs: T[]) =>
 async function main() {
   const [soubor, ...args] = process.argv.slice(2);
   if (!soubor) throw new Error("Chybí cesta k MWF exportu.");
-  const { at: now, zNazvu } = casExportu(soubor, tedPraha());
+  const { at: now, zNazvu } = casExportu(soubor, new Date());
   if (!zNazvu) console.log("Čas exportu nejde zjistit z názvu souboru – použit aktuální čas.");
   const { zakazky, chybejiciSloupce } = importExport(readFileSync(soubor), now);
 
