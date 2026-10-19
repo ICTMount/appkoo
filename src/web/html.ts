@@ -102,7 +102,7 @@ header .kdo{color:var(--text)}a.konfig{font-size:12px;font-weight:600}a.konfig.o
 .c-zel{color:#2e9d4b;font-weight:600}.c-oranz{color:#e08a00;font-weight:600}.c-cerv{color:#d32f2f;font-weight:600}
 form.hledani{display:flex;gap:8px;padding:8px 20px;border-top:1px solid var(--line)}form.hledani .pole-hledani{flex:1;position:relative;display:flex}form.hledani input{flex:1;font-size:15px;padding:8px 36px 8px 10px}
 form.hledani input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;width:16px;height:16px;cursor:pointer;background:linear-gradient(45deg,transparent 44%,var(--muted) 44%,var(--muted) 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,var(--muted) 44%,var(--muted) 56%,transparent 56%)}
-form.hledani .zrusit{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:24px;text-align:center;border-radius:50%;font-size:20px;color:var(--muted);background:var(--panel)}form.hledani .zrusit:hover{text-decoration:none;color:var(--text);background:var(--line)}
+form.hledani .zrusit{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:24px;text-align:center;border-radius:50%;font-size:20px;color:var(--muted);background:var(--panel)}form.hledani .pole-hledani:has(.zrusit) input::-webkit-search-cancel-button{display:none}form.hledani .zrusit:hover{text-decoration:none;color:var(--text);background:var(--line)}
 .infra{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid currentColor;vertical-align:middle;white-space:nowrap}
 .i-TMCZ{color:#d1006b}.i-CETIN{color:#1769c2}.i-VDF{color:#d10000}.i-jin{color:var(--muted)}
 
