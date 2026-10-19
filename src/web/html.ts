@@ -100,7 +100,9 @@ header .kdo{color:var(--text)}a.konfig{font-size:12px;font-weight:600}a.konfig.o
 .bar{position:relative;align-self:stretch;width:100%;height:6px;border-radius:3px;margin-top:3px;background:linear-gradient(90deg,#2e9d4b 0%,#2e9d4b 20%,#e08a00 37%,#d32f2f 55%,#d32f2f 100%)}.bar span{position:absolute;top:-3px;width:4px;height:12px;margin-left:-2px;border-radius:2px;background:var(--text);box-shadow:0 0 0 2px var(--bg)}
 .b-zel{background:#2e9d4b}.b-oranz{background:#e08a00}.b-cerv{background:#d32f2f}
 .c-zel{color:#2e9d4b;font-weight:600}.c-oranz{color:#e08a00;font-weight:600}.c-cerv{color:#d32f2f;font-weight:600}
-form.hledani{display:flex;gap:8px;padding:8px 20px;border-top:1px solid var(--line)}form.hledani input{flex:1;font-size:15px;padding:8px 10px}
+form.hledani{display:flex;gap:8px;padding:8px 20px;border-top:1px solid var(--line)}form.hledani .pole-hledani{flex:1;position:relative;display:flex}form.hledani input{flex:1;font-size:15px;padding:8px 36px 8px 10px}
+form.hledani input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;width:16px;height:16px;cursor:pointer;background:linear-gradient(45deg,transparent 44%,var(--muted) 44%,var(--muted) 56%,transparent 56%),linear-gradient(-45deg,transparent 44%,var(--muted) 44%,var(--muted) 56%,transparent 56%)}
+form.hledani .zrusit{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:26px;height:26px;line-height:24px;text-align:center;border-radius:50%;font-size:20px;color:var(--muted);background:var(--panel)}form.hledani .zrusit:hover{text-decoration:none;color:var(--text);background:var(--line)}
 .infra{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid currentColor;vertical-align:middle;white-space:nowrap}
 .i-TMCZ{color:#d1006b}.i-CETIN{color:#1769c2}.i-VDF{color:#d10000}.i-jin{color:var(--muted)}
 
@@ -200,7 +202,9 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
 <div class="vpravo"><nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav>
 <div class="kdo">${esc(uzivatel)}<!--role--></div><!--konfigurace:${zal === "konfigurace" ? "on" : "off"}--></div></div>
 <nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a></nav>
-<form class="hledani" action="/" method="get"><input name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku"><button>Najít a plánovat</button></form></header>
+<form class="hledani" action="/" method="get"><span class="pole-hledani"><input type="search" name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku" autocomplete="off">${
+    o.dotaz ? `<a class="zrusit" href="/" title="Zrušit hledání" aria-label="Zrušit hledání">×</a>` : ""
+  }</span><button>Najít a plánovat</button></form></header>
 <main>${telo}</main></body></html>`;
 }
 
