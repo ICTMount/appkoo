@@ -73,3 +73,12 @@ describe("vytěžení poznámek přes Claude", () => {
     expect(r.chyba).toMatch(/529/);
   });
 });
+
+describe("Vertex AI adresa", () => {
+  it("multi-region eu/us, global a konkrétní region", async () => {
+    const { vertexAdresa } = await import("../src/ai/client.js");
+    expect(vertexAdresa("eu")).toBe("https://aiplatform.eu.rep.googleapis.com/v1");
+    expect(vertexAdresa("global")).toBe("https://aiplatform.googleapis.com/v1");
+    expect(vertexAdresa("europe-west1")).toBe("https://europe-west1-aiplatform.googleapis.com/v1");
+  });
+});
