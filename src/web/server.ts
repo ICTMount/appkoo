@@ -40,7 +40,8 @@ import { sestavUdalost } from "../gcal/udalost.js";
 import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
 import { slaKonec } from "../plan/kpi.js";
-import { kontrolaBran, nabidniProZakazku, nactiKalendare, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
+import { webcalendar } from "../domain/webcalendar.js";
+import { kontrolaBran, nabidniProZakazku, nactiKalendare, najdiTerminVKalendari, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
 import { addDays, atTime, isoDate } from "../domain/time.js";
 import { isWorkday } from "../domain/workdays.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
@@ -284,11 +285,13 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const formular = req.method === "POST" ? await ctiFormular(req) : url.searchParams;
         const vyb0 = vybranySlot(formular);
         const presun = presunZParametru(formular);
-        const vyb = vyb0 && { ...vyb0, presun };
+        // pp = doplnit / přeplánovat bez původní události v kalendáři (např. webcalendar: termín je jen v MWF)
+        const pp = formular.get("pp") === "1";
+        const vyb = vyb0 && { ...vyb0, presun, pp };
         const technik = vyb && kontext.technici.find((t) => t.jmeno === vyb.t && t.kalendar === vyb.k);
         const puvodni = presun && kontext.technici.find((t) => t.jmeno === presun.pt && t.kalendar === presun.pk);
         if (!vyb || !technik || (presun && (!puvodni || !detail.z.termin))) return posli(res, 400, strankaChyby(400, "Neplatný výběr slotu – vyberte termín znovu z nabídky."));
-        const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presun });
+        const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presun, doplnit: pp && !presun });
         const povolen = role !== "cteni" && zapis.zapnuty && smiTechnik(technik.jmeno) && (!puvodni || smiTechnik(puvodni.jmeno)) && !brany.blokace.length;
         if (req.method === "GET") return posli(res, 200, strankaZapisu(detail, vyb, brany, povolen, stav, email));
 
@@ -332,8 +335,22 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const detail = await nactiDetail(db, decodeURIComponent(m[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
         const kontext = await nactiKontext(db);
-        const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane);
         const planovac = n.planovac;
+        // webcalendar: zakázka přišla s termínem jen v MWF → ověřit, zda je v kalendáři technika
+        // přeplánovat: zakázka s termínem se smí naplánovat znovu (původní událost se vrátí na VOLNY)
+        const wc = webcalendar(detail.z);
+        const preplanovat = url.searchParams.get("preplanovat") === "1" && !!detail.z.termin;
+        let puvodni: Awaited<ReturnType<typeof najdiTerminVKalendari>> = null;
+        if (detail.z.termin && (wc || preplanovat) && planovac && !detail.uzavreno) {
+          try {
+            puvodni = await najdiTerminVKalendari((await planovac()).api, kontext.technici, detail.z);
+          } catch {
+            puvodni = null;
+          }
+        }
+        const doplnit = !!detail.z.termin && !puvodni && (!!wc || preplanovat);
+        const presunPlan = preplanovat && puvodni ? puvodni : null;
+        const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presunPlan, doplnit });
         const odP = url.searchParams.get("od") ?? "";
         const odData = /^\d{4}-\d{2}-\d{2}$/.test(odP) && !Number.isNaN(Date.parse(odP)) && odP > isoDate(now) ? odP : undefined;
         const spocitat = !brany.blokace.length && !detail.uzavreno && planovac;
@@ -350,6 +367,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
                     dni: kontext.nastaveni.dniNabidky,
                     trvaniMin: kontext.nastaveni.delkaPraceMin,
                     ...(odData ? { odData } : {}),
+                    ...(doplnit && detail.z.termin ? { dohodnuty: detail.z.termin } : {}),
                   });
                 } catch (e) {
                   console.log(JSON.stringify({ severity: "ERROR", message: `Nabídka termínů: ${e instanceof Error ? e.message : String(e)}`, objednavka: detail.z.idObjednavky }));
@@ -373,7 +391,12 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
           ...(nabidka?.moznosti ?? []).flatMap((m) => [m.sousede?.pred.adresa, m.sousede?.po.adresa]),
         ]);
-        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, casti, lokalita, ...(odData ? { odData } : {}) }));
+        return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, casti, lokalita, ...(odData ? { odData } : {}),
+          webcal: wc ? { ...wc, vKalendari: puvodni } : null,
+          preplanovat,
+          doplnit,
+          presun: presunPlan,
+        }));
       }
 
       // ---------- Doplnit technika: jeho dny nahoře, vhodné zakázky do vybraného slotu dole ----------

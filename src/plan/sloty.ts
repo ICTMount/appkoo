@@ -92,6 +92,8 @@ export function nabidniTerminy(
   dnes: string,
   n: Partial<NastaveniPlanu> = {},
   pocet = 3,
+  /** úprava skóre slotu (např. zvýhodnit dohodnutý termín) – záporné = lepší */
+  uprava?: (den: string, okno: Okno) => number,
 ): Moznost[] {
   const nast = { ...NASTAVENI_PLANU, ...n };
   const moznosti: Moznost[] = [];
@@ -112,7 +114,8 @@ export function nabidniTerminy(
         (poSla ? nast.penalizacePoSlaKm : 0) +
         dniOdkladu * nast.penalizaceDneKm[z.priorita] +
         (mimoPreferovane ? nast.penalizaceMimoPreferovaneKm : 0) +
-        cenaZaplneni(den.navstevy.length, nast);
+        cenaZaplneni(den.navstevy.length, nast) +
+        (uprava ? uprava(den.datum, okno) : 0);
       moznosti.push({ technik: den.technik, datum: den.datum, okno, kmNavic, kmDne: t.km, poSla, skore, trasa: t });
     }
   }

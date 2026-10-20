@@ -9,6 +9,8 @@ import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, TechnikPla
 import { jeVolneOkno, jeVyhrazeneVolno, vytizeniDne, type UdalostTechnika, type VytizeniDne } from "../gcal/kontrola.js";
 import { POVINNA_POTVRZENI } from "./planovani.js";
 import type { Nalez, NalezLokality, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
+import { webcalendar, type Webcalendar } from "../domain/webcalendar.js";
+import type { Zaznam } from "../import/notes.js";
 
 export function esc(s: unknown): string {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -70,7 +72,9 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}.P0{background:var(--p0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
+.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.webcal-pruh .btn{margin-left:8px}
+.termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;background:var(--panel)}
+a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
@@ -184,8 +188,22 @@ const s7 = (z: { idS7: string; predobjednavka?: boolean; typAktivity: string }) 
 /** Předobjednávka (Typ aktivity Predobjednavka_*) – realizovat až po změně na standardní zakázku */
 export const predobjStitek = (z: { predobjednavka?: boolean }) =>
   z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
-/** Sloupec P17: vlastník sítě a pod ním štítek předobjednávky */
-const p17Bunka = (z: { infrastruktura: string; predobjednavka?: boolean }) => `${infraStitek(z.infrastruktura)}${z.predobjednavka ? `<br>${predobjStitek(z).trim()}` : ""}`;
+/** Zakázka z webového kalendáře – přišla už s termínem, který si zákazník vybral sám */
+export const webcalStitek = (z: { zaznamy?: Zaznam[] }) =>
+  webcalendar(z) ? ` <span class="webcal" title="Webcalendar – zákazník si termín vybral sám, zakázka přišla s dohodnutým termínem">WEBCALENDAR</span>` : "";
+/** Výrazný pruh u zakázky z webcalendar: termín si vybral zákazník, je jen v MWF – je potřeba ho zapsat do GCAL */
+function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: string): string {
+  const kdy = `${fmtDate(w.at)} ${fmtTime(w.at)}`;
+  const termin = w.termin ? ` <b>${esc(w.termin)}</b>` : "";
+  if (w.vKalendari) {
+    return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zákazník si sám vybral termín${termin} (${esc(kdy)}). V kalendáři je zapsaný u <b>${esc(w.vKalendari.technik)}</b> ${esc(`${fmtDate(w.vKalendari.od)} ${fmtTime(w.vKalendari.od)}–${fmtTime(w.vKalendari.do)}`)}.</div>`;
+  }
+  return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zákazník si sám vybral termín${termin} (${esc(kdy)}). Termín je <b>jen v MWF, v kalendáři technika chybí</b> – zapište ho do GCAL na dohodnutý, nebo náhradní termín.<a class="btn" href="/zakazka/${encodeURIComponent(idAktivity)}#planovani">Doplánovat do GCAL ↓</a></div>`;
+}
+
+/** Sloupec P17: vlastník sítě a pod ním štítky předobjednávky / webcalendar */
+const p17Bunka = (z: { infrastruktura: string; predobjednavka?: boolean; zaznamy?: Zaznam[] }) =>
+  `${infraStitek(z.infrastruktura)}${z.predobjednavka ? `<br>${predobjStitek(z).trim()}` : ""}${webcalendar(z) ? `<br>${webcalStitek(z).trim()}` : ""}`;
 
 /** Buňka ID v seznamech: O-ID (+ předobjednávka), pod tím malým písmem ID S7 obj. a u předobjednávky RFS */
 const idBunka = (z: { idAktivity: string; idObjednavky: string; idS7: string; predobjednavka?: boolean; typAktivity: string; rfs?: Date | null }) =>
@@ -278,6 +296,14 @@ export interface PlanovaniZakazky {
   zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean };
   /** plánovač není zapnutý (chybí kalendáře) */
   nedostupne?: boolean;
+  /** zakázka z webcalendar: termín si vybral zákazník; vKalendari = našla se událost u technika */
+  webcal?: (Webcalendar & { vKalendari: { technik: string; od: Date; do: Date } | null }) | null;
+  /** režim „Přeplánovat zakázku“ */
+  preplanovat?: boolean;
+  /** termín zatím není v kalendáři → zapsat jako nový (pp=1) */
+  doplnit?: boolean;
+  /** přeplánování: původní událost, která se po zápisu vrátí na VOLNY */
+  presun?: { kalendar: string; eventId: string; technik: string; od: Date; do: Date } | null;
 }
 
 /** Zakázka: nahoře detail se všemi podklady, dole kam ji naplánovat */
@@ -329,8 +355,9 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
       }`
     : `<span class="muted">bez historie</span>`;
 
-  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${webcalStitek(z)} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
+${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity) : ""}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
 <div class="card"><h2>Zákazník</h2><dl>
@@ -456,11 +483,19 @@ function sekceLokality(l: Lokalita | null | undefined): string {
 function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
   const z = d.z;
   const { brany, nabidka, zapis } = plan;
-  const blok = brany.blokace.length
-    ? `<div class="err"><b>Termín teď nelze naplánovat:</b><ul>${brany.blokace.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div>`
+  // zakázka s dohodnutým termínem: místo chyby výrazné tlačítko „Přeplánovat zakázku“
+  const zakl0 = `/zakazka/${encodeURIComponent(z.idAktivity)}`;
+  const jeTermin = (b: string) => b.startsWith("Zakázka už má dohodnutý termín");
+  const ostatni = brany.blokace.filter((b) => !jeTermin(b));
+  const blok = ostatni.length
+    ? `<div class="err"><b>Termín teď nelze naplánovat:</b><ul>${ostatni.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div>`
     : "";
   const upoz = brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join("<br>")}</div>` : "";
   if (blok) return blok + upoz;
+  if (z.termin && brany.blokace.some(jeTermin)) {
+    return `<div class="termin-box"><div>Zakázka má dohodnutý termín <b>${esc(slot(z.termin.od, z.termin.do))}</b>${z.technik ? ` · ${esc(z.technik)}` : ""}.</div>
+<a class="btn velke" href="${esc(`${zakl0}?preplanovat=1#planovani`)}">Přeplánovat zakázku</a></div>${upoz}`;
+  }
   if (d.uzavreno) return `<div class="warn">Uzavřená zakázka se neplánuje.</div>`;
   if (!nabidka) return `${upoz}<div class="warn">${plan.nedostupne ? "Kalendáře techniků nejsou v této instalaci zapnuté." : "Nabídku se nepodařilo spočítat."}</div>`;
 
@@ -469,9 +504,18 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
     nabidka.bezZakladny.length ? `Technik bez adresy výjezdu v číselníku: ${nabidka.bezZakladny.join(", ")}.` : "",
     nabidka.bezPolohy ? `${nabidka.bezPolohy} zakázek v kalendářích nemá dohledatelnou adresu – v trasách chybí.` : "",
   ].filter(Boolean);
+  // přeplánování / doplnění termínu: parametry, které jdou s výběrem slotu do zápisu
+  const navic = (q: URLSearchParams) => {
+    if (plan.presun) {
+      q.set("pk", plan.presun.kalendar);
+      q.set("pe", plan.presun.eventId);
+      q.set("pt", plan.presun.technik);
+    } else if (plan.doplnit) q.set("pp", "1");
+    return q;
+  };
   const radky = nabidka.moznosti.map((m: MoznostSlotu, i) => {
-    const smi = zapis.zapnuty && zapis.smiTechnik(m.technik);
-    const q = new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() });
+    const smi = zapis.zapnuty && zapis.smiTechnik(m.technik) && (!plan.presun || zapis.smiTechnik(plan.presun.technik));
+    const q = navic(new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() }));
     const so = m.sousede;
     const radekSouseda = (smer: string, x: NonNullable<MoznostSlotu["sousede"]>["pred"]) =>
       `<div class="soused${x.zakladna ? " zakl" : ""}"><span class="smer">${smer}</span> ${x.cas ? `<b>${esc(x.cas)}</b> ` : ""}${esc(x.popis)}${mc(x.adresa, plan.casti)} <span class="km${x.km > DLOUHY_PREJEZD_KM ? " dlouhy" : ""}">${x.km.toFixed(1)} km</span></div>`;
@@ -485,25 +529,27 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
         }`
       : "";
     const odkazZapisu = (x: MoznostSlotu) =>
-      `/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${new URLSearchParams({ k: x.kalendar, e: x.eventId, t: x.technik, od: x.od.toISOString(), do: x.do.toISOString() })}`;
+      `/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${navic(new URLSearchParams({ k: x.kalendar, e: x.eventId, t: x.technik, od: x.od.toISOString(), do: x.do.toISOString() }))}`;
     const jinyCas = m.alternativy?.length
       ? `<div class="jiny-cas">jiný čas téhož dne: ${m.alternativy
           .map((a) => (smi ? `<a href="${esc(odkazZapisu(a))}">${esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)}</a>` : esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)))
           .join(" · ")}</div>`
       : "";
-    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${trasa ? `<div class="trasa">${trasa}</div>` : ""}${jinyCas}</td><td>${esc(m.technik)}${m.vytizeni ? barVytizeni(m.vytizeni, m.eventId) : ""}</td>
+    return `<tr${m.naDohodnuty ? ` class="na-dohodnuty"` : ""}><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${m.naDohodnuty ? ` <span class="webcal">= DOHODNUTÝ TERMÍN</span>` : ""}${trasa ? `<div class="trasa">${trasa}</div>` : ""}${jinyCas}</td><td>${esc(m.technik)}${m.vytizeni ? barVytizeni(m.vytizeni, m.eventId) : ""}</td>
 <td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
 <td>${m.poSla ? `<span class="prio P1">po SLA</span>` : "v SLA"}</td>
 <td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
   });
   // Jiné termíny: zákazník nemůže → posun dopředu (od dne po posledním nabídnutém), nebo od zvoleného data
+  const pp = plan.preplanovat ? "preplanovat=1&" : "";
   const zakl = `/zakazka/${encodeURIComponent(z.idAktivity)}`;
   const posledni = nabidka.moznosti.map((m) => isoDate(m.od)).sort().at(-1) ?? nabidka.obdobi?.do;
   const pozdeji = posledni ? addDays(posledni, 1) : null;
   const terminy = `<form class="terminy" method="get" action="${esc(zakl)}#planovani">
 ${nabidka.obdobi ? `<span>Hledáno <b>${esc(fmtDate(nabidka.obdobi.od))} – ${esc(fmtDate(nabidka.obdobi.do))}</b></span>` : ""}
-${plan.odData ? `<a href="${esc(zakl)}#planovani">← nejbližší termíny</a>` : ""}
-${pozdeji ? `<a class="btn" href="${esc(`${zakl}?od=${pozdeji}#planovani`)}">Pozdější termíny →</a>` : ""}
+${plan.preplanovat ? `<input type="hidden" name="preplanovat" value="1"><span class="webcal">PŘEPLÁNOVÁNÍ</span> <a href="${esc(zakl)}#planovani">zrušit</a>` : ""}
+${plan.odData ? `<a href="${esc(`${zakl}${pp ? `?${pp.slice(0, -1)}` : ""}`)}#planovani">← nejbližší termíny</a>` : ""}
+${pozdeji ? `<a class="btn" href="${esc(`${zakl}?${pp}od=${pozdeji}#planovani`)}">Pozdější termíny →</a>` : ""}
 <label>od data <input type="date" name="od" value="${esc(plan.odData ?? "")}"></label><button>Hledat</button>
 </form>`;
   return `${upoz}${terminy}${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
@@ -533,7 +579,7 @@ const presunPole = (p?: Presun | null) =>
 
 export function strankaZapisu(
   d: Detail,
-  vyb: { k: string; e: string; t: string; od: Date; do: Date; presun?: Presun | null },
+  vyb: { k: string; e: string; t: string; od: Date; do: Date; presun?: Presun | null; pp?: boolean },
   brany: Brany,
   zapisPovolen: boolean,
   stav: StavImportu,
@@ -545,7 +591,7 @@ export function strankaZapisu(
   const h = (n: string) => esc(hodnoty.get(n) ?? "");
   const form = `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis">
 <input type="hidden" name="k" value="${esc(vyb.k)}"><input type="hidden" name="e" value="${esc(vyb.e)}"><input type="hidden" name="t" value="${esc(vyb.t)}">
-<input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">${presunPole(vyb.presun)}
+<input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">${presunPole(vyb.presun)}${vyb.pp && !vyb.presun ? `<input type="hidden" name="pp" value="1">` : ""}
 <fieldset><legend>Zásuvka a instalace</legend><div class="pole">
 <label>Instalace${vyber("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], hodnoty.get("instalace") ?? "nova")}</label>
 <label>Číslo zásuvky / foto<input name="zasuvka" value="${h("zasuvka")}"></label>

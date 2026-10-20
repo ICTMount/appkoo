@@ -69,7 +69,7 @@ export interface Brany {
 }
 
 /** Zlatá pravidla koordinace (SKILLS v5) – kdy se termín plánovat nesmí */
-export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: { presun?: boolean } = {}): Brany {
+export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: { presun?: boolean; doplnit?: boolean } = {}): Brany {
   const blokace: string[] = [];
   const upozorneni: string[] = [];
   if (!z.adresa) blokace.push("Zakázka nemá adresu – nelze spočítat trasu.");
@@ -77,7 +77,9 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
   if (f.posledniKodR === "r_2" && f.dalsiKontakt && f.dalsiKontakt > f.dnes) {
     blokace.push(`Smlouva s jiným poskytovatelem (r_2) – neplánovat před ${f.dalsiKontakt.split("-").reverse().join(".")}.`);
   }
-  if (z.termin && !opts.presun) blokace.push("Zakázka už má dohodnutý termín – přesunout lze jen zakázku s poznámkou „flex“ (režim doplnění slotu).");
+  if (z.termin && opts.doplnit) {
+    upozorneni.push(`Dohodnutý termín ${isoDate(z.termin.od).split("-").reverse().join(".")} ${String(z.termin.od.getUTCHours()).padStart(2, "0")}:${String(z.termin.od.getUTCMinutes()).padStart(2, "0")} zatím není v kalendáři technika – zapište ho na dohodnutý termín (nahoře v nabídce), nebo na náhradní; náhradní termín změňte i v MWF.`);
+  } else if (z.termin && !opts.presun) blokace.push("Zakázka už má dohodnutý termín – přesunout lze jen zakázku s poznámkou „flex“ (režim doplnění slotu).");
   if (z.termin && opts.presun) upozorneni.push(`Přesun: zakázka má termín ${isoDate(z.termin.od).split("-").reverse().join(".")} – po zápisu se původní událost vrátí na VOLNY; změňte termín i v MWF.`);
   if (z.predobjednavka) {
     const rfs = z.rfs ? ` (RFS ${isoDate(z.rfs).split("-").reverse().join(".")})` : "";
@@ -122,6 +124,22 @@ export interface MoznostSlotu extends Moznost {
   do: Date;
   /** vytížení technika v ten den (bar volné / obsazené sloty) */
   vytizeni?: VytizeniDne;
+  /** slot se překrývá s dohodnutým termínem (webcalendar / přeplánování) */
+  naDohodnuty?: boolean;
+}
+
+/** Událost zakázky v kalendářích techniků v den dohodnutého termínu (pro přeplánování / kontrolu webcalendar) */
+export async function najdiTerminVKalendari(
+  api: calendar_v3.Calendar,
+  technici: TechnikPlanu[],
+  z: Pick<Zakazka, "termin" | "idAktivity" | "idObjednavkyZaklad">,
+): Promise<{ kalendar: string; eventId: string; technik: string; od: Date; do: Date } | null> {
+  if (!z.termin || !z.idObjednavkyZaklad) return null;
+  const den = isoDate(z.termin.od);
+  const { udalosti } = await nactiKalendare(api, technici, atTime(den, 0), atTime(addDays(den, 1), 0));
+  const u = udalosti.find((x) => isoDate(x.od) === den && (x.appkoo === z.idAktivity || `${x.summary} ${x.description}`.includes(z.idObjednavkyZaklad)));
+  const t = u && technici.find((x) => x.jmeno === u.technik);
+  return u && t ? { kalendar: t.kalendar, eventId: u.id, technik: t.jmeno, od: u.od, do: u.do } : null;
 }
 
 export interface Nabidka {
@@ -179,7 +197,16 @@ export async function nabidniProZakazku(
   technici: TechnikPlanu[],
   zav: ZavislostiPlanovace,
   now: Date,
-  opts: { dni?: number; pocet?: number; trvaniMin?: number; nastaveni?: Partial<NastaveniPlanu>; adresyZMwf?: Map<string, string>; odData?: string } = {},
+  opts: {
+    dni?: number;
+    pocet?: number;
+    trvaniMin?: number;
+    nastaveni?: Partial<NastaveniPlanu>;
+    adresyZMwf?: Map<string, string>;
+    odData?: string;
+    /** dohodnutý termín (webcalendar / přeplánování) – volné sloty, které se s ním překrývají, jdou nahoru */
+    dohodnuty?: { od: Date; do: Date };
+  } = {},
 ): Promise<Nabidka> {
   const skupina = skupinaZakazky(z.typAktivity);
   const vhodni = technici.filter((t) => t.skupiny.includes(skupina));
@@ -225,8 +252,14 @@ export async function nabidniProZakazku(
     dnes,
     opts.nastaveni,
     (opts.pocet ?? 5) * 10,
+    opts.dohodnuty ? (den, okno) => (naDohodnuty(den, okno) ? -100_000 : 0) : undefined,
   );
 
+  function naDohodnuty(den: string, okno: { od: number; do: number }): boolean {
+    const d = opts.dohodnuty;
+    if (!d || isoDate(d.od) !== den) return false;
+    return okno.od < minutesOfDay(d.do) && okno.do >= minutesOfDay(d.od);
+  }
   const podleJmena = new Map(citelni.map((t) => [t.jmeno, t]));
   const hm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(Math.round(min % 60)).padStart(2, "0")}`;
   const popisUdalosti = (technik: string, id: string) => {
@@ -257,7 +290,7 @@ export async function nabidniProZakazku(
     const t = podleJmena.get(m.technik)!;
     const slot = udalosti.find((u) => u.technik === m.technik && isoDate(u.od) === m.datum && minutesOfDay(u.od) === m.okno.od && jeVolneOkno(u));
     if (!slot) continue;
-    const ms: MoznostSlotu = { ...m, kalendar: t.kalendar, nazevVKalendari: t.nazevVKalendari, eventId: slot.id, od: slot.od, do: slot.do };
+    const ms: MoznostSlotu = { ...m, kalendar: t.kalendar, nazevVKalendari: t.nazevVKalendari, eventId: slot.id, od: slot.od, do: slot.do, ...(naDohodnuty(m.datum, m.okno) ? { naDohodnuty: true } : {}) };
     const hlavni = skupiny.get(`${m.technik}|${m.datum}`);
     if (hlavni) {
       (hlavni.alternativy ??= []).push(ms);
