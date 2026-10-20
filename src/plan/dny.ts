@@ -40,18 +40,30 @@ export async function sestavDny(
   const bezPolohy: UdalostTechnika[] = [];
   const bezZakladny: string[] = [];
 
+  // všechny adresy dne najednou (souběžně) – pak už se jen skládá
+  const adresy = new Set<string>();
+  const vDni = udalosti.filter((u) => isoDate(u.od) === datum && !jeVolneOkno(u) && !jeBlok(u));
+  for (const t of technici) [t.vyjezd, t.vyjezd2].forEach((a) => a && adresy.add(a));
+  for (const u of vDni) {
+    const a = adresaZMwf(u) ?? u.location;
+    if (a) adresy.add(a);
+  }
+  const body = new Map<string, Bod | null>();
+  await Promise.all([...adresy].map(async (a) => body.set(a, (await geokoder.najdi(a)).bod)));
+  const bodAdresy = (a: string | undefined | null) => (a ? (body.get(a) ?? null) : null);
+
   for (const t of technici) {
-    const zakladna = t.vyjezd ? (await geokoder.najdi(t.vyjezd)).bod : null;
-    const zakladna2 = t.vyjezd2 ? (await geokoder.najdi(t.vyjezd2)).bod : null;
+    const zakladna = bodAdresy(t.vyjezd);
+    const zakladna2 = bodAdresy(t.vyjezd2);
     if (!zakladna) {
       bezZakladny.push(t.jmeno);
       continue;
     }
-    const jeho = udalosti.filter((u) => u.technik === t.jmeno && isoDate(u.od) === datum && !jeVolneOkno(u) && !jeBlok(u));
+    const jeho = vDni.filter((u) => u.technik === t.jmeno);
     const navstevy: Navsteva[] = [];
     for (const u of jeho) {
       const adresa = adresaZMwf(u) ?? u.location;
-      const bod: Bod | null = adresa ? (await geokoder.najdi(adresa)).bod : null;
+      const bod = bodAdresy(adresa);
       if (!bod) {
         bezPolohy.push(u);
         continue;

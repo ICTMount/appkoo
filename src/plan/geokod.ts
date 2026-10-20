@@ -120,7 +120,46 @@ export function googleGeokoder(apiKey = process.env.GOOGLE_MAPS_API_KEY ?? "", f
 /** Sloupec mestska_cast přibyl později – doplní se do tabulky při prvním použití (jednou za běh) */
 let castPripravena: Promise<unknown> | null = null;
 
+/** Geokódy v paměti instance: nalezené 12 h, nenalezené 1 h (nabídka termínů jich čte stovky) */
+const PAMET_NALEZENO_MS = 12 * 3_600_000;
+const PAMET_NENALEZENO_MS = 3_600_000;
+
 export function sCache(db: Dotaz, sluzba: Geokoder): Geokoder {
+  const zDb = sDatabazi(db, sluzba);
+  const pamet = new Map<string, { do: number; v: Promise<Awaited<ReturnType<Geokoder["najdi"]>>> }>();
+  // nejvýš 8 souběžných dotazů (DB / Google) – nabídka termínů jich vyšle stovky naráz
+  let bezi = 0;
+  const cekajici: (() => void)[] = [];
+  const omez = async <T,>(f: () => Promise<T>): Promise<T> => {
+    if (bezi >= 8) await new Promise<void>((r) => cekajici.push(r));
+    bezi++;
+    try {
+      return await f();
+    } finally {
+      bezi--;
+      cekajici.shift()?.();
+    }
+  };
+  return {
+    najdi(adresa) {
+      const klic = klicAdresy(adresa);
+      const hit = pamet.get(klic);
+      if (hit && hit.do > Date.now()) return hit.v;
+      const v = omez(() => zDb.najdi(adresa));
+      pamet.set(klic, { do: Date.now() + PAMET_NENALEZENO_MS, v });
+      v.then(
+        (r) => {
+          if (r.bod) pamet.set(klic, { do: Date.now() + PAMET_NALEZENO_MS, v });
+          if (pamet.size > 20_000) pamet.delete(pamet.keys().next().value!);
+        },
+        () => pamet.delete(klic),
+      );
+      return v;
+    },
+  };
+}
+
+function sDatabazi(db: Dotaz, sluzba: Geokoder): Geokoder {
   return {
     async najdi(adresa) {
       castPripravena ??= db.query("ALTER TABLE geokod ADD COLUMN IF NOT EXISTS mestska_cast text").catch(() => undefined);

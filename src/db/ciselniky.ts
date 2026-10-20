@@ -4,12 +4,30 @@ import type { CiselnikId, NahledImportu, Polozka } from "../config/ciselniky.js"
 import { CISELNIKY } from "../config/ciselniky.js";
 import type { Db, Dotaz } from "./db.js";
 
+/**
+ * Krátká cache číselníků v paměti instance (30 s): role uživatele a Nastavení plánování se čtou
+ * při každém požadavku. Uložení číselníku cache dané databáze hned vyprázdní; jiné instance
+ * Cloud Run uvidí změnu nejpozději za 30 s.
+ */
+const CACHE_MS = 30_000;
+const cache = new WeakMap<Dotaz, Map<string, { do: number; data: Promise<Polozka[]> }>>();
+
+export function vyprazdniCacheCiselniku(db: Dotaz) {
+  cache.delete(db);
+}
+
 export async function nactiCiselnik(db: Dotaz, id: CiselnikId, jenAktivni = true): Promise<Polozka[]> {
-  const { rows } = await db.query<{ data: Polozka }>(
-    `SELECT data FROM ciselnik_polozka WHERE ciselnik = $1 ${jenAktivni ? "AND aktivni" : ""} ORDER BY klic`,
-    [id],
-  );
-  return rows.map((r) => r.data);
+  let mapa = cache.get(db);
+  if (!mapa) cache.set(db, (mapa = new Map()));
+  const klic = `${id}|${jenAktivni}`;
+  const hit = mapa.get(klic);
+  if (hit && hit.do > Date.now()) return hit.data;
+  const data = db
+    .query<{ data: Polozka }>(`SELECT data FROM ciselnik_polozka WHERE ciselnik = $1 ${jenAktivni ? "AND aktivni" : ""} ORDER BY klic`, [id])
+    .then((r) => r.rows.map((x) => x.data));
+  mapa.set(klic, { do: Date.now() + CACHE_MS, data });
+  data.catch(() => mapa!.delete(klic));
+  return data;
 }
 
 const klicPolozky = (id: CiselnikId, p: Polozka) => String(p[CISELNIKY[id].klic] ?? "").trim();
@@ -27,7 +45,8 @@ export async function ulozImport(
   nahradit = false,
 ): Promise<{ pridano: number; zmeneno: number; odebrano: number }> {
   if (!n.lzeUlozit) throw new Error("Import obsahuje chyby – nelze uložit.");
-  return db.tx(async (q) => {
+  vyprazdniCacheCiselniku(db);
+  const vysledek = await db.tx(async (q) => {
     const uloz = async (p: Polozka, akce: "pridano" | "zmeneno", pred: Polozka | null) => {
       const klic = klicPolozky(id, p);
       const aktivni = p.aktivni === undefined ? true : p.aktivni !== false;
@@ -57,4 +76,6 @@ export async function ulozImport(
     }
     return { pridano: n.nove.length, zmeneno: n.zmenene.length, odebrano };
   });
+  vyprazdniCacheCiselniku(db);
+  return vysledek;
 }

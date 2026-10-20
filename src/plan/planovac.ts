@@ -235,8 +235,10 @@ export async function nabidniProZakazku(
   const vsechnyDny: DenSOkny[] = [];
   const bezZakladny = new Set<string>();
   let bezPolohy = 0;
-  for (const d of dny) {
-    const s = await sestavDny(citelni.map((t) => ({ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 })), udalosti, d, zav.geokoder, opts.trvaniMin ?? 90, adresaZMwf);
+  const techniciPlanu = citelni.map((t) => ({ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 }));
+  const sestavene = await Promise.all(dny.map((d) => sestavDny(techniciPlanu, udalosti, d, zav.geokoder, opts.trvaniMin ?? 90, adresaZMwf)));
+  for (const [i, d] of dny.entries()) {
+    const s = sestavene[i]!;
     s.bezZakladny.forEach((x) => bezZakladny.add(x));
     bezPolohy += s.bezPolohy.length;
     for (const den of s.dny) {
