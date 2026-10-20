@@ -35,11 +35,14 @@ describe("doplnění slotu (režim B)", () => {
     expect(n[0]!.kmNavic).toBeLessThan(n[1]!.kmNavic);
   });
 
-  it("naléhavé SLA a priorita předběhnou o něco bližší zakázku", () => {
+  it("výchozí: SLA pořadí neovlivní – rozhoduje, co slot nejlépe zaplní (km navíc)", () => {
     const sla = local(2026, 10, 16, 20, 0); // do 48 h od slotu
-    const n = doplnSlot(den, okno, [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("SLA", { lat: 50.07, lon: 14.45 }, { slaKonec: sla, priorita: "P1" })], v);
+    const kandidati = [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("SLA", { lat: 50.07, lon: 14.45 }, { slaKonec: sla })];
+    expect(doplnSlot(den, okno, kandidati, v)[0]!.kandidat.z.idAktivity).toBe("BLIZKO");
+    // zvýhodnění SLA jde zapnout v Nastavení plánování
+    const n = doplnSlot(den, okno, kandidati, v, { bonusSlaDo48h: 40 });
     expect(n[0]!.kandidat.z.idAktivity).toBe("SLA");
-    expect(n[0]!.duvody).toEqual(expect.arrayContaining(["SLA do 48 h", "priorita P1"]));
+    expect(n[0]!.duvody).toContain("SLA do 48 h");
   });
 
   it("flex: přesouvá se jen dopředu, zakázka už ve dni se nenabízí", () => {

@@ -57,9 +57,10 @@ export interface NastaveniDoplneni {
 
 export const NASTAVENI_DOPLNENI: NastaveniDoplneni = {
   maxZajizdkaKm: NASTAVENI_PLANU.maxZajizdkaKm, // 75 km – bude se zpřesňovat
-  bonusSlaProslo: 60,
-  bonusSlaDo48h: 40,
-  bonusSlaDo5dni: 20,
+  // doplnění slotu: primární je slot zaplnit – SLA pořadí neovlivňuje (lze zapnout v Nastavení plánování)
+  bonusSlaProslo: 0,
+  bonusSlaDo48h: 0,
+  bonusSlaDo5dni: 0,
   bonusPriorita: { P1: 20, P2: 10, P3: 0, P0: 0 },
   trvaniMin: 90,
 };
@@ -87,15 +88,10 @@ export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: V
     const poSla = !!k.slaKonec && start > k.slaKonec;
     if (k.slaKonec) {
       const hodin = (k.slaKonec.getTime() - start.getTime()) / 3_600_000;
-      if (hodin <= 0) {
-        bonus += nast.bonusSlaProslo;
-        duvody.push("SLA už prošlo");
-      } else if (hodin <= 48) {
-        bonus += nast.bonusSlaDo48h;
-        duvody.push("SLA do 48 h");
-      } else if (hodin <= 120) {
-        bonus += nast.bonusSlaDo5dni;
-        duvody.push("SLA do 5 dní");
+      const b = hodin <= 0 ? nast.bonusSlaProslo : hodin <= 48 ? nast.bonusSlaDo48h : hodin <= 120 ? nast.bonusSlaDo5dni : 0;
+      if (b > 0) {
+        bonus += b;
+        duvody.push(hodin <= 0 ? "SLA už prošlo" : hodin <= 48 ? "SLA do 48 h" : "SLA do 5 dní");
       }
     }
     bonus += nast.bonusPriorita[k.priorita] ?? 0;
