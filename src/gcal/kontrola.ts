@@ -118,3 +118,34 @@ export function volnaOkna(udalosti: UdalostTechnika[], technik: string, den: str
     .map((u) => ({ od: minutesOfDay(u.od), do: minutesOfDay(u.do) - 1 }))
     .sort((a, b) => a.od - b.od);
 }
+
+/** Vytížení dne technika pro jednoduchý „bar“: sloty v pořadí podle času a podíl obsazených */
+export interface DilekDne {
+  id: string;
+  od: Date;
+  do: Date;
+  stav: "volno" | "obsazeno" | "blok" | "vyhrazeno";
+}
+export interface VytizeniDne {
+  dilky: DilekDne[];
+  volnych: number;
+  obsazenych: number;
+  /** obsazené / (obsazené + volné) v %, null = den bez slotů */
+  procento: number | null;
+}
+
+export function vytizeniDne(udalosti: UdalostTechnika[], technik: string, den: string): VytizeniDne {
+  const dilky: DilekDne[] = udalosti
+    .filter((u) => u.technik === technik && isoDate(u.od) === den && u.do.getTime() > u.od.getTime())
+    .sort((a, b) => a.od.getTime() - b.od.getTime())
+    .map((u) => ({
+      id: u.id,
+      od: u.od,
+      do: u.do,
+      stav: jeVyhrazeneVolno(u) ? "vyhrazeno" : jeVolneOkno(u) ? "volno" : jeBlok(u) ? "blok" : "obsazeno",
+    }));
+  const volnych = dilky.filter((d) => d.stav === "volno").length;
+  const obsazenych = dilky.filter((d) => d.stav === "obsazeno").length;
+  const celkem = volnych + obsazenych;
+  return { dilky, volnych, obsazenych, procento: celkem ? Math.round((obsazenych / celkem) * 100) : null };
+}

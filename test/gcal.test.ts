@@ -77,6 +77,20 @@ describe("kontrola MWF ↔ kalendář", () => {
     expect(zkontroluj([], [sz]).jenVKalendari).toEqual([]);
   });
 
+  it("vytížení dne: volno / obsazeno / blok v pořadí času a % obsazení", async () => {
+    const { vytizeniDne } = await import("../src/gcal/kontrola.js");
+    const u = [
+      ud({ id: "a", summary: "Hristov - FTTH O-1234567890", od: local(2026, 10, 16, 8, 0), do: local(2026, 10, 16, 10, 0) }),
+      ud({ id: "b", summary: "Hristov - VOLNY", barva: "10", od: local(2026, 10, 16, 10, 0), do: local(2026, 10, 16, 12, 0) }),
+      ud({ id: "c", summary: "Hristov - FTTH O-1234567891", od: local(2026, 10, 16, 12, 0), do: local(2026, 10, 16, 14, 0) }),
+      ud({ id: "d", summary: "Hristov - VOLNY", barva: "10", od: local(2026, 10, 16, 14, 0), do: local(2026, 10, 16, 16, 0) }),
+      ud({ id: "e", summary: "Hristov - NEPLANOVAT", od: local(2026, 10, 16, 16, 0), do: local(2026, 10, 16, 18, 0) }),
+    ];
+    const v = vytizeniDne(u, "Hristov", "2026-10-16");
+    expect(v.dilky.map((d) => d.stav)).toEqual(["obsazeno", "volno", "obsazeno", "volno", "blok"]);
+    expect(v).toMatchObject({ volnych: 2, obsazenych: 2, procento: 50 });
+  });
+
   it("skutečné události: VOLNY a NEPLANOVAT nejsou zakázky, HTML popis se přečte", async () => {
     const { zHtml } = await import("../src/gcal/kalendar.js");
     const html = ud({ description: zHtml("<u>pero</u><br><br>TEL: 603354035<br>O-8532577900"), summary: "Hristov - FTTH O-8532577900 Patera SLA 23.10.2026 10:18 (LH)" });

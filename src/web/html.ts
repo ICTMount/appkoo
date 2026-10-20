@@ -6,7 +6,7 @@ import type { Priorita } from "../domain/priorita.js";
 import type { Detail, PolozkaFronty, StavImportu } from "./data.js";
 import { pokusyZakazky } from "./data.js";
 import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, TechnikPlanu, VybranySlot } from "../plan/planovac.js";
-import { jeVolneOkno, jeVyhrazeneVolno, type UdalostTechnika } from "../gcal/kontrola.js";
+import { jeVolneOkno, jeVyhrazeneVolno, vytizeniDne, type UdalostTechnika, type VytizeniDne } from "../gcal/kontrola.js";
 import { POVINNA_POTVRZENI } from "./planovani.js";
 import type { Nalez, NalezLokality, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
 
@@ -113,6 +113,9 @@ h2.sekce{font-size:17px;margin:22px 0 10px;padding-top:14px;border-top:2px solid
 .ud{font-size:12px;padding:4px 0;border-top:1px solid var(--line)}.ud:first-of-type{border-top:0}.ud .cas{color:var(--muted);margin-right:4px}
 a.volny{display:block;font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;background:#e6f4ea;color:#1e5e2e;font-weight:600}
 a.volny.vyb{outline:2px solid var(--accent)}
+.vytizeni{display:flex;align-items:center;gap:6px;margin-top:4px;white-space:nowrap}.vytizeni .pruh{display:inline-flex;gap:2px}.vytizeni i{display:inline-block;width:14px;height:8px;border-radius:2px}
+.vytizeni .d-volno{background:#2e9d4b}.vytizeni .d-obsazeno{background:#8a8a85}.vytizeni .d-blok{background:repeating-linear-gradient(45deg,#8a8a85 0 2px,transparent 2px 4px)}.vytizeni .d-vyhrazeno{background:#2e9d4b;opacity:.35}
+.vytizeni .d-navrh{outline:2px solid var(--accent);outline-offset:1px}.vytizeni small{font-size:11px;color:var(--muted)}.vytizeni small b{color:var(--text)}
 .vyhrazeny{font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;border:1px dashed var(--line);color:var(--muted)}
 .card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:210px;overflow-y:auto}.posun.zdroj{max-height:340px}
 .grid>*{min-width:0}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
@@ -198,6 +201,17 @@ export function nastavZobrazeniPriorit(zap: boolean) {
 const prio = (p: string) => (prioritySvisible ? `<span class="prio ${esc(p)}">${esc(p)}</span>` : "");
 const prioTh = () => (prioritySvisible ? "<th>Priorita</th>" : "");
 const prioTd = (p: string) => (prioritySvisible ? `<td>${prio(p)}</td>` : "");
+
+/** Vytížení technika v den: proužek slotů podle času (zelená = volno, šedá = obsazeno) a % obsazení */
+export function barVytizeni(v: VytizeniDne, zvyraznit?: string): string {
+  if (!v.dilky.length) return `<div class="vytizeni"><span class="muted">bez slotů</span></div>`;
+  const POPIS = { volno: "volno", obsazeno: "obsazeno", blok: "blokováno", vyhrazeno: "VOLNY sz – vyhrazeno" } as const;
+  const dilky = v.dilky
+    .map((d) => `<i class="d-${d.stav}${d.id === zvyraznit ? " d-navrh" : ""}" title="${esc(`${fmtTime(d.od)}–${fmtTime(d.do)} ${POPIS[d.stav]}${d.id === zvyraznit ? " · navržený slot" : ""}`)}"></i>`)
+    .join("");
+  const pct = v.procento === null ? "" : `<b>${v.procento} %</b> obsazeno · ${v.obsazenych}/${v.obsazenych + v.volnych}`;
+  return `<div class="vytizeni"><span class="pruh">${dilky}</span><small>${pct}</small></div>`;
+}
 
 export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník sítě">${esc(i || "?")}</span>`;
 
@@ -477,7 +491,7 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
           .map((a) => (smi ? `<a href="${esc(odkazZapisu(a))}">${esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)}</a>` : esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)))
           .join(" · ")}</div>`
       : "";
-    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${trasa ? `<div class="trasa">${trasa}</div>` : ""}${jinyCas}</td><td>${esc(m.technik)}</td>
+    return `<tr><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${trasa ? `<div class="trasa">${trasa}</div>` : ""}${jinyCas}</td><td>${esc(m.technik)}${m.vytizeni ? barVytizeni(m.vytizeni, m.eventId) : ""}</td>
 <td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
 <td>${m.poSla ? `<span class="prio P1">po SLA</span>` : "v SLA"}</td>
 <td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
@@ -669,7 +683,7 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
               : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
           )
           .join("");
-        return `<div class="card"><h3>${esc(DNY_DLOUHE(d.datum))} ${esc(fmtDate(d.datum))} <small class="muted">· ${zak.length} ${zak.length === 1 ? "událost" : "událostí"}</small></h3>${obsah || `<span class="muted">prázdný den</span>`}</div>`;
+        return `<div class="card"><h3>${esc(DNY_DLOUHE(d.datum))} ${esc(fmtDate(d.datum))} <small class="muted">· ${zak.length} ${zak.length === 1 ? "událost" : "událostí"}</small></h3>${barVytizeni(vytizeniDne(d.udalosti, t.jmeno, d.datum), s.slot?.eventId)}${obsah || `<span class="muted">prázdný den</span>`}</div>`;
       })
       .join("")}</div>`;
   } else if (s.prehled) {
@@ -685,7 +699,7 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
             : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
         )
         .join("");
-      return `<tr><td><a href="/technik?t=${encodeURIComponent(d.technik.jmeno)}&den=${esc(s.den)}"><b>${esc(d.technik.jmeno)}</b></a><br><small class="muted">${esc(d.technik.skupiny.join(", "))}</small></td>
+      return `<tr><td><a href="/technik?t=${encodeURIComponent(d.technik.jmeno)}&den=${esc(s.den)}"><b>${esc(d.technik.jmeno)}</b></a><br><small class="muted">${esc(d.technik.skupiny.join(", "))}</small>${barVytizeni(vytizeniDne([...d.zakazky, ...d.volne, ...d.vyhrazene], d.technik.jmeno, s.den))}</td>
 <td class="nowrap">${d.zakazky.length}</td><td class="nowrap">${d.volne.length}</td><td>${osa || `<span class="muted">prázdný den</span>`}</td></tr>`;
     });
     horni = `<h1>Doplnit technika <small>přehled ${esc(DNY_DLOUHE(s.den))} ${esc(fmtDate(s.den))} – od nejméně vytížených</small></h1>
@@ -740,6 +754,7 @@ ${prioTd(n.kandidat.priorita)}
     v.bezPolohyVeDni ? `${v.bezPolohyVeDni} zakázek ve dni technika nemá dohledatelnou adresu – v trase chybí.` : "",
   ].filter(Boolean);
   return `<h2 class="sekce">Zakázky do slotu ${esc(slot(vyb.od, vyb.do))} · ${esc(vyb.technik.jmeno)}</h2>
+${v.den.length ? barVytizeni(vytizeniDne(v.den, vyb.technik.jmeno, isoDate(vyb.od)), vyb.eventId) : ""}
 ${v.chyba ? `<div class="err">${esc(v.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
 <div class="tbl"><table><thead><tr><th>#</th><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th>${prioTh()}<th>Do splnění</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>

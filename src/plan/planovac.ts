@@ -9,7 +9,7 @@
 import type { calendar_v3 } from "@googleapis/calendar";
 import type { Polozka } from "../config/ciselniky.js";
 import { nactiUdalosti } from "../gcal/kalendar.js";
-import { jeBlok, jeVolneOkno, jeVyhrazeneVolno, type UdalostTechnika } from "../gcal/kontrola.js";
+import { jeBlok, jeVolneOkno, jeVyhrazeneVolno, vytizeniDne, type UdalostTechnika, type VytizeniDne } from "../gcal/kontrola.js";
 import type { Zakazka } from "../import/mwfExport.js";
 import type { Fakta, Priorita } from "../domain/priorita.js";
 import { addDays, atTime, isoDate, minutesOfDay } from "../domain/time.js";
@@ -120,6 +120,8 @@ export interface MoznostSlotu extends Moznost {
   /** začátek a konec slotu („Praha v UTC“) */
   od: Date;
   do: Date;
+  /** vytížení technika v ten den (bar volné / obsazené sloty) */
+  vytizeni?: VytizeniDne;
 }
 
 export interface Nabidka {
@@ -263,6 +265,7 @@ export async function nabidniProZakazku(
     }
     if (moznosti.length >= (opts.pocet ?? 5)) continue;
     ms.sousede = sousede(m);
+    ms.vytizeni = vytizeniDne(udalosti, m.technik, m.datum);
     skupiny.set(`${m.technik}|${m.datum}`, ms);
     moznosti.push(ms);
   }
