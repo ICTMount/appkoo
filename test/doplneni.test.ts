@@ -49,4 +49,17 @@ describe("doplnění slotu (režim B)", () => {
     expect(n.map((x) => x.kandidat.z.idAktivity)).toEqual(["FLEX"]);
     expect(n[0]!.duvody).toContain("přesun dopředu (flex)");
   });
+
+  it("přejezd až 59 min: zakázka, která by zdržela další termín, se nabídne s upozorněním", () => {
+    // slot 10–12, v 12:00 pevná zakázka v Hloubětíně; kandidát daleko (Kladno) by další termín zdržel
+    const tesny: DenSOkny = {
+      den: { ...den.den, navstevy: [...den.den.navstevy, { id: "z2", bod: HLOUBETIN, od: 720, do: 779, trvani: 110 }] },
+      volnaOkna: [okno],
+    };
+    const daleko = kand("KLADNO", { lat: 50.147, lon: 14.103 });
+    expect(doplnSlot(tesny, okno, [daleko], v).map((x) => x.kandidat.z.idAktivity)).toEqual([]);
+    const s59 = doplnSlot(tesny, okno, [daleko], v, { toleranceMin: 59, maxZajizdkaKm: 110 });
+    expect(s59.map((x) => x.kandidat.z.idAktivity)).toEqual(["KLADNO"]);
+    expect(s59[0]!.duvody.join(" ")).toMatch(/později/);
+  });
 });

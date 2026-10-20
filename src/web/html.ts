@@ -141,7 +141,7 @@ form.vyber-tech{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;marg
 form.vyber-tech .pole{display:flex;flex-direction:column;gap:6px}
 form.vyber-tech .pole label{display:flex;flex-direction:row;align-items:center;gap:4px;white-space:nowrap;font-size:12px;color:var(--muted);height:18px;line-height:18px}form.vyber-tech label b{color:var(--text)}
 form.vyber-tech select,form.vyber-tech input,form.vyber-tech button{height:38px;box-sizing:border-box}form.vyber-tech select{min-width:320px}
-form.vyber-tech .radek{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+form.vyber-tech label.chk{display:flex;align-items:center;gap:8px;height:38px;font-size:14px;color:var(--text);line-height:normal}form.vyber-tech .pole small{max-width:260px}form.vyber-tech .radek{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .rychle{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
 .rychle a.on{border-color:var(--accent);background:var(--accent);color:#fff}.rychle a:hover{text-decoration:none}
 form.filtr label b{color:var(--text);margin-left:4px}
@@ -692,13 +692,19 @@ export interface StrankaTechnika {
   navrhy: NavrhySlotu | null;
   chyba?: string;
   zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean };
+  /** „přejezd až 59 min“ – rozšíří nabídku zakázek do slotu */
+  p59?: boolean;
 }
 
 export function strankaTechnika(s: StrankaTechnika, stav: StavImportu, uzivatel: string): string {
   const volby = s.technici
     .map((t) => `<option value="${esc(t.jmeno)}"${s.technik?.jmeno === t.jmeno ? " selected" : ""}>${esc(t.jmeno)} – ${esc(t.skupiny.join(", "))} · ${esc(t.vyjezd)}</option>`)
     .join("");
-  const navT = s.technik ? `&t=${encodeURIComponent(s.technik.jmeno)}` : "";
+  const navT = `${s.technik ? `&t=${encodeURIComponent(s.technik.jmeno)}` : ""}${s.p59 ? "&p59=1" : ""}`;
+  const slotOdkaz = (u: UdalostTechnika) => `${odkazSlotu(u, s.den)}${s.p59 ? "&p59=1" : ""}`;
+  const skryteSlotu = s.slot
+    ? `<input type="hidden" name="k" value="${esc(s.slot.technik.kalendar)}"><input type="hidden" name="e" value="${esc(s.slot.eventId)}"><input type="hidden" name="od" value="${esc(s.slot.od.toISOString())}"><input type="hidden" name="do" value="${esc(s.slot.do.toISOString())}">`
+    : "";
   const krok = s.technik ? "o týden" : "o den";
   // Technik vlevo, Den vpravo: popisky na stejné výšce, pod Dnem posun a rychlá volba dnů
   const formular = `<form class="vyber-tech" method="get" action="/technik">
@@ -710,6 +716,8 @@ ${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← ${kr
     .map((d) => `<a class="${d === s.den ? "on" : ""}" href="/technik?den=${esc(d)}${esc(navT)}">${esc(DNY_DLOUHE(d))} ${esc(fmtDate(d).slice(0, 6))}</a>`)
     .join("")}</div>
 </div>
+<div class="pole"><label>Doplnění slotu</label><label class="chk"><input type="checkbox" name="p59" value="1"${s.p59 ? " checked" : ""}> Přejezd až 59 min</label>
+<small class="muted">víc zakázek do slotu – technik smí na další zakázku dorazit až o 59 min později (potvrďte Zobrazit)</small></div>${skryteSlotu}
 </form>`;
 
   let horni = "";
@@ -725,7 +733,7 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
             jeVyhrazeneVolno(u)
               ? `<div class="vyhrazeny">${esc(hm(u.od))}–${esc(hm(u.do))} ${VYHRAZENY}</div>`
               : jeVolneOkno(u)
-              ? `<a class="volny${s.slot?.eventId === u.id ? " vyb" : ""}" href="${esc(odkazSlotu(u, s.den))}">${esc(hm(u.od))}–${esc(hm(u.do))} volno → doplnit</a>`
+              ? `<a class="volny${s.slot?.eventId === u.id ? " vyb" : ""}" href="${esc(slotOdkaz(u))}">${esc(hm(u.od))}–${esc(hm(u.do))} volno → doplnit</a>`
               : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
           )
           .join("");
@@ -741,7 +749,7 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
           d.vyhrazene.includes(u)
             ? `<div class="vyhrazeny"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span> ${VYHRAZENY}</div>`
             : d.volne.includes(u)
-            ? `<a class="volny radek" href="${esc(odkazSlotu(u, s.den))}"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span> volno → doplnit</a>`
+            ? `<a class="volny radek" href="${esc(slotOdkaz(u))}"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span> volno → doplnit</a>`
             : `<div class="ud"><span class="cas">${esc(hm(u.od))}–${esc(hm(u.do))}</span>${textUdalosti(u, s.adresy, s.casti)}</div>`,
         )
         .join("");

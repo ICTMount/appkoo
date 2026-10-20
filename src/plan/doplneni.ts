@@ -51,6 +51,8 @@ export interface NastaveniDoplneni {
   bonusSlaDo5dni: number;
   bonusPriorita: Record<Priorita, number>;
   trvaniMin: number;
+  /** „přejezd až 59 min“: povolený pozdější příjezd na další zakázku (min), 0 = přesně podle oken */
+  toleranceMin?: number;
 }
 
 export const NASTAVENI_DOPLNENI: NastaveniDoplneni = {
@@ -67,7 +69,7 @@ const zacatek = (datum: string, okno: Okno) => new Date(Date.parse(`${datum}T00:
 
 export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: Vzdalenosti, n: Partial<NastaveniDoplneni> = {}, pocet = 10): NavrhDoplneni[] {
   const nast = { ...NASTAVENI_DOPLNENI, ...n };
-  const d = den.den;
+  const d = nast.toleranceMin ? { ...den.den, toleranceMin: nast.toleranceMin } : den.den;
   const zaklad = nejlepsiPoradi(d, v) ?? vyhodnotTrasu(d, [...d.navstevy].sort((a, b) => a.od - b.od), v);
   const start = zacatek(d.datum, okno);
   const vysledek: NavrhDoplneni[] = [];
@@ -99,6 +101,12 @@ export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: V
     bonus += nast.bonusPriorita[k.priorita] ?? 0;
     if (k.priorita === "P1" || k.priorita === "P2") duvody.push(`priorita ${k.priorita}`);
     if (k.presun) duvody.push("přesun dopředu (flex)");
+    const pozde = Math.max(0, ...t.zastavky.map((x) => x.zpozdeni));
+    if (pozde > 0) duvody.push(`další zakázka o ${Math.round(pozde)} min později`);
+    const sem = t.zastavky.find((x) => x.id === k.z.idAktivity);
+    if (sem && sem.prijezd - (t.zastavky[t.zastavky.indexOf(sem) - 1]?.konec ?? d.pracujeOd) > 30) {
+      duvody.push(`přejezd ${Math.round(sem.prijezd - (t.zastavky[t.zastavky.indexOf(sem) - 1]?.konec ?? d.pracujeOd))} min`);
+    }
     vysledek.push({ kandidat: k, kmNavic, kmDne: t.km, poSla, skore: kmNavic - bonus, duvody });
   }
   return vysledek.sort((a, b) => a.skore - b.skore).slice(0, pocet);
