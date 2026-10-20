@@ -73,7 +73,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
 .card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.webcal-pruh .btn{margin-left:8px}
-.termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;background:var(--panel)}
+.termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
@@ -493,7 +493,7 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
   const upoz = brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join("<br>")}</div>` : "";
   if (blok) return blok + upoz;
   if (z.termin && brany.blokace.some(jeTermin)) {
-    return `<div class="termin-box"><div>Zakázka má dohodnutý termín <b>${esc(slot(z.termin.od, z.termin.do))}</b>${z.technik ? ` · ${esc(z.technik)}` : ""}.</div>
+    return `<div class="err termin-box"><div><b>Termín teď nelze naplánovat:</b><ul><li>Zakázka už má dohodnutý termín <b>${esc(slot(z.termin.od, z.termin.do))}</b>${z.technik ? ` · ${esc(z.technik)}` : ""}.</li></ul></div>
 <a class="btn velke" href="${esc(`${zakl0}?preplanovat=1#planovani`)}">Přeplánovat zakázku</a></div>${upoz}`;
   }
   if (d.uzavreno) return `<div class="warn">Uzavřená zakázka se neplánuje.</div>`;
