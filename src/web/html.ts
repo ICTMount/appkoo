@@ -196,7 +196,7 @@ function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: stri
   const kdy = `${fmtDate(w.at)} ${fmtTime(w.at)}`;
   const termin = w.termin ? ` <b>${esc(w.termin)}</b>` : "";
   if (w.vKalendari) {
-    return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zákazník si sám vybral termín${termin} (${esc(kdy)}). V kalendáři je zapsaný u <b>${esc(w.vKalendari.technik)}</b> ${esc(`${fmtDate(w.vKalendari.od)} ${fmtTime(w.vKalendari.od)}–${fmtTime(w.vKalendari.do)}`)}.</div>`;
+    return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – původní termín${termin} (${esc(kdy)}). V kalendáři je zapsaný u <b>${esc(w.vKalendari.technik)}</b> ${esc(`${fmtDate(w.vKalendari.od)} ${fmtTime(w.vKalendari.od)}–${fmtTime(w.vKalendari.do)}`)}.</div>`;
   }
   return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zákazník si sám vybral termín${termin} (${esc(kdy)}). Termín je <b>jen v MWF, v kalendáři technika chybí</b> – zapište ho do GCAL na dohodnutý, nebo náhradní termín.<a class="btn" href="/zakazka/${encodeURIComponent(idAktivity)}#planovani">Doplánovat do GCAL ↓</a></div>`;
 }
