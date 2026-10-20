@@ -692,16 +692,17 @@ export interface StrankaTechnika {
   navrhy: NavrhySlotu | null;
   chyba?: string;
   zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean };
-  /** „přejezd až 59 min“ – rozšíří nabídku zakázek do slotu */
-  p59?: boolean;
+  /** „Zvýšit toleranci“ – rozšíří nabídku zakázek do slotu */
+  tolerance?: boolean;
+  tolerancePct?: number;
 }
 
 export function strankaTechnika(s: StrankaTechnika, stav: StavImportu, uzivatel: string): string {
   const volby = s.technici
     .map((t) => `<option value="${esc(t.jmeno)}"${s.technik?.jmeno === t.jmeno ? " selected" : ""}>${esc(t.jmeno)} – ${esc(t.skupiny.join(", "))} · ${esc(t.vyjezd)}</option>`)
     .join("");
-  const navT = `${s.technik ? `&t=${encodeURIComponent(s.technik.jmeno)}` : ""}${s.p59 ? "&p59=1" : ""}`;
-  const slotOdkaz = (u: UdalostTechnika) => `${odkazSlotu(u, s.den)}${s.p59 ? "&p59=1" : ""}`;
+  const navT = `${s.technik ? `&t=${encodeURIComponent(s.technik.jmeno)}` : ""}${s.tolerance ? "&tol=1" : ""}`;
+  const slotOdkaz = (u: UdalostTechnika) => `${odkazSlotu(u, s.den)}${s.tolerance ? "&tol=1" : ""}`;
   const skryteSlotu = s.slot
     ? `<input type="hidden" name="k" value="${esc(s.slot.technik.kalendar)}"><input type="hidden" name="e" value="${esc(s.slot.eventId)}"><input type="hidden" name="od" value="${esc(s.slot.od.toISOString())}"><input type="hidden" name="do" value="${esc(s.slot.do.toISOString())}">`
     : "";
@@ -716,8 +717,8 @@ ${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← ${kr
     .map((d) => `<a class="${d === s.den ? "on" : ""}" href="/technik?den=${esc(d)}${esc(navT)}">${esc(DNY_DLOUHE(d))} ${esc(fmtDate(d).slice(0, 6))}</a>`)
     .join("")}</div>
 </div>
-<div class="pole"><label>Doplnění slotu</label><label class="chk"><input type="checkbox" name="p59" value="1"${s.p59 ? " checked" : ""}> Přejezd až 59 min</label>
-<small class="muted">víc zakázek do slotu – technik smí na další zakázku dorazit až o 59 min později (potvrďte Zobrazit)</small></div>${skryteSlotu}
+<div class="pole"><label>Doplnění slotu</label><label class="chk"><input type="checkbox" name="tol" value="1"${s.tolerance ? " checked" : ""}> Zvýšit toleranci o ${s.tolerancePct ?? 25} %</label>
+<small class="muted">víc zakázek do slotu – pozdější příjezd na další zakázku o ${s.tolerancePct ?? 25} % slotu (2h slot = ${Math.round(120 * (s.tolerancePct ?? 25) / 100)} min) a delší zajížďka; potvrďte Zobrazit</small></div>${skryteSlotu}
 </form>`;
 
   let horni = "";

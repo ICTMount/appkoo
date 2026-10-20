@@ -51,8 +51,8 @@ export interface NastaveniDoplneni {
   bonusSlaDo5dni: number;
   bonusPriorita: Record<Priorita, number>;
   trvaniMin: number;
-  /** „přejezd až 59 min“: povolený pozdější příjezd na další zakázku (min), 0 = přesně podle oken */
-  toleranceMin?: number;
+  /** „zvýšit toleranci“: povolený pozdější příjezd na další zakázku jako podíl délky okna (0,25 = 25 %) */
+  tolerance?: number;
 }
 
 export const NASTAVENI_DOPLNENI: NastaveniDoplneni = {
@@ -69,7 +69,7 @@ const zacatek = (datum: string, okno: Okno) => new Date(Date.parse(`${datum}T00:
 
 export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: Vzdalenosti, n: Partial<NastaveniDoplneni> = {}, pocet = 10): NavrhDoplneni[] {
   const nast = { ...NASTAVENI_DOPLNENI, ...n };
-  const d = nast.toleranceMin ? { ...den.den, toleranceMin: nast.toleranceMin } : den.den;
+  const d = nast.tolerance ? { ...den.den, tolerance: nast.tolerance } : den.den;
   const zaklad = nejlepsiPoradi(d, v) ?? vyhodnotTrasu(d, [...d.navstevy].sort((a, b) => a.od - b.od), v);
   const start = zacatek(d.datum, okno);
   const vysledek: NavrhDoplneni[] = [];

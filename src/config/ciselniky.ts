@@ -57,6 +57,7 @@ export const PARAMETRY_PLANOVANI = {
   bonusPrioritaP1: { vychozi: 20, popis: "Doplnění slotu: zvýhodnění priority P1 (km)" },
   bonusPrioritaP2: { vychozi: 10, popis: "Doplnění slotu: zvýhodnění priority P2 (km)" },
   flexDni: { vychozi: 21, popis: "Doplnění slotu: jak daleko dopředu hledat zakázky „flex“ k přesunu (dní)" },
+  tolerancePct: { vychozi: 25, popis: "Zaškrtávátko „Zvýšit toleranci“: pozdější příjezd na další zakázku (% délky slotu) a delší zajížďka (+ stejné %)" },
   pouzivatPriority: { vychozi: 0, popis: "Používat priority P1–P0 při plánování a zobrazovat je (1 = ano, 0 = ne)" },
 } as const;
 export type ParametrPlanovani = keyof typeof PARAMETRY_PLANOVANI;
@@ -414,6 +415,8 @@ export interface NastaveniPlanovaniApp {
   dniNabidky: number;
   delkaPraceMin: number;
   flexDni: number;
+  /** „Zvýšit toleranci“ v Doplnit technika (0,25 = 25 %) */
+  tolerance: number;
   /** priority P1–P0: 0 = vypnuté (do odvolání), plánuje se jen podle SLA, trasy a zaplnění dne */
   pouzivatPriority: boolean;
 }
@@ -448,6 +451,7 @@ export function nastaveniPlanovani(polozky: Polozka[]): NastaveniPlanovaniApp {
     dniNabidky: Math.min(30, Math.max(1, Math.round(h("dniNabidky")))),
     delkaPraceMin: delka,
     flexDni: Math.min(60, Math.max(1, Math.round(h("flexDni")))),
+    tolerance: Math.min(1, Math.max(0, h("tolerancePct") / 100)),
     pouzivatPriority: h("pouzivatPriority") === 1,
   };
 }

@@ -24,8 +24,8 @@ export interface DenTechnika {
   pracujeOd: number; // minuty od půlnoci
   pracujeDo: number;
   navstevy: Navsteva[];
-  /** povolený pozdější příjezd po konci okna (min) – „přejezd až 59 min“ v Doplnit technika */
-  toleranceMin?: number;
+  /** povolený pozdější příjezd po konci okna v % délky okna (0,25 = 25 %) – „zvýšit toleranci“ */
+  tolerance?: number;
 }
 
 export interface Zastavka {
@@ -52,6 +52,9 @@ export interface VyhodnoceniTrasy {
 
 export const LIMIT_DLOUHY_PREJEZD_KM = 50;
 
+/** Tolerance pozdějšího příjezdu pro návštěvu (min): podíl délky jejího okna (2h slot × 25 % = 30 min) */
+const tolerance = (den: DenTechnika, n: Navsteva) => (den.tolerance ? Math.round((n.do - n.od + 1) * den.tolerance) : 0);
+
 export function vyhodnotTrasu(den: DenTechnika, poradi: Navsteva[], v: Vzdalenosti): VyhodnoceniTrasy {
   let cas = den.pracujeOd;
   let poloha = den.zakladna;
@@ -67,7 +70,7 @@ export function vyhodnotTrasu(den: DenTechnika, poradi: Navsteva[], v: Vzdalenos
     const prijezd = cas + v.minuty(poloha, n.bod);
     const zacatek = Math.max(prijezd, n.od);
     const zpozdeni = Math.max(0, zacatek - n.do);
-    if (zpozdeni > (den.toleranceMin ?? 0)) proveditelna = false;
+    if (zpozdeni > tolerance(den, n)) proveditelna = false;
     zastavky.push({ id: n.id, prijezd, zacatek, konec: zacatek + n.trvani, kmPrejezd: k, zpozdeni });
     km += k;
     cas = zacatek + n.trvani;
@@ -104,7 +107,7 @@ function presne(den: DenTechnika, v: Vzdalenosti): VyhodnoceniTrasy | null {
     den.navstevy.forEach((nv, i) => {
       if (pouzite[i]) return;
       const zacatek = Math.max(cas + v.minuty(poloha, nv.bod), nv.od);
-      if (zacatek > nv.do + (den.toleranceMin ?? 0)) return;
+      if (zacatek > nv.do + tolerance(den, nv)) return;
       pouzite[i] = true;
       cesta.push(nv);
       krok(zacatek + nv.trvani, nv.bod, km + v.km(poloha, nv.bod));

@@ -433,7 +433,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           slot: null,
           navrhy: null,
           zapis: { zapnuty: zapis.zapnuty, smiTechnik },
-          p59: p.get("p59") === "1",
+          tolerance: p.get("tol") === "1",
+          tolerancePct: Math.round(kontext.nastaveni.tolerance * 100),
         };
         if (technik) {
           const rozsah = pracovniDny(den, 5);
@@ -446,9 +447,13 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             const kandidati = await kandidatiKDoplneni(db, now, kontext.blokovane, stav.posledniExport ?? now, kontext.nastaveni.pouzivatPriority);
             s.navrhy = await navrhyProSlot(s.slot, kandidati, kontext.technici, zav, {
               adresyZMwf: kontext.adresyZMwf,
-              // „přejezd až 59 min“: technik smí na další zakázku dorazit až o 59 min později, delší zajížďka
-              nastaveni: s.p59
-                ? { ...kontext.nastaveni.doplneni, toleranceMin: 59, maxZajizdkaKm: Math.max(kontext.nastaveni.doplneni.maxZajizdkaKm ?? 75, 110) }
+              // „Zvýšit toleranci“: pozdější příjezd na další zakázku o % délky slotu a o stejné % delší zajížďka
+              nastaveni: s.tolerance
+                ? {
+                    ...kontext.nastaveni.doplneni,
+                    tolerance: kontext.nastaveni.tolerance,
+                    maxZajizdkaKm: Math.round((kontext.nastaveni.doplneni.maxZajizdkaKm ?? 75) * (1 + kontext.nastaveni.tolerance)),
+                  }
                 : kontext.nastaveni.doplneni,
               flexDni: kontext.nastaveni.flexDni,
             });
