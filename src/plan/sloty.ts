@@ -53,7 +53,7 @@ export interface NastaveniPlanu {
 
 export const NASTAVENI_PLANU: NastaveniPlanu = {
   maxZajizdkaKm: 75, // SKILLS v5, část 22: „max 75 km za férové“
-  penalizacePoSlaKm: 80,
+  penalizacePoSlaKm: 0, // SLA nabídku termínů neovlivňuje (lze zapnout v Nastavení plánování)
   penalizaceDneKm: { P1: 15, P2: 8, P3: 3, P0: 0 },
   preferovaneOkno: { od: 10 * 60, do: 14 * 60 },
   penalizaceMimoPreferovaneKm: 8,

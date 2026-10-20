@@ -537,7 +537,6 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
       : "";
     return `<tr${m.naDohodnuty ? ` class="na-dohodnuty"` : ""}><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${m.naDohodnuty ? ` <span class="webcal">= DOHODNUTÝ TERMÍN</span>` : ""}${trasa ? `<div class="trasa">${trasa}</div>` : ""}${jinyCas}</td><td>${esc(m.technik)}${m.vytizeni ? barVytizeni(m.vytizeni, m.eventId) : ""}</td>
 <td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
-<td>${m.poSla ? `<span class="prio P1">po SLA</span>` : "v SLA"}</td>
 <td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
   });
   // Jiné termíny: zákazník nemůže → posun dopředu (od dne po posledním nabídnutém), nebo od zvoleného data
@@ -554,9 +553,9 @@ ${pozdeji ? `<a class="btn" href="${esc(`${zakl}?${pp}od=${pozdeji}#planovani`)}
 </form>`;
   return `${upoz}${terminy}${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
-<div class="tbl"><table><thead><tr><th>#</th><th>Slot</th><th>Technik</th><th>Km navíc</th><th>Do splnění</th><th></th></tr></thead>
-<tbody>${radky.join("") || `<tr><td colspan="6" class="muted">${nabidka.chyba ? "" : "V tomto období žádný volný slot v dosahu – zkuste Pozdější termíny."}</td></tr>`}</tbody></table></div>
-<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: zaplnění dne, SLA, km navíc oproti trase dne, preferované okno 10–14 h. U každého slotu je vidět, kam technik jede před ní a po ní (km = přejezd, odhad vzdušnou čarou × 1,3).</p>`;
+<div class="tbl"><table><thead><tr><th>#</th><th>Slot</th><th>Technik</th><th>Km navíc</th><th></th></tr></thead>
+<tbody>${radky.join("") || `<tr><td colspan="5" class="muted">${nabidka.chyba ? "" : "V tomto období žádný volný slot v dosahu – zkuste Pozdější termíny."}</td></tr>`}</tbody></table></div>
+<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: zaplnění dne, km navíc oproti trase dne, preferované okno 10–14 h. U každého slotu je vidět, kam technik jede před ní a po ní (km = přejezd, odhad vzdušnou čarou × 1,3).</p>`;
 }
 
 /** přejezd nad tento limit se v nabídce zvýrazní (červeně) – na první pohled vidět nesmyslnou cestu */

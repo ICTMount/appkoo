@@ -45,7 +45,7 @@ export const PARAMETRY_PLANOVANI = {
   penalizacePrazdnyDenKm: { vychozi: 100, popis: "Penalizace za otevření prázdného dne technika (km) – „zaplnit den“" },
   bonusZaZakazkuVeDniKm: { vychozi: 6, popis: "Zvýhodnění za každou zakázku, kterou už technik ten den má (km)" },
   maxZakazekProBonus: { vychozi: 4, popis: "Zvýhodnění se počítá nejvýš pro tolik zakázek" },
-  penalizacePoSlaKm: { vychozi: 80, popis: "Penalizace slotu po termínu SLA (km)" },
+  penalizacePoSlaKm: { vychozi: 0, popis: "Penalizace slotu po termínu SLA (km) – 0 = SLA nabídku termínů neovlivňuje" },
   preferovaneOdHod: { vychozi: 10, popis: "Preferované okno termínů od (hodina)" },
   preferovaneDoHod: { vychozi: 14, popis: "Preferované okno termínů do (hodina)" },
   penalizaceMimoPreferovaneKm: { vychozi: 8, popis: "Penalizace slotu mimo preferované okno (km)" },
