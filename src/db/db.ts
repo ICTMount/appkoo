@@ -14,7 +14,8 @@ export interface Db extends Dotaz {
 export function pgDb(connectionString = process.env.DATABASE_URL): Db {
   // timestamp bez časové zóny = místní čas Praha uložený jako UTC Date (viz src/domain/time.ts)
   pg.types.setTypeParser(1114, (s) => new Date(s.replace(" ", "T") + "Z"));
-  const pool = new pg.Pool({ connectionString });
+  // malý pool na instanci: db-f1-micro unese jen ~25 spojení; při 3 instancích Cloud Run 3 × 6 = 18
+  const pool = new pg.Pool({ connectionString, max: Number(process.env.DB_POOL_MAX ?? 6), idleTimeoutMillis: 30_000, connectionTimeoutMillis: 10_000 });
   return {
     query: async (sql, params) => pool.query(sql, params as unknown[]) as never,
     async tx(fn) {

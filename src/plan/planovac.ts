@@ -172,12 +172,38 @@ export function pracovniDny(dnes: string, pocet: number): string[] {
  * Události techniků v rozsahu dní (od–do jsou „Praha v UTC“). Kalendáře se čtou souběžně a po jednom –
  * nečitelný kalendář (nenasdílený, chybí delegace) nesmí shodit ostatní.
  */
+/**
+ * Krátká cache událostí (30 s) – 10 koordinátorek otevírá nabídky nad stejnými kalendáři a Calendar API
+ * má limit dotazů. Zápis do kalendáře cache daného kalendáře hned vyprázdní (`zapomenKalendar`);
+ * před přepsáním slotu se událost vždy čte znovu přímo z kalendáře.
+ */
+const KALENDAR_CACHE_MS = 30_000;
+const kalendarCache = new WeakMap<calendar_v3.Calendar, Map<string, { do: number; u: Promise<UdalostTechnika[]> }>>();
+
+export function zapomenKalendar(api: calendar_v3.Calendar, kalendar: string) {
+  const m = kalendarCache.get(api);
+  if (m) for (const k of [...m.keys()]) if (k.startsWith(`${kalendar}|`)) m.delete(k);
+}
+
+function udalostiSCache(api: calendar_v3.Calendar, t: TechnikPlanu, od: Date, do_: Date): Promise<UdalostTechnika[]> {
+  let m = kalendarCache.get(api);
+  if (!m) kalendarCache.set(api, (m = new Map()));
+  const klic = `${t.kalendar}|${t.jmeno}|${od.toISOString()}|${do_.toISOString()}`;
+  const hit = m.get(klic);
+  if (hit && hit.do > Date.now()) return hit.u;
+  const u = nactiUdalosti(api, [{ technik: t.jmeno, kalendar: t.kalendar }], od, do_);
+  m.set(klic, { do: Date.now() + KALENDAR_CACHE_MS, u });
+  u.catch(() => m!.delete(klic));
+  if (m.size > 2000) m.delete(m.keys().next().value!);
+  return u;
+}
+
 export async function nactiKalendare(api: calendar_v3.Calendar, technici: TechnikPlanu[], od: Date, do_: Date) {
   const vysledky = await Promise.all(
     technici.map(async (t) => {
       try {
         // API chce skutečný čas (UTC); „Praha v UTC“ posuneme o 3 h – rezerva, filtruje se podle dne
-        return { t, u: await nactiUdalosti(api, [{ technik: t.jmeno, kalendar: t.kalendar }], new Date(od.getTime() - 3 * 3_600_000), do_) };
+        return { t, u: await udalostiSCache(api, t, new Date(od.getTime() - 3 * 3_600_000), do_) };
       } catch {
         return { t, u: null };
       }

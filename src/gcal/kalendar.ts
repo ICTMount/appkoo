@@ -167,12 +167,22 @@ export async function obsadVolnySlot(
     throw new SlotObsazen("Čas slotu se v kalendáři změnil. Načtěte nabídku termínů znovu.");
   }
   const pat = paticka(zHtml(e.description ?? ""));
-  const { data } = await api.events.patch({
-    calendarId: kalendar,
-    eventId,
-    requestBody: { ...u, description: pat ? `${u.description}\n\n${pat}` : u.description, colorId: null } as never,
-  });
-  return { eventId: data.id ?? eventId, htmlLink: data.htmlLink ?? null };
+  try {
+    // If-Match: když slot mezi čtením a zápisem obsadila jiná koordinátorka, Google vrátí 412 a nic se nepřepíše
+    const { data } = await api.events.patch(
+      {
+        calendarId: kalendar,
+        eventId,
+        requestBody: { ...u, description: pat ? `${u.description}\n\n${pat}` : u.description, colorId: null } as never,
+      },
+      e.etag ? { headers: { "If-Match": e.etag } } : {},
+    );
+    return { eventId: data.id ?? eventId, htmlLink: data.htmlLink ?? null };
+  } catch (err) {
+    const kod = (err as { code?: number; status?: number; response?: { status?: number } }).response?.status ?? (err as { code?: number }).code;
+    if (kod === 412) throw new SlotObsazen("Slot právě obsadila jiná koordinátorka. Načtěte nabídku termínů znovu.");
+    throw err;
+  }
 }
 
 /** Patří událost zakázce? Skryté ID zakázky (appkoo) nebo O-číslo v názvu události */

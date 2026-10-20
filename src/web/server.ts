@@ -41,7 +41,7 @@ import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
 import { slaKonec } from "../plan/kpi.js";
 import { webcalendar } from "../domain/webcalendar.js";
-import { kontrolaBran, nabidniProZakazku, nactiKalendare, najdiTerminVKalendari, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
+import { kontrolaBran, nabidniProZakazku, nactiKalendare, najdiTerminVKalendari, zapomenKalendar, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
 import { addDays, atTime, isoDate } from "../domain/time.js";
 import { isWorkday } from "../domain/workdays.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
@@ -310,11 +310,13 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             throw new SlotObsazen("Původní termín zakázky v kalendáři nenalezen (mezitím změněn?). Načtěte návrhy znovu.");
           }
           const r = await obsadVolnySlot(api, technik.kalendar, vyb.e, udalost, vyb.od);
+          zapomenKalendar(api, technik.kalendar);
           await ulozUdalost(db, detail.z.idAktivity, technik.kalendar, r.eventId, vyb.od, vyb.do);
           let vysledekPresunu: { ok: boolean; zprava: string } | null = null;
           if (presun && puvodni) {
             try {
               await vratitNaVolny(api, presun.pk, presun.pe, puvodni.nazevVKalendari, detail.z);
+              zapomenKalendar(api, presun.pk);
               await smazUdalost(db, presun.pk, presun.pe);
               vysledekPresunu = { ok: true, zprava: `Původní termín (${puvodni.jmeno}) vrácen v kalendáři na VOLNY.` };
             } catch (e) {
@@ -324,6 +326,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           console.log(JSON.stringify({ severity: "INFO", message: `Termín zapsán: ${detail.z.idObjednavky} → ${technik.jmeno} ${vyb.od.toISOString()}${presun ? " (přesun flex)" : ""}`, uzivatel: email, objednavka: detail.z.idObjednavky, technik: technik.jmeno, eventId: r.eventId, presun }));
           return posli(res, 200, strankaZapsano(detail, technik.jmeno, vyb.od, vyb.do, textProMwf(detail.z.zakaznik, vyb.od, vyb.do), r.htmlLink, stav, email, vysledekPresunu));
         } catch (e) {
+          zapomenKalendar(api, technik.kalendar); // po konfliktu ukázat čerstvý stav kalendáře
           if (e instanceof SlotObsazen) return posli(res, 409, strankaZapisu(detail, vyb, brany, povolen, stav, email, [e.message], formular));
           throw e;
         }
@@ -566,7 +569,13 @@ function main() {
       const vzdalenosti = odhadVzdalenosti();
       if (env.DELEGACE_UZIVATEL && env.SERVISNI_UCET) {
         const d = delegace(env.SERVISNI_UCET, env.DELEGACE_UZIVATEL, SCOPY_KALENDAR);
-        return async () => ({ api: calendarApi({ version: "v3", auth: (await d.klient()) as never }), geokoder, vzdalenosti });
+        // jeden API objekt na běh (klient delegace jen obnovuje token) – drží cache kalendářů
+        let api: ReturnType<typeof calendarApi> | null = null;
+        return async () => {
+          const klient = await d.klient();
+          api ??= calendarApi({ version: "v3", auth: klient as never });
+          return { api, geokoder, vzdalenosti };
+        };
       }
       const zav: ZavislostiPlanovace = { api: kalendarApi(), geokoder, vzdalenosti };
       return () => zav;

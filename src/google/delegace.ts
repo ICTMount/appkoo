@@ -69,9 +69,10 @@ export function delegace(
     return t.access_token;
   }
 
+  // jeden klient na celou dobu běhu – token se před každým použitím jen obnoví (stejný API objekt = funguje cache)
+  const c = new OAuth2Client();
   return {
     async klient() {
-      const c = new OAuth2Client();
       c.setCredentials({ access_token: await token() });
       return c;
     },
