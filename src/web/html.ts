@@ -190,6 +190,15 @@ const idBunka = (z: { idAktivity: string; idObjednavky: string; idS7: string; pr
     z.predobjednavka && z.rfs ? `<br><small>RFS ${esc(den(z.rfs))}</small>` : ""
   }`;
 
+/** Priority P1–P0 v UI: vypnuté do odvolání (Nastavení plánování → pouzivatPriority); nastavuje server při každém požadavku */
+let prioritySvisible = false;
+export function nastavZobrazeniPriorit(zap: boolean) {
+  prioritySvisible = zap;
+}
+const prio = (p: string) => (prioritySvisible ? `<span class="prio ${esc(p)}">${esc(p)}</span>` : "");
+const prioTh = () => (prioritySvisible ? "<th>Priorita</th>" : "");
+const prioTd = (p: string) => (prioritySvisible ? `<td>${prio(p)}</td>` : "");
+
 export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník sítě">${esc(i || "?")}</span>`;
 
 export function stranka(titulek: string, uzivatel: string, stav: StavImportu, telo: string, o: { zalozka?: Zalozka; dotaz?: string } = {}): string {
@@ -229,10 +238,10 @@ export function strankaVysledku(
   const radky = polozky.map(
     ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid">${idBunka(z)}</td>
 <td>${p17Bunka(z)}</td><td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}</td>
-<td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td><td><span class="prio ${priorita}">${priorita}</span></td></tr>`,
+<td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td>${prioTd(priorita)}</tr>`,
   );
   const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${polozky.length} zakázek</small></h1>
-<div class="tbl"><table><thead><tr><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th><th>Priorita</th></tr></thead>
+<div class="tbl"><table><thead><tr><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th>${prioTh()}</tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF (otevřených i uzavřených) nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
 ${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo, { dotaz });
@@ -306,7 +315,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
       }`
     : `<span class="muted">bez historie</span>`;
 
-  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} <span class="prio ${d.priorita}">${d.priorita}</span> <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
@@ -328,7 +337,7 @@ ${radek("Důvod parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniN
 ${radek("P17: Vlastník sítě", infraStitek(z.infrastruktura))}
 ${radek("Typ aktivity", `${esc(z.typAktivity)}${predobjStitek(z)}`)}
 ${radek("P3: Typ balíčku", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
-${radek("Priorita", `<span class="prio ${d.priorita}">${d.priorita}</span> ${esc(d.duvod)}`)}
+${prioritySvisible ? radek("Priorita", `${prio(d.priorita)} ${esc(d.duvod)}`) : ""}
 ${radek("Preferované datum", esc(den(z.preferovanyDatum)))}
 ${radek("Datum RFS", esc(den(z.rfs)))}
 ${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
@@ -719,7 +728,7 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
 <td class="oid">${idBunka(z)}</td>
 <td>${p17Bunka(z)}</td>
 <td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}${posledniPoznamky(z.zaznamy)}</td>
-<td><span class="prio ${n.kandidat.priorita}">${n.kandidat.priorita}</span></td>
+${prioTd(n.kandidat.priorita)}
 <td class="nowrap">${n.kandidat.slaKonec ? esc(dt(n.kandidat.slaKonec)) : ""}${n.poSla ? `<br><span class="prio P1">po SLA</span>` : ""}</td>
 <td class="nowrap">+${n.kmNavic.toFixed(1)} km<br><small>den ${n.kmDne.toFixed(0)} km</small></td>
 <td>${esc(n.duvody.join(", "))}${p ? `<br><small>teď ${esc(`${denTydne(p.od)} ${fmtDate(p.od)} ${fmtTime(p.od)}`)} · ${esc(p.technik)}</small>` : ""}</td>
@@ -733,7 +742,7 @@ function sekceNavrhu(vyb: VybranySlot, v: NavrhySlotu, zapis: { zapnuty: boolean
   return `<h2 class="sekce">Zakázky do slotu ${esc(slot(vyb.od, vyb.do))} · ${esc(vyb.technik.jmeno)}</h2>
 ${v.chyba ? `<div class="err">${esc(v.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
-<div class="tbl"><table><thead><tr><th>#</th><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Priorita</th><th>Do splnění</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>
+<div class="tbl"><table><thead><tr><th>#</th><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th>${prioTh()}<th>Do splnění</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="9" class="muted">${v.chyba ? "" : "Žádná vhodná zakázka v dosahu (max 75 km zajížďky)."}</td></tr>`}</tbody></table></div>
 <p class="muted">Kandidátů ${v.kandidatu} (z toho flex k přesunu ${v.flex}). Pořadí: naléhavost SLA a priorita, pak km navíc oproti trase dne. Zákazníkovi je vždy potřeba zavolat a termín potvrdit.</p>`;
 }

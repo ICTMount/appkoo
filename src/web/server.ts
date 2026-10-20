@@ -25,8 +25,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { pathToFileURL } from "node:url";
 import { OAuth2Client } from "google-auth-library";
 import type { Db } from "../db/db.js";
-import { CISELNIKY, nahledImportu, VYCHOZI_POLOZKY, exportCsv, type CiselnikId } from "../config/ciselniky.js";
+import { CISELNIKY, nahledImportu, nastaveniPlanovani, VYCHOZI_POLOZKY, exportCsv, type CiselnikId } from "../config/ciselniky.js";
 import { nactiCiselnik, ulozImport } from "../db/ciselniky.js";
+
 import { decodeExport } from "../import/csv.js";
 import { nactiHistorii, nactiPolozky, nactiPrehled, strankaCiselniku, strankaKonfigurace, strankaNahledu } from "./konfigurace.js";
 import { akcePozadavku, nactiLog, strankaLogu, zaznamenej } from "./log.js";
@@ -48,7 +49,7 @@ import { delegace, SCOPY_KALENDAR } from "../google/delegace.js";
 import { hledejNaLokalite, hledejVsude, ocistitDotaz, sLimitem, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
-import { strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
+import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
 import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, mestskeCasti, nactiKontext, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 
 export interface NastaveniWebu {
@@ -224,6 +225,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       const role = await roleUzivatele(db, email, n.spravci ?? [], (e) => povolenUzivatel(e, n.povoleni));
       if (!role) return posli(res, 403, strankaChyby(403, `Účet ${email} nemá do aplikace přístup – požádejte správce o přidání do Konfigurace → Uživatelé.`));
       roleOdpovedi.set(res, role);
+      // priority P1–P0 do odvolání vypnuté – zobrazí se jen při pouzivatPriority = 1 v Nastavení plánování
+      nastavZobrazeniPriorit(nastaveniPlanovani(await nactiCiselnik(db, "nastaveniPlanovani")).pouzivatPriority);
 
       // přepínač světlý / tmavý / podle systému – uloží volbu do cookie a vrátí se na stránku, odkud přišel
       if (url.pathname === "/tema") {
@@ -341,7 +344,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             ? (async (): Promise<Nabidka> => {
                 try {
                   const sla = slaKonec(detail.z, stav.posledniExport ?? now);
-                  return await nabidniProZakazku(detail.z, detail.priorita, sla, kontext.technici, await planovac(), now, {
+                  return await nabidniProZakazku(detail.z, kontext.nastaveni.pouzivatPriority ? detail.priorita : "P3", sla, kontext.technici, await planovac(), now, {
                     adresyZMwf: kontext.adresyZMwf,
                     nastaveni: kontext.nastaveni.plan,
                     dni: kontext.nastaveni.dniNabidky,
@@ -416,7 +419,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           const vyb = vybranySlot(p);
           if (vyb && vyb.t === technik.jmeno && vyb.k === technik.kalendar) {
             s.slot = { technik, eventId: vyb.e, od: vyb.od, do: vyb.do };
-            const kandidati = await kandidatiKDoplneni(db, now, kontext.blokovane, stav.posledniExport ?? now);
+            const kandidati = await kandidatiKDoplneni(db, now, kontext.blokovane, stav.posledniExport ?? now, kontext.nastaveni.pouzivatPriority);
             s.navrhy = await navrhyProSlot(s.slot, kandidati, kontext.technici, zav, {
               adresyZMwf: kontext.adresyZMwf,
               nastaveni: kontext.nastaveni.doplneni,

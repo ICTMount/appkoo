@@ -400,6 +400,9 @@ describe("uživatelé a Konfigurace", () => {
     expect(detail).toContain("Uloženo: přidáno 2");
     expect(detail).toContain("web: planovani.csv");
     expect(nastaveniPlanovani(await nactiCiselnik(db, "nastaveniPlanovani"))).toMatchObject({ dniNabidky: 7, plan: { maxZajizdkaKm: 60 }, doplneni: { maxZajizdkaKm: 60 } });
+    // priority P1–P0 jsou do odvolání vypnuté; zapínají se parametrem pouzivatPriority = 1
+    expect(nastaveniPlanovani([]).pouzivatPriority).toBe(false);
+    expect(nastaveniPlanovani([{ parametr: "pouzivatPriority", hodnota: 1 }]).pouzivatPriority).toBe(true);
 
     // chybný soubor se neuloží; koordinátorka konfiguraci nesmí
     const spatne = new FormData();
