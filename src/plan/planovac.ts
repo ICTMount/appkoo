@@ -236,7 +236,7 @@ export async function nabidniProZakazku(
   const bezZakladny = new Set<string>();
   let bezPolohy = 0;
   for (const d of dny) {
-    const s = await sestavDny(citelni.map((t) => ({ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 })), udalosti, d, zav.geokoder, opts.trvaniMin ?? 110, adresaZMwf);
+    const s = await sestavDny(citelni.map((t) => ({ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 })), udalosti, d, zav.geokoder, opts.trvaniMin ?? 90, adresaZMwf);
     s.bezZakladny.forEach((x) => bezZakladny.add(x));
     bezPolohy += s.bezPolohy.length;
     for (const den of s.dny) {
@@ -246,7 +246,7 @@ export async function nabidniProZakazku(
   }
 
   const zakladni = nabidniTerminy(
-    { id: z.idAktivity, bod, trvani: opts.trvaniMin ?? 110, priorita, slaKonec },
+    { id: z.idAktivity, bod, trvani: opts.trvaniMin ?? 90, priorita, slaKonec },
     vsechnyDny,
     zav.vzdalenosti,
     dnes,
@@ -386,7 +386,7 @@ export async function navrhyProSlot(
     const o = oCislo(u);
     return o ? opts.adresyZMwf?.get(o) : undefined;
   };
-  const s = await sestavDny([{ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 }], den, datum, zav.geokoder, opts.nastaveni?.trvaniMin ?? 110, adresaZMwf);
+  const s = await sestavDny([{ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 }], den, datum, zav.geokoder, opts.nastaveni?.trvaniMin ?? 90, adresaZMwf);
   if (!s.dny.length) return { ...prazdne, den, chyba: `Technik ${t.jmeno} nemá v číselníku adresu výjezdu (nebo ji nejde najít na mapě).` };
 
   // Kandidáti se správnou dovedností; naplánované jen s termínem po slotu (přesun dopředu)

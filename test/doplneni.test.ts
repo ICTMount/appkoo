@@ -57,8 +57,8 @@ describe("doplnění slotu (režim B)", () => {
       volnaOkna: [okno],
     };
     const daleko = kand("KLADNO", { lat: 50.147, lon: 14.103 });
-    expect(doplnSlot(tesny, okno, [daleko], v).map((x) => x.kandidat.z.idAktivity)).toEqual([]);
-    const s59 = doplnSlot(tesny, okno, [daleko], v, { toleranceMin: 59, maxZajizdkaKm: 110 });
+    expect(doplnSlot(tesny, okno, [daleko], v, { trvaniMin: 110 }).map((x) => x.kandidat.z.idAktivity)).toEqual([]);
+    const s59 = doplnSlot(tesny, okno, [daleko], v, { toleranceMin: 59, maxZajizdkaKm: 110, trvaniMin: 110 });
     expect(s59.map((x) => x.kandidat.z.idAktivity)).toEqual(["KLADNO"]);
     expect(s59[0]!.duvody.join(" ")).toMatch(/později/);
   });

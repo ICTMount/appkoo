@@ -140,7 +140,7 @@ describe("dny techniků z kalendáře", async () => {
     );
     expect(r.bezZakladny).toEqual(["Novák"]);
     expect(r.bezPolohy.map((x) => x.id)).toEqual(["e2"]);
-    expect(r.dny[0]!.den.navstevy).toEqual([{ id: "A1", bod: B.krc, od: 600, do: 719, trvani: 110 }]);
+    expect(r.dny[0]!.den.navstevy).toEqual([{ id: "A1", bod: B.krc, od: 600, do: 719, trvani: 90 }]);
     expect(r.dny[0]!.volnaOkna).toEqual([{ od: 840, do: 959 }]);
   });
 });

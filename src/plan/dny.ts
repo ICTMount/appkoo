@@ -32,7 +32,7 @@ export async function sestavDny(
   udalosti: UdalostTechnika[],
   datum: string,
   geokoder: Geokoder,
-  vychoziDelkaMin = 110,
+  vychoziDelkaMin = 90,
   /** úplná adresa z MWF (místo v kalendáři bývá bez obce: „Podolská 348/88“) */
   adresaZMwf: (u: UdalostTechnika) => string | undefined = () => undefined,
 ): Promise<SestaveneDny> {

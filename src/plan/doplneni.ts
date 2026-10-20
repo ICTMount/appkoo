@@ -61,7 +61,7 @@ export const NASTAVENI_DOPLNENI: NastaveniDoplneni = {
   bonusSlaDo48h: 40,
   bonusSlaDo5dni: 20,
   bonusPriorita: { P1: 20, P2: 10, P3: 0, P0: 0 },
-  trvaniMin: 110,
+  trvaniMin: 90,
 };
 
 /** Začátek slotu v daný den („Praha v UTC“) */

@@ -50,7 +50,7 @@ export const PARAMETRY_PLANOVANI = {
   preferovaneDoHod: { vychozi: 14, popis: "Preferované okno termínů do (hodina)" },
   penalizaceMimoPreferovaneKm: { vychozi: 8, popis: "Penalizace slotu mimo preferované okno (km)" },
   dniNabidky: { vychozi: 10, popis: "Kolik pracovních dní dopředu hledat volné sloty" },
-  delkaPraceMin: { vychozi: 110, popis: "Výchozí délka práce u zakázky (min)" },
+  delkaPraceMin: { vychozi: 90, popis: "Délka práce u zakázky (min) – zbytek 2h slotu je rezerva na přesun" },
   bonusSlaProslo: { vychozi: 60, popis: "Doplnění slotu: zvýhodnění zakázky po SLA (km)" },
   bonusSlaDo48h: { vychozi: 40, popis: "Doplnění slotu: zvýhodnění, SLA do 48 h (km)" },
   bonusSlaDo5dni: { vychozi: 20, popis: "Doplnění slotu: zvýhodnění, SLA do 5 dní (km)" },
