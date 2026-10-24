@@ -31,7 +31,9 @@ import { nactiCiselnik, ulozImport } from "../db/ciselniky.js";
 import { decodeExport } from "../import/csv.js";
 import { nactiHistorii, nactiPolozky, nactiPrehled, strankaCiselniku, strankaKonfigurace, strankaNahledu } from "./konfigurace.js";
 import { akcePozadavku, nactiLog, strankaLogu, strankaNotifikaci, zaznamenej } from "./log.js";
-import { prehledNotifikaci } from "../ingest/notifikace.js";
+import { dohledejNotifikaci, prehledNotifikaci, type UlozenaNotifikace } from "../ingest/notifikace.js";
+import { drive as driveApi } from "@googleapis/drive";
+import { GoogleAuth } from "google-auth-library";
 import { POPIS_ROLE, roleUzivatele, type Role } from "./uzivatele.js";
 import { pgDb } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
@@ -67,6 +69,8 @@ export interface NastaveniWebu {
   zdroje?: () => ZavislostiZdroju;
   /** správci (e-maily) – vždy role správce, i když nejsou v číselníku Uživatelé */
   spravci?: string[];
+  /** dohledání notifikačního PDF na Drive, když ho detail ještě nemá (web má NOTIFIKACE_SLOZKA) */
+  notifikace?: (idAktivity: string, klice: { idObjednavkyZaklad?: string | null; idS7?: string | null }) => Promise<UlozenaNotifikace | null>;
 }
 
 /** Formulář smí přijít jen z vlastní stránky (ochrana proti podvrženému odeslání z cizího webu) */
@@ -338,6 +342,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       if (m) {
         const detail = await nactiDetail(db, decodeURIComponent(m[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
+        if (!detail.notifikace && n.notifikace) detail.notifikace = await n.notifikace(detail.z.idAktivity, { idObjednavkyZaklad: detail.z.idObjednavkyZaklad, idS7: detail.z.idS7 });
         const kontext = await nactiKontext(db);
         const planovac = n.planovac;
         // webcalendar: zakázka přišla s termínem jen v MWF → ověřit, zda je v kalendáři technika
@@ -567,6 +572,12 @@ function main() {
     spravci: (env.SPRAVCI ?? "davidh@ictmount.com").split(",").map((s) => s.trim()).filter(Boolean),
     overIap: env.IAP_AUDIENCE ? overovacIap(env.IAP_AUDIENCE) : undefined,
     devUser: env.DEV_USER,
+    notifikace: env.NOTIFIKACE_SLOZKA
+      ? (() => {
+          const drive = driveApi({ version: "v3", auth: new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/drive.readonly"] }) });
+          return (idAktivity, klice) => dohledejNotifikaci(db, drive, env.NOTIFIKACE_SLOZKA!, idAktivity, klice);
+        })()
+      : undefined,
     planovac: (() => {
       // Kalendáře techniků jménem tmcz01 (delegace) – odpadá sdílení každého kalendáře servisnímu účtu.
       // Bez delegace čte a zapisuje servisní účet sám (kalendáře mu musí být nasdílené).

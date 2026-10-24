@@ -290,3 +290,51 @@ export async function prehledNotifikaci(db: Dotaz, hledat?: string): Promise<{ c
   );
   return { celkem: Number(souhrn?.celkem ?? 0), chyb: Number(souhrn?.chyb ?? 0), radky: rows };
 }
+
+/** Negativní výsledky dohledání (žádné PDF ve složce) – nehledat na Drive při každém otevření detailu */
+const nenalezeno = new Map<string, number>();
+const NENALEZENO_MS = 10 * 60_000;
+
+/**
+ * Dohledání na vyžádání z webu: když detail zakázky PDF ještě nemá, zkusí ho najít ve složce podle názvu
+ * (<MWF ID aktivity>.pdf), stáhnout a uložit hned – nečeká se na další běh importu.
+ */
+export async function dohledejNotifikaci(
+  db: Dotaz,
+  api: drive_v3.Drive,
+  slozkaId: string,
+  idAktivity: string,
+  klice: { idObjednavkyZaklad?: string | null; idS7?: string | null } = {},
+  deps: { textZPdf?: (pdf: Buffer) => Promise<string>; ted?: () => number } = {},
+): Promise<UlozenaNotifikace | null> {
+  const ted = deps.ted ?? Date.now;
+  if (!/^\d+$/.test(idAktivity)) return null;
+  const kdy = nenalezeno.get(idAktivity);
+  if (kdy && ted() - kdy < NENALEZENO_MS) return null;
+  try {
+    const { data } = await api.files.list({
+      q: `'${slozkaId}' in parents and trashed = false and name = '${idAktivity}.pdf'`,
+      orderBy: "createdTime desc",
+      pageSize: 3,
+      fields: "files(id,name,createdTime)",
+    });
+    const f = data.files?.[0];
+    if (!f?.id) {
+      nenalezeno.set(idAktivity, ted());
+      return null;
+    }
+    const res = await api.files.get({ fileId: f.id, alt: "media" }, { responseType: "arraybuffer" });
+    const text = await (deps.textZPdf ?? textZPdf)(Buffer.from(res.data as ArrayBuffer));
+    const n = parsujNotifikaci(text, f.name ?? "");
+    const vznik = new Date(f.createdTime ?? ted());
+    if (!n) {
+      await ulozNotifikaci(db, { souborId: f.id, nazev: f.name ?? "", vznik, chyba: "v PDF chybí MWF ID aktivity" });
+      return null;
+    }
+    await ulozNotifikaci(db, { ...n, souborId: f.id, nazev: f.name ?? "", vznik });
+    return nactiNotifikaci(db, idAktivity, klice);
+  } catch (e) {
+    console.log(JSON.stringify({ severity: "WARNING", message: `Notifikační PDF ${idAktivity} nejde dohledat: ${e instanceof Error ? e.message : String(e)}` }));
+    return null;
+  }
+}
