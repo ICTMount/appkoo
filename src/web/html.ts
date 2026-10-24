@@ -74,7 +74,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
 .card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
-a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
+a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
@@ -121,7 +121,8 @@ a.volny.vyb{outline:2px solid var(--accent)}
 .vytizeni .d-volno{background:#2e9d4b}.vytizeni .d-obsazeno{background:#8a8a85}.vytizeni .d-blok{background:repeating-linear-gradient(45deg,#8a8a85 0 2px,transparent 2px 4px)}.vytizeni .d-vyhrazeno{background:#2e9d4b;opacity:.35}
 .vytizeni .d-navrh{outline:2px solid var(--accent);outline-offset:1px}.vytizeni small{font-size:11px;color:var(--muted)}.vytizeni small b{color:var(--text)}
 .vyhrazeny{font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;border:1px dashed var(--line);color:var(--muted)}
-.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:210px;overflow-y:auto}.posun.zdroj{max-height:340px}
+.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:210px;overflow-y:auto}.posun.zdroj{max-height:340px}.posun.maly{max-height:120px}
+.notif dl{grid-template-columns:max-content 1fr}.notif .predpis{margin:0 0 6px;padding:0;list-style:none}.notif .predpis li{padding:1px 0;border-bottom:1px dotted var(--border, #e3e3e3)}.notif .predpis li:last-child{border:0}.notif h3{font-size:11px;margin:6px 0 2px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .grid>*{min-width:0}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
 .konec-detailu{margin:26px 0 18px;border-top:3px double var(--line)}
@@ -279,6 +280,19 @@ ${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo, { dotaz });
 }
 
+/** Výpis z notifikačního PDF z MWF: „Inštalačný predpis k“ celý, ze „Zoznam KZ“ jen CPE Mode a kompatibilní zařízení */
+export function sekceNotifikace(n: Detail["notifikace"]): string {
+  const odkaz = n ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(n.souborId)}/view" target="_blank" rel="noopener">PDF</a>` : "";
+  const radek = (k: string, v: string) => `<dt>${esc(k)}</dt><dd>${v}</dd>`;
+  const telo = !n
+    ? `<span class="muted">Notifikační PDF k této aktivitě zatím nedorazilo.</span>`
+    : `<h3>Inštalačný predpis k</h3>
+${n.predpis.length ? `<ul class="predpis">${n.predpis.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<span class="muted">v PDF chybí</span>`}
+<h3>Zoznam KZ</h3>
+<dl>${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>`;
+  return `<div class="card kompakt notif"><h2 class="s-ikonou"><span class="i-drive">${IKONA.drive}</span>Výpis z notifikačního PDF${n ? ` <small class="muted">${esc(n.nazev)} · ${esc(fmtDate(n.vznik))} · ${odkaz}</small>` : ""}</h2><div class="posun">${telo}</div></div>`;
+}
+
 /** Instalovali jsme v lokalitě: null nalezy = adresa bez ulice a čísla popisného */
 export interface Lokalita {
   nalezy: NalezLokality[] | null;
@@ -391,7 +405,7 @@ ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další 
 <div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
 ${sekceZdroju(zdroje)}
 <div class="grid" style="margin-top:12px">
-<div class="card kompakt"><h2>Kontaktování</h2><div class="posun"><dl>
+<div class="card kompakt"><h2>Kontaktování</h2><div class="posun maly"><dl>
 ${radek("Stav", esc(stavKontaktu(d, now)))}
 ${radek("Další kontakt", esc(denIso(d.dalsiKontakt)))}
 ${radek("Navolané dny", esc(`${d.plan.navolaneDny} (cíl ${d.plan.pokusuDenne} pokus/y denně)`))}
@@ -399,7 +413,8 @@ ${radek("SMS", esc(`odesláno ${d.plan.sms.odeslano}${d.plan.sms.doporucena ? " 
 ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" : "nedovoláno"}${p.sms ? " + SMS" : ""}`).join("; ")))}
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div></div>
-<div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun">${historieHtml}</div></div>
+<div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun maly">${historieHtml}</div></div>
+${sekceNotifikace(d.notifikace)}
 <div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 </div>
 <div class="konec-detailu"></div>
@@ -412,7 +427,8 @@ ${sekcePlanovani(d, plan)}</section>`;
 /** Ikony služeb Google Workspace (obecné, bez log): obálka = e-mail, kalendář, bublina = chat */
 const svg = (cesta: string) =>
   `<svg class="ikona" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${cesta}</svg>`;
-const IKONA: Record<Zdroj, string> = {
+const IKONA: Record<Zdroj | "drive", string> = {
+  drive: svg('<path d="M8 3h8l5 11-4 7H7l-4-7z"/><path d="M8 3l4 7h9M3 14h9l4-11M12 10l-5 11"/>'),
   email: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>'),
   kalendar: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
   chat: svg('<path d="M4 5h16v11H9l-5 4z"/>'),

@@ -156,3 +156,18 @@ CREATE TABLE IF NOT EXISTS uzivatel_log (
   stav    integer NOT NULL                   -- HTTP stav odpovědi
 );
 CREATE INDEX IF NOT EXISTS uzivatel_log_email_kdy ON uzivatel_log (email, kdy DESC);
+
+-- Notifikační PDF z MWF (Drive složka NOTIFIKACE_SLOZKA, soubor = <MWF ID aktivity>.pdf); vytváří si i aplikace sama
+CREATE TABLE IF NOT EXISTS notifikace_pdf (
+  soubor_id     text PRIMARY KEY,            -- ID souboru na Drive
+  nazev         text NOT NULL,
+  vznik         timestamptz NOT NULL,        -- createdTime souboru
+  id_aktivity   text,                        -- MWF ID aktivity z textu PDF
+  id_objednavky text,                        -- Identifikátor O-…
+  predpis       text[],                      -- řádky oddílu „Inštalačný predpis k“
+  cpe_mode      text,                        -- Zoznam KZ → CPE Mode
+  zoznam        text,                        -- Zoznam KZ → Zoznam kompatibilných zariadení
+  chyba         text,                        -- proč se PDF nepodařilo přečíst (NULL = v pořádku)
+  nacteno       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC);

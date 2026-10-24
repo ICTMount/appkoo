@@ -5,6 +5,9 @@ FROM node:24-slim
 WORKDIR /app
 ENV NODE_ENV=production TZ=Europe/Prague
 
+# pdftotext (poppler) – čtení notifikačních PDF z MWF
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*
+
 # Závislosti zvlášť, aby se při změně kódu nestahovaly znovu (tsx je v devDependencies, proto --include=dev)
 COPY package.json package-lock.json ./
 RUN npm ci --include=dev --no-audit --no-fund

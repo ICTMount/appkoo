@@ -10,6 +10,7 @@ import { faktaZakazky, urciPrioritu, PRIORITY, type Priorita, type PravidloPrior
 import { pravidlaPriority } from "../config/ciselniky.js";
 import type { Infrastruktura, Zakazka } from "../import/mwfExport.js";
 import { pokusyZPoznamky, rozlozPoznamku } from "../import/notes.js";
+import { nactiNotifikaci, type UlozenaNotifikace } from "../ingest/notifikace.js";
 
 /** Řádek tabulky `zakazka` (jen sloupce, které web používá) */
 export interface ZakazkaRow {
@@ -185,6 +186,8 @@ export interface Detail extends PolozkaFronty {
   historie: HistorieRadek[];
   /** další aktivity se stejným O-ID (např. instalace + demontáž) */
   souvisejici: { id_aktivity: string; typ_aktivity: string; stav_mwf: string; uzavreno: Date | null }[];
+  /** výpis z notifikačního PDF z MWF (null = PDF zatím nedorazilo) */
+  notifikace: UlozenaNotifikace | null;
 }
 
 export async function nactiDetail(db: Dotaz, idAktivity: string, now: Date, pravidla?: PravidloPriority[]): Promise<Detail | null> {
@@ -211,7 +214,9 @@ export async function nactiDetail(db: Dotaz, idAktivity: string, now: Date, prav
     )
   ).rows;
 
-  return { z, priorita, duvod, plan: f.plan, dalsiKontakt: f.dalsiKontakt, uzavreno: r.uzavreno, historie, souvisejici };
+  const notifikace = await nactiNotifikaci(db, idAktivity);
+
+  return { z, priorita, duvod, plan: f.plan, dalsiKontakt: f.dalsiKontakt, uzavreno: r.uzavreno, historie, souvisejici, notifikace };
 }
 
 /** Najde aktivitu podle O-ID / S7 / ID aktivity (pro rychlé hledání z hlavičky) */

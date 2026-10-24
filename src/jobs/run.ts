@@ -3,6 +3,7 @@
 // Proměnné prostředí:
 //   DATABASE_URL          připojení k Cloud SQL (secret), např. postgresql://appkoo:…@/appkoo?host=/cloudsql/…
 //   MWF_SLOZKA            ID složky s MWF exporty na Google Drive (nasdílená servisnímu účtu jako čtenáři)
+//   NOTIFIKACE_SLOZKA     volitelně: ID složky s notifikačními PDF z MWF (<MWF ID aktivity>.pdf), nasdílená stejně
 //   GMAIL_SCHRANKA        volitelně: schránka s exporty v příloze (vyžaduje delegaci v rámci domény)
 //   POVOLENI_ODESILATELE  volitelně: povolení odesílatelé e-mailů, čárkami (výchozí @ictmount.com)
 //   STARY_EXPORT_HODIN    volitelně: po kolika hodinách bez nového exportu zalogovat varování (výchozí 6)
@@ -14,7 +15,10 @@ import { pathToFileURL } from "node:url";
 import type { Db } from "../db/db.js";
 import { pgDb, ts } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
+import { drive as driveApi } from "@googleapis/drive";
+import { GoogleAuth } from "google-auth-library";
 import { driveZdroj, gmailZdroj, type ZdrojExportu } from "../ingest/google.js";
+import { importujNotifikace } from "../ingest/notifikace.js";
 import { casExportu } from "../ingest/prijem.js";
 import { spustImport, type ZaznamBehu } from "./importJob.js";
 
@@ -156,10 +160,21 @@ async function main(): Promise<number> {
   const zdroje = [{ nazev: "drive", zdroj: driveZdroj(env.MWF_SLOZKA) }];
   if (env.GMAIL_SCHRANKA) zdroje.push({ nazev: "email", zdroj: gmailZdroj({ schranka: env.GMAIL_SCHRANKA }) });
 
-  const { kod } = await behImportu(pgDb(env.DATABASE_URL), zdroje, {
+  const db = pgDb(env.DATABASE_URL);
+  const { kod } = await behImportu(db, zdroje, {
     povoleniOdesilatele: env.POVOLENI_ODESILATELE?.split(",").map((s) => s.trim()).filter(Boolean),
     staryExportHodin: env.STARY_EXPORT_HODIN ? Number(env.STARY_EXPORT_HODIN) : undefined,
   });
+  if (env.NOTIFIKACE_SLOZKA) {
+    // notifikační PDF: chyba tu nesmí shodit import exportů – jen se zaloguje
+    try {
+      const api = driveApi({ version: "v3", auth: new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/drive.readonly"] }) });
+      const v = await importujNotifikace(db, api, env.NOTIFIKACE_SLOZKA);
+      jsonLog(v.chyb ? "WARNING" : "INFO", `Notifikační PDF: načteno ${v.nacteno}, chyb ${v.chyb}`, { notifikace: v });
+    } catch (e) {
+      jsonLog("ERROR", `Notifikační PDF nejdou načíst: ${popisChyby(e)}`, { notifikace_vypadek: true });
+    }
+  }
   return kod;
 }
 
