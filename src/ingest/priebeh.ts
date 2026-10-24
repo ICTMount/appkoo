@@ -8,6 +8,8 @@ import { execFile } from "node:child_process";
 export interface RadekPriebehu {
   nazovLinky: string;
   aUzol: string;
+  /** Akcia na linke (EXIST / NEW) */
+  akciaNaLinke?: string;
   zAkcia: string;
 }
 
@@ -69,6 +71,7 @@ export function textBunky(slova: Slovo[]): string {
 interface Sloupce {
   nazov: [number, number];
   aUzol: [number, number];
+  akciaNaLinke: [number, number];
   zAkcia: [number, number];
 }
 
@@ -80,6 +83,8 @@ function sloupceZeZahlavi(slova: Slovo[], odY: number): { sloupce: Sloupce; kone
   const uzly = vZahlavi.filter((w) => w.text === "uzol").sort((a, b) => a.x - b.x);
   const porty = vZahlavi.filter((w) => w.text === "port").sort((a, b) => a.x - b.x);
   const akcia = vZahlavi.find((w) => w.text === "akcia");
+  const akciaNaLinke = vZahlavi.find((w) => w.text === "Akcia");
+  const farba = vZahlavi.find((w) => w.text === "Farba");
   const typ = vZahlavi.find((w) => w.text === "Typ");
   if (uzly.length < 2 || !porty.length || !akcia || !typ) return null;
   const stred = (w: Slovo) => {
@@ -88,11 +93,14 @@ function sloupceZeZahlavi(slova: Slovo[], odY: number): { sloupce: Sloupce; kone
     return ((pred ? pred.xMin : w.xMin) + w.xMax) / 2;
   };
   const cNazov = nazov.x, cAUzol = stred(uzly[0]!), cAPort = stred(porty[0]!), cZUzol = stred(uzly[1]!), cZAkcia = stred(akcia), cTyp = typ.x;
+  const cAkcia = akciaNaLinke?.x ?? (cAPort + cZUzol) / 2;
+  const cFarba = farba?.x ?? (cAPort + cAkcia) / 2;
   const konecZahlavi = Math.max(...vZahlavi.map((w) => w.yMax));
   return {
     sloupce: {
       nazov: [cNazov - (cAUzol - cNazov), (cNazov + cAUzol) / 2],
       aUzol: [(cNazov + cAUzol) / 2, (cAUzol + cAPort) / 2],
+      akciaNaLinke: [(cFarba + cAkcia) / 2, (cAkcia + cZUzol) / 2],
       zAkcia: [(cZUzol + cZAkcia) / 2, (cZAkcia + cTyp) / 2],
     },
     konecZahlavi,
@@ -146,6 +154,7 @@ export function parsujPriebeh(bboxHtml: string): RadekPriebehu[] {
       vysledek.push({
         nazovLinky: textBunky(vRadku.filter((w) => vRozsahu(w, sloupce!.nazov))),
         aUzol: textBunky(vRadku.filter((w) => vRozsahu(w, sloupce!.aUzol))),
+        akciaNaLinke: textBunky(vRadku.filter((w) => vRozsahu(w, sloupce!.akciaNaLinke))),
         zAkcia: textBunky(sk),
       });
     }
@@ -153,6 +162,9 @@ export function parsujPriebeh(bboxHtml: string): RadekPriebehu[] {
   }
   return vysledek;
 }
+
+/** Jeden řádek pro koordinátorku: Názov linky / A uzol / Akcia na linke / Z akcia */
+export const radekPriebehu = (r: RadekPriebehu) => [r.nazovLinky, r.aUzol, r.akciaNaLinke, r.zAkcia].filter((x) => x).join(" / ");
 
 /** Řádky, kde má technik něco vytvořit (Z akcia = Vytvoriť) */
 export const kVytvoreni = (radky: RadekPriebehu[]) => radky.filter((r) => /vytvor/i.test(r.zAkcia.replace(/\s+/g, "")));

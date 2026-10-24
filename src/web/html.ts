@@ -2,7 +2,7 @@
 // Zakázka se vždy označuje ID O- (ID obj. v ext. systému); S7 je doplňkové.
 
 import { addDays, fmtDate, fmtTime, isoDate } from "../domain/time.js";
-import { kVytvoreni } from "../ingest/priebeh.js";
+import { kVytvoreni, radekPriebehu } from "../ingest/priebeh.js";
 import type { Priorita } from "../domain/priorita.js";
 import type { Detail, PolozkaFronty, StavImportu } from "./data.js";
 import { pokusyZakazky } from "./data.js";
@@ -291,12 +291,12 @@ export function sekceNotifikace(n: Detail["notifikace"]): string {
 ${n.predpis.length ? `<ul class="predpis">${n.predpis.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<span class="muted">v PDF chybí</span>`}
 <h3>Zoznam KZ</h3>
 <dl>${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>
-<h3>Priebeh optický – Vytvoriť</h3>
+<h3>Priebeh optický – Vytvoriť <small class="muted">Názov linky / A uzol / Akcia na linke / Z akcia</small></h3>
 ${(() => {
   const v = kVytvoreni(n.priebeh);
   if (!n.priebeh.length) return `<span class="muted">tabulka v PDF nenalezena</span>`;
   if (!v.length) return `<span class="muted">žádný řádek s akcí Vytvoriť (${n.priebeh.length} linek, vše Ponechať)</span>`;
-  return `<ul class="predpis">${v.map((r) => `<li>${esc(r.nazovLinky)} / <b>${esc(r.aUzol)}</b> / ${esc(r.zAkcia)}</li>`).join("")}</ul>`;
+  return `<ul class="predpis">${v.map((r) => `<li>${esc(radekPriebehu(r))}</li>`).join("")}</ul>`;
 })()}`;
   return `<div class="card kompakt notif"><h2 class="s-ikonou"><span class="i-drive">${IKONA.drive}</span>Výpis z notifikačního PDF${n ? ` <small class="muted">${esc(n.nazev)} · ${esc(fmtDate(n.vznik))} · ${odkaz}</small>` : ""}</h2><div class="posun">${telo}</div></div>`;
 }

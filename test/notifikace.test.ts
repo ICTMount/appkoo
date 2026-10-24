@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parsujKz, parsujNotifikaci } from "../src/ingest/notifikace.js";
-import { kVytvoreni, parsujPriebeh, textBunky } from "../src/ingest/priebeh.js";
+import { kVytvoreni, parsujPriebeh, radekPriebehu, textBunky } from "../src/ingest/priebeh.js";
 
 // Výřez textu notifikačního PDF (pdftotext -layout) pro O-8555864483_22243701#1-DDWX4YA
 const TEXT = `                                                  CZ_CETIN_Instalace přístupu FTTH
@@ -83,7 +83,10 @@ describe("notifikační PDF z MWF", () => {
 
   it("Priebeh optický: sloupce podle záhlaví, řádky podle Z akcia, zalomená slova se spojí", () => {
     const r = parsujPriebeh(readFileSync("test/fixtures/priebeh-bbox.html", "utf8"));
-    expect(r).toEqual([{ nazovLinky: "ZAMB/CTN/CETIN/CZE-ZAMB/CTN/CETIN/CZEXGSPON 4", aUzol: "ZAMB1 X-31", zAkcia: "Ponechať" }]);
+    expect(r).toEqual([{ nazovLinky: "ZAMB/CTN/CETIN/CZE-ZAMB/CTN/CETIN/CZEXGSPON 4", aUzol: "ZAMB1 X-31", akciaNaLinke: "Ponechať", zAkcia: "Ponechať" }]);
+    expect(radekPriebehu({ nazovLinky: "SPP:000221:PH:1.3.55-G-ODF:0554:PH:38", aUzol: "SPP:000221:PH:Steinerova 1", akciaNaLinke: "NEW", zAkcia: "Vytvoriť" })).toBe(
+      "SPP:000221:PH:1.3.55-G-ODF:0554:PH:38 / SPP:000221:PH:Steinerova 1 / NEW / Vytvoriť",
+    );
     expect(kVytvoreni(r)).toEqual([]);
     expect(kVytvoreni([{ nazovLinky: "L", aUzol: "SPP:000221:PH:Steinerova 1", zAkcia: "Vytvor iť" }]).length).toBe(1);
   });
