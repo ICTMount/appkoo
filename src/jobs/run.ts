@@ -170,7 +170,7 @@ async function main(): Promise<number> {
     try {
       const api = driveApi({ version: "v3", auth: new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/drive.readonly"] }) });
       const v = await importujNotifikace(db, api, env.NOTIFIKACE_SLOZKA);
-      jsonLog(v.chyb ? "WARNING" : "INFO", `Notifikační PDF: načteno ${v.nacteno}, chyb ${v.chyb}`, { notifikace: v });
+      jsonLog(v.chyb || !v.veSlozce ? "WARNING" : "INFO", `Notifikační PDF: ve složce ${v.veSlozce}, načteno ${v.nacteno}, chyb ${v.chyb}${v.zprávy.length ? ` – ${v.zprávy[0]}` : ""}`, { notifikace: v });
     } catch (e) {
       jsonLog("ERROR", `Notifikační PDF nejdou načíst: ${popisChyby(e)}`, { notifikace_vypadek: true });
     }

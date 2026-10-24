@@ -174,6 +174,8 @@ export async function nactiNotifikaci(db: Dotaz, idAktivity: string): Promise<Ul
 export const MAX_PDF_NA_BEH = 40;
 
 export interface VysledekNotifikaci {
+  /** kolik PDF je ve složce vidět (0 = složka je prázdná nebo není nasdílená servisnímu účtu) */
+  veSlozce: number;
   nacteno: number;
   chyb: number;
   zprávy: string[];
@@ -206,7 +208,8 @@ export async function importujNotifikace(
     pageToken = data.nextPageToken ?? undefined;
   } while (pageToken && soubory.filter((f) => !znama.has(f.id!)).length < MAX_PDF_NA_BEH);
 
-  const v: VysledekNotifikaci = { nacteno: 0, chyb: 0, zprávy: [] };
+  const v: VysledekNotifikaci = { veSlozce: soubory.length, nacteno: 0, chyb: 0, zprávy: [] };
+  if (!soubory.length) v.zprávy.push("Ve složce není vidět žádné PDF – je složka nasdílená servisnímu účtu jobu jako Čtenář?");
   for (const f of soubory.filter((s) => !znama.has(s.id!)).slice(0, MAX_PDF_NA_BEH)) {
     const vznik = new Date(f.createdTime ?? (deps.ted ?? (() => new Date()))());
     try {
