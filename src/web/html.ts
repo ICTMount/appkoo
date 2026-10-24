@@ -123,7 +123,7 @@ a.volny.vyb{outline:2px solid var(--accent)}
 .vyhrazeny{font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;border:1px dashed var(--line);color:var(--muted)}
 .card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:210px;overflow-y:auto}.posun.zdroj{max-height:340px}.posun.maly{max-height:120px}
 .notif dl{grid-template-columns:max-content 1fr}.notif .predpis{margin:0 0 6px;padding:0;list-style:none}.notif .predpis li{padding:1px 0;border-bottom:1px dotted var(--border, #e3e3e3)}.notif .predpis li:last-child{border:0}.notif h3{font-size:11px;margin:6px 0 2px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
-.grid>*{min-width:0}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.grid>*{min-width:0}.grid.pul{grid-template-columns:1fr 1fr}@media (max-width:760px){.grid.pul{grid-template-columns:1fr}}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
 .konec-detailu{margin:26px 0 18px;border-top:3px double var(--line)}
 section.planovani{border:2px solid var(--accent);border-radius:10px;padding:14px 16px 6px;background:color-mix(in srgb,var(--accent) 6%,var(--panel));box-shadow:0 2px 10px rgba(0,0,0,.06)}
@@ -404,7 +404,9 @@ ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další 
     .join("")}</div>` : ""}
 <div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
 ${sekceZdroju(zdroje)}
-<div class="grid" style="margin-top:12px">
+<div class="grid pul" style="margin-top:12px">
+${sekceNotifikace(d.notifikace)}
+<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 <div class="card kompakt"><h2>Kontaktování</h2><div class="posun maly"><dl>
 ${radek("Stav", esc(stavKontaktu(d, now)))}
 ${radek("Další kontakt", esc(denIso(d.dalsiKontakt)))}
@@ -414,8 +416,6 @@ ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" 
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div></div>
 <div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun maly">${historieHtml}</div></div>
-${sekceNotifikace(d.notifikace)}
-<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 </div>
 <div class="konec-detailu"></div>
 <section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
