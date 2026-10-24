@@ -30,7 +30,8 @@ import { nactiCiselnik, ulozImport } from "../db/ciselniky.js";
 
 import { decodeExport } from "../import/csv.js";
 import { nactiHistorii, nactiPolozky, nactiPrehled, strankaCiselniku, strankaKonfigurace, strankaNahledu } from "./konfigurace.js";
-import { akcePozadavku, nactiLog, strankaLogu, zaznamenej } from "./log.js";
+import { akcePozadavku, nactiLog, strankaLogu, strankaNotifikaci, zaznamenej } from "./log.js";
+import { prehledNotifikaci } from "../ingest/notifikace.js";
 import { POPIS_ROLE, roleUzivatele, type Role } from "./uzivatele.js";
 import { pgDb } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
@@ -480,6 +481,10 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       if (url.pathname === "/konfigurace" || url.pathname.startsWith("/konfigurace/")) {
         if (role !== "spravce") return posli(res, 403, strankaChyby(403, "Konfiguraci může měnit jen správce."));
         if (url.pathname === "/konfigurace") return posli(res, 200, strankaKonfigurace(await nactiPrehled(db), stav, email));
+        if (url.pathname === "/konfigurace/notifikace") {
+          const q = url.searchParams.get("q")?.trim() ?? "";
+          return posli(res, 200, strankaNotifikaci(await prehledNotifikaci(db, q), q, stav, email));
+        }
         if (url.pathname === "/konfigurace/log") {
           const dni = [1, 7, 30, 90, 180].includes(Number(url.searchParams.get("dni"))) ? Number(url.searchParams.get("dni")) : 7;
           const filtr = { email: url.searchParams.get("u")?.trim().toLowerCase() || undefined, akce: url.searchParams.get("a") || undefined, dni };

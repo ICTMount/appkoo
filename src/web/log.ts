@@ -6,6 +6,7 @@
 import type { Dotaz } from "../db/db.js";
 import { fmtDate, fmtTime } from "../domain/time.js";
 import type { StavImportu } from "./data.js";
+import type { RadekPrehleduNotifikaci } from "../ingest/notifikace.js";
 import { esc, stranka } from "./html.js";
 
 export type Akce = "uvod" | "hledani" | "detail" | "terminy" | "formular" | "zapis" | "technik" | "konfigurace" | "ulozeni" | "odepreno";
@@ -75,7 +76,7 @@ export function akcePozadavku(metoda: string, url: URL, stav: number): Omit<Zazn
     return { akce: "technik", detail: d, stav };
   }
   if (p === "/konfigurace" || p.startsWith("/konfigurace/")) {
-    if (p === "/konfigurace/log") return null; // prohlížení historie se do historie nepíše
+    if (p === "/konfigurace/log" || p === "/konfigurace/notifikace") return null; // prohlížení diagnostiky se do historie nepíše
     const u = p.match(/^\/konfigurace\/([A-Za-z]+)\/ulozit$/);
     return u ? { akce: "ulozeni", detail: u[1]!, stav } : { akce: "konfigurace", detail: p.replace(/^\/konfigurace\/?/, "") || "přehled", stav };
   }
@@ -196,4 +197,25 @@ export function strankaLogu(
 <tbody>${radky || `<tr><td colspan="5" class="muted">Nic nenalezeno.</td></tr>`}</tbody></table></div>
 ${data.zaznamy.length === 500 ? `<p class="muted">Zobrazeno posledních 500 záznamů – zužte filtr.</p>` : ""}`;
   return stranka("Historie uživatelů", uzivatel, stav, telo, { zalozka: "konfigurace" });
+}
+
+/** Konfigurace → Notifikační PDF: diagnostika importu PDF ze složky na Drive */
+export function strankaNotifikaci(data: { celkem: number; chyb: number; radky: RadekPrehleduNotifikaci[] }, hledat: string, stav: StavImportu, uzivatel: string): string {
+  const radky = data.radky
+    .map((r) => {
+      const pdf = `<a href="https://drive.google.com/file/d/${encodeURIComponent(r.soubor_id)}/view" target="_blank" rel="noopener">${esc(r.nazev)}</a>`;
+      const zak = r.zakazka ? `<a href="/zakazka/${encodeURIComponent(r.zakazka)}">${esc(r.zakazka)}</a>` : `<span class="muted">žádná</span>`;
+      const stavPdf = r.chyba ? `<span class="c-cerv">${esc(r.chyba)}</span>` : `${r.predpis_radku} ř. předpisu · ${esc(r.cpe_mode ?? "–")} · ${esc(r.zoznam ?? "–")}`;
+      return `<tr><td class="nowrap">${pdf}</td><td class="nowrap">${esc(praha(r.vznik))}</td><td>${esc(r.id_aktivity ?? "")}</td><td>${esc(r.id_objednavky ?? "")}</td><td>${esc((r.id_s7 ?? []).join(", "))}</td><td>${zak}</td><td>${stavPdf}</td></tr>`;
+    })
+    .join("");
+  const telo = `<p><a href="/konfigurace">← Konfigurace</a></p>
+<h1>Notifikační PDF <small>načteno ${data.celkem} souborů, z toho ${data.chyb} s chybou · složka na Drive se čte při každém běhu importu</small></h1>
+<form class="filtr" method="get" action="/konfigurace/notifikace">
+<label>Hledat<input type="search" name="q" value="${esc(hledat)}" placeholder="O-…, S7, ID aktivity, název souboru"></label>
+<button>Filtrovat</button>${hledat ? ` <a href="/konfigurace/notifikace">zrušit</a>` : ""}
+</form>
+<div class="tbl"><table><thead><tr><th>Soubor</th><th>Vznik</th><th>MWF ID aktivity</th><th>Identifikátor</th><th>ID S7</th><th>Spárovaná zakázka</th><th>Načteno</th></tr></thead>
+<tbody>${radky || `<tr><td colspan="7" class="muted">Nic nenalezeno.</td></tr>`}</tbody></table></div>`;
+  return stranka("Notifikační PDF", uzivatel, stav, telo, { zalozka: "konfigurace" });
 }

@@ -255,3 +255,38 @@ export async function importujNotifikace(
   }
   return v;
 }
+
+export interface RadekPrehleduNotifikaci {
+  soubor_id: string;
+  nazev: string;
+  vznik: Date;
+  nacteno: Date;
+  id_aktivity: string | null;
+  id_objednavky: string | null;
+  id_s7: string[] | null;
+  cpe_mode: string | null;
+  zoznam: string | null;
+  predpis_radku: number;
+  chyba: string | null;
+  /** ID aktivity zakázky v DB, ke které se PDF spáruje (null = zatím k ničemu) */
+  zakazka: string | null;
+}
+
+/** Přehled pro Konfiguraci: co je načteno, chyby, a jestli se PDF spáruje s nějakou zakázkou. */
+export async function prehledNotifikaci(db: Dotaz, hledat?: string): Promise<{ celkem: number; chyb: number; radky: RadekPrehleduNotifikaci[] }> {
+  await priprav(db);
+  const { rows: [souhrn] } = await db.query<{ celkem: number | string; chyb: number | string }>("SELECT count(*) AS celkem, count(*) FILTER (WHERE chyba IS NOT NULL) AS chyb FROM notifikace_pdf");
+  const q = hledat?.trim() ? `%${hledat.trim()}%` : null;
+  const { rows } = await db.query<RadekPrehleduNotifikaci>(
+    `SELECT n.soubor_id, n.nazev, n.vznik, n.nacteno, n.id_aktivity, n.id_objednavky, n.id_s7, n.cpe_mode, n.zoznam,
+            coalesce(array_length(n.predpis, 1), 0)::int AS predpis_radku, n.chyba,
+            (SELECT z.id_aktivity FROM zakazka z
+              WHERE z.id_aktivity = n.id_aktivity OR (n.id_s7 IS NOT NULL AND upper(z.id_s7) = ANY(n.id_s7)) OR z.id_objednavky_zaklad = n.id_objednavky_zaklad
+              ORDER BY (z.id_aktivity = n.id_aktivity) DESC LIMIT 1) AS zakazka
+       FROM notifikace_pdf n
+      WHERE $1::text IS NULL OR n.nazev ILIKE $1 OR n.id_objednavky ILIKE $1 OR n.id_aktivity ILIKE $1 OR array_to_string(n.id_s7, ' ') ILIKE $1
+      ORDER BY n.nacteno DESC LIMIT 200`,
+    [q],
+  );
+  return { celkem: Number(souhrn?.celkem ?? 0), chyb: Number(souhrn?.chyb ?? 0), radky: rows };
+}
