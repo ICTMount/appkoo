@@ -193,7 +193,7 @@ export async function nactiNotifikaci(db: Dotaz, idAktivity: string, klice: { id
   }
 }
 
-export const MAX_PDF_NA_BEH = 150;
+export const MAX_PDF_NA_BEH = 400;
 
 export interface VysledekNotifikaci {
   /** kolik PDF je ve složce vidět (0 = složka je prázdná nebo není nasdílená servisnímu účtu) */
