@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS notifikace_pdf (
   vznik         timestamptz NOT NULL,        -- createdTime souboru
   id_aktivity   text,                        -- MWF ID aktivity z textu PDF
   id_objednavky text,                        -- Identifikátor O-…
+  id_objednavky_zaklad text,                 -- O- bez přípon – stačí shoda O-čísla se zakázkou
   predpis       text[],                      -- řádky oddílu „Inštalačný predpis k“
   cpe_mode      text,                        -- Zoznam KZ → CPE Mode
   zoznam        text,                        -- Zoznam KZ → Zoznam kompatibilných zariadení
@@ -171,3 +172,4 @@ CREATE TABLE IF NOT EXISTS notifikace_pdf (
   nacteno       timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC);
+CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC);

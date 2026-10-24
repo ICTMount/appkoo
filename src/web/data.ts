@@ -214,7 +214,7 @@ export async function nactiDetail(db: Dotaz, idAktivity: string, now: Date, prav
     )
   ).rows;
 
-  const notifikace = await nactiNotifikaci(db, idAktivity);
+  const notifikace = await nactiNotifikaci(db, idAktivity, r.id_objednavky_zaklad);
 
   return { z, priorita, duvod, plan: f.plan, dalsiKontakt: f.dalsiKontakt, uzavreno: r.uzavreno, historie, souvisejici, notifikace };
 }

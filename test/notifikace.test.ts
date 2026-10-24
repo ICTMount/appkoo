@@ -48,6 +48,7 @@ describe("notifikační PDF z MWF", () => {
     const n = parsujNotifikaci(TEXT, "19846155.pdf")!;
     expect(n.idAktivity).toBe("19846155");
     expect(n.idObjednavky).toBe("O-8555864483_22243701#1-DDWX4YA");
+    expect(n.idObjednavkyZaklad).toBe("O-8555864483");
     expect(n.predpis[0]).toBe("Inštalačný Predpis ACCESS(Ethernet Bearer) Pridaj : Vlastnosti uzla Inštalácia prístupu potrebná : Y");
     expect(n.predpis).toContain("Kód partnera : CETIN");
     expect(n.predpis).toContain("5. Číslo bytu: 7");
