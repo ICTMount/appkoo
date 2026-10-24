@@ -23,8 +23,8 @@ export interface Notifikace {
   cpeMode: string | null;
   /** Zoznam KZ → Zoznam kompatibilných zariadení */
   zoznam: string | null;
-  /** Priebeh optický – řádky tabulky (Názov linky, A uzol, Z akcia) */
-  priebeh: RadekPriebehu[];
+  /** Priebeh optický – řádky tabulky (Názov linky, A uzol, Z akcia); null = PDF načteno starší verzí, tabulka se ještě nečetla */
+  priebeh: RadekPriebehu[] | null;
 }
 
 export interface UlozenaNotifikace extends Notifikace {
@@ -192,7 +192,7 @@ export async function nactiNotifikaci(db: Dotaz, idAktivity: string, klice: { id
     );
     const r = rows[0];
     if (!r) return null;
-    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam, priebeh: Array.isArray(r.priebeh) ? r.priebeh : [] };
+    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam, priebeh: Array.isArray(r.priebeh) ? r.priebeh : null };
   } catch {
     return null; // detail zakázky nesmí spadnout kvůli notifikacím
   }
@@ -319,7 +319,9 @@ export async function dohledejNotifikaci(
   const ted = deps.ted ?? Date.now;
   if (!/^\d+$/.test(idAktivity)) return null;
   const kdy = nenalezeno.get(idAktivity);
-  if (kdy && ted() - kdy < NENALEZENO_MS) return null;
+  const stavajici = await nactiNotifikaci(db, idAktivity, klice);
+  if (stavajici?.priebeh) return stavajici; // už kompletní
+  if (kdy && ted() - kdy < NENALEZENO_MS) return stavajici;
   try {
     const { data } = await api.files.list({
       q: `'${slozkaId}' in parents and trashed = false and name = '${idAktivity}.pdf'`,
@@ -330,7 +332,7 @@ export async function dohledejNotifikaci(
     const f = data.files?.[0];
     if (!f?.id) {
       nenalezeno.set(idAktivity, ted());
-      return null;
+      return stavajici;
     }
     const res = await api.files.get({ fileId: f.id, alt: "media" }, { responseType: "arraybuffer" });
     const pdf = Buffer.from(res.data as ArrayBuffer);
@@ -339,12 +341,12 @@ export async function dohledejNotifikaci(
     const vznik = new Date(f.createdTime ?? ted());
     if (!n) {
       await ulozNotifikaci(db, { souborId: f.id, nazev: f.name ?? "", vznik, chyba: "v PDF chybí MWF ID aktivity" });
-      return null;
+      return stavajici;
     }
     await ulozNotifikaci(db, { ...n, souborId: f.id, nazev: f.name ?? "", vznik });
     return nactiNotifikaci(db, idAktivity, klice);
   } catch (e) {
     console.log(JSON.stringify({ severity: "WARNING", message: `Notifikační PDF ${idAktivity} nejde dohledat: ${e instanceof Error ? e.message : String(e)}` }));
-    return null;
+    return stavajici;
   }
 }

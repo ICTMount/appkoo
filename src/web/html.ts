@@ -286,6 +286,7 @@ export function sekceNotifikace(n: Detail["notifikace"]): string {
   const odkaz = n ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(n.souborId)}/view" target="_blank" rel="noopener">PDF</a>` : "";
   const radek = (k: string, v: string) => `<dt>${esc(k)}</dt><dd>${v}</dd>`;
   const priebeh = () => {
+    if (!n!.priebeh) return `<span class="muted">tabulka se přečte při příštím běhu importu</span>`;
     if (!n!.priebeh.length) return `<span class="muted">tabulka v PDF nenalezena</span>`;
     const v = kVytvoreni(n!.priebeh);
     if (!v.length) return `<span class="muted">všude Ponechať (${n!.priebeh.length} linek, žádná akce NEW / Vytvoriť)</span>`;

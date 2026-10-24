@@ -342,7 +342,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       if (m) {
         const detail = await nactiDetail(db, decodeURIComponent(m[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
-        if (!detail.notifikace && n.notifikace) detail.notifikace = await n.notifikace(detail.z.idAktivity, { idObjednavkyZaklad: detail.z.idObjednavkyZaklad, idS7: detail.z.idS7 });
+        // PDF chybí, nebo bylo načteno starší verzí bez tabulky Priebeh → dohledat / přečíst znovu hned
+        if ((!detail.notifikace || !detail.notifikace.priebeh) && n.notifikace) detail.notifikace = await n.notifikace(detail.z.idAktivity, { idObjednavkyZaklad: detail.z.idObjednavkyZaklad, idS7: detail.z.idS7 });
         const kontext = await nactiKontext(db);
         const planovac = n.planovac;
         // webcalendar: zakázka přišla s termínem jen v MWF → ověřit, zda je v kalendáři technika
