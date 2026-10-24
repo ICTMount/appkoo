@@ -166,8 +166,12 @@ export function parsujPriebeh(bboxHtml: string): RadekPriebehu[] {
 /** Jeden řádek pro koordinátorku: Názov linky / A uzol / Akcia na linke / Z akcia */
 export const radekPriebehu = (r: RadekPriebehu) => [r.nazovLinky, r.aUzol, r.akciaNaLinke, r.zAkcia].filter((x) => x).join(" / ");
 
-/** Řádky, kde má technik něco vytvořit (Z akcia = Vytvoriť) */
-export const kVytvoreni = (radky: RadekPriebehu[]) => radky.filter((r) => /vytvor/i.test(r.zAkcia.replace(/\s+/g, "")));
+/** Řádky, kde má technik něco udělat: 5. sloupec „Akcia na linke“ = NEW nebo Vytvoriť (záloha: Z akcia = Vytvoriť) */
+export const kVytvoreni = (radky: RadekPriebehu[]) =>
+  radky.filter((r) => {
+    const a = (r.akciaNaLinke ?? "").replace(/\s+/g, "");
+    return a ? /^(new|vytvor)/i.test(a) : /vytvor/i.test(r.zAkcia.replace(/\s+/g, ""));
+  });
 
 /** XHTML s pozicemi slov (`pdftotext -bbox-layout`) */
 export function bboxZPdf(pdf: Buffer): Promise<string> {

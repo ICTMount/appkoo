@@ -285,19 +285,21 @@ ${sekceZdroju(zdroje)}`;
 export function sekceNotifikace(n: Detail["notifikace"]): string {
   const odkaz = n ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(n.souborId)}/view" target="_blank" rel="noopener">PDF</a>` : "";
   const radek = (k: string, v: string) => `<dt>${esc(k)}</dt><dd>${v}</dd>`;
+  const priebeh = () => {
+    if (!n!.priebeh.length) return `<span class="muted">tabulka v PDF nenalezena</span>`;
+    const v = kVytvoreni(n!.priebeh);
+    if (!v.length) return `<span class="muted">všude Ponechať (${n!.priebeh.length} linek, žádná akce NEW / Vytvoriť)</span>`;
+    return `<ul class="predpis">${v.map((r) => `<li>${esc(radekPriebehu(r))}</li>`).join("")}</ul>`;
+  };
+  // pořadí oddílů jako v PDF: Priebeh optický → Inštalačný predpis → Zoznam KZ
   const telo = !n
     ? `<span class="muted">Notifikační PDF k této aktivitě zatím nedorazilo.</span>`
-    : `<h3>Inštalačný predpis k</h3>
+    : `<h3>Priebeh optický – akce technika <small class="muted">Názov linky / A uzol / Akcia na linke / Z akcia</small></h3>
+${priebeh()}
+<h3>Inštalačný predpis k</h3>
 ${n.predpis.length ? `<ul class="predpis">${n.predpis.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<span class="muted">v PDF chybí</span>`}
 <h3>Zoznam KZ</h3>
-<dl>${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>
-<h3>Priebeh optický – Vytvoriť <small class="muted">Názov linky / A uzol / Akcia na linke / Z akcia</small></h3>
-${(() => {
-  const v = kVytvoreni(n.priebeh);
-  if (!n.priebeh.length) return `<span class="muted">tabulka v PDF nenalezena</span>`;
-  if (!v.length) return `<span class="muted">žádný řádek s akcí Vytvoriť (${n.priebeh.length} linek, vše Ponechať)</span>`;
-  return `<ul class="predpis">${v.map((r) => `<li>${esc(radekPriebehu(r))}</li>`).join("")}</ul>`;
-})()}`;
+<dl>${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>`;
   return `<div class="card kompakt notif"><h2 class="s-ikonou"><span class="i-drive">${IKONA.drive}</span>Výpis z notifikačního PDF${n ? ` <small class="muted">${esc(n.nazev)} · ${esc(fmtDate(n.vznik))} · ${odkaz}</small>` : ""}</h2><div class="posun">${telo}</div></div>`;
 }
 

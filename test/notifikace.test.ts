@@ -89,6 +89,7 @@ describe("notifikační PDF z MWF", () => {
     );
     expect(kVytvoreni(r)).toEqual([]);
     expect(kVytvoreni([{ nazovLinky: "L", aUzol: "SPP:000221:PH:Steinerova 1", zAkcia: "Vytvor iť" }]).length).toBe(1);
+    expect(kVytvoreni([{ nazovLinky: "L", aUzol: "X", akciaNaLinke: "NEW", zAkcia: "Vytvoriť" }, { nazovLinky: "M", aUzol: "Y", akciaNaLinke: "EXIST", zAkcia: "Ponechať" }]).map((r) => r.nazovLinky)).toEqual(["L"]);
   });
 
   it("textBunky: mezera jen mezi písmenem a číslicí nebo malým a velkým písmenem", () => {
