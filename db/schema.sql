@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS notifikace_pdf (
   predpis       text[],                      -- řádky oddílu „Inštalačný predpis k“
   cpe_mode      text,                        -- Zoznam KZ → CPE Mode
   zoznam        text,                        -- Zoznam KZ → Zoznam kompatibilných zariadení
+  priebeh       jsonb,                       -- Priebeh optický: [{nazovLinky, aUzol, zAkcia}]
   chyba         text,                        -- proč se PDF nepodařilo přečíst (NULL = v pořádku)
   nacteno       timestamptz NOT NULL DEFAULT now()
 );

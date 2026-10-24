@@ -6,6 +6,7 @@ import { execFile } from "node:child_process";
 import type { drive_v3 } from "@googleapis/drive";
 import type { Dotaz } from "../db/db.js";
 import { zakladniCisloObjednavky } from "../domain/slovnik.js";
+import { bboxZPdf, parsujPriebeh, type RadekPriebehu } from "./priebeh.js";
 
 export interface Notifikace {
   /** MWF ID aktivity (z textu PDF, jinak z názvu souboru) */
@@ -22,6 +23,8 @@ export interface Notifikace {
   cpeMode: string | null;
   /** Zoznam KZ → Zoznam kompatibilných zariadení */
   zoznam: string | null;
+  /** Priebeh optický – řádky tabulky (Názov linky, A uzol, Z akcia) */
+  priebeh: RadekPriebehu[];
 }
 
 export interface UlozenaNotifikace extends Notifikace {
@@ -77,7 +80,7 @@ export function parsujKz(radky: string[]): { cpeMode: string | null; zoznam: str
 }
 
 /** Rozbor textu notifikačního PDF (výstup `pdftotext -layout`). null = není notifikace z MWF. */
-export function parsujNotifikaci(text: string, nazevSouboru = ""): Notifikace | null {
+export function parsujNotifikaci(text: string, nazevSouboru = "", bboxHtml = ""): Notifikace | null {
   const radky = text.split(/\r?\n/);
   const idZTextu = text.match(/MWF ID aktivity:\s*(\d+)/)?.[1] ?? null;
   const idZNazvu = nazevSouboru.match(/^(\d+)\.pdf$/i)?.[1] ?? null;
@@ -104,7 +107,7 @@ export function parsujNotifikaci(text: string, nazevSouboru = ""): Notifikace | 
   }
   const kzRadky = iKz >= 0 ? [radky[iKz]!.replace(/^[\s\S]*?Zoznam KZ\s*:/i, (m) => " ".repeat(m.length)), ...radky.slice(iKz + 1)] : [];
   const { cpeMode, zoznam } = parsujKz(kzRadky);
-  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, idS7, predpis: predpis.filter((p) => p !== ""), cpeMode, zoznam };
+  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, idS7, predpis: predpis.filter((p) => p !== ""), cpeMode, zoznam, priebeh: bboxHtml ? parsujPriebeh(bboxHtml) : [] };
 }
 
 /** Text PDF přes poppler (`pdftotext -layout`), v image je balík poppler-utils. */
@@ -133,6 +136,7 @@ const TABULKA = `CREATE TABLE IF NOT EXISTS notifikace_pdf (
   predpis       text[],
   cpe_mode      text,
   zoznam        text,
+  priebeh       jsonb,
   chyba         text,
   nacteno       timestamptz NOT NULL DEFAULT now()
 )`;
@@ -143,6 +147,7 @@ const priprav = (db: Dotaz) =>
     .query(TABULKA)
     .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_objednavky_zaklad text"))
     .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_s7 text[]"))
+    .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS priebeh jsonb"))
     .then(() => db.query("UPDATE notifikace_pdf SET id_objednavky_zaklad = upper(substring(id_objednavky from '^O-[0-9]+')) WHERE id_objednavky_zaklad IS NULL AND id_objednavky IS NOT NULL"))
     .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC)"))
     .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC)"))
@@ -162,11 +167,11 @@ export async function ulozNotifikaci(db: Dotaz, n: UlozenaNotifikace | { souborI
     return;
   }
   await db.query(
-    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, chyba)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL)
+    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, chyba)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, NULL)
      ON CONFLICT (soubor_id) DO UPDATE SET id_aktivity = EXCLUDED.id_aktivity, id_objednavky = EXCLUDED.id_objednavky, id_objednavky_zaklad = EXCLUDED.id_objednavky_zaklad,
-       id_s7 = EXCLUDED.id_s7, predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, chyba = NULL, nacteno = now()`,
-    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.idS7, n.predpis, n.cpeMode, n.zoznam],
+       id_s7 = EXCLUDED.id_s7, predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, priebeh = EXCLUDED.priebeh, chyba = NULL, nacteno = now()`,
+    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.idS7, n.predpis, n.cpeMode, n.zoznam, JSON.stringify(n.priebeh)],
   );
 }
 
@@ -179,15 +184,15 @@ export async function nactiNotifikaci(db: Dotaz, idAktivity: string, klice: { id
     await priprav(db);
     const zaklad = klice.idObjednavkyZaklad ? zakladniCisloObjednavky(klice.idObjednavkyZaklad) : null;
     const s7 = klice.idS7?.trim().toUpperCase() || null;
-    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; id_s7: string[] | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null }>(
-      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam FROM notifikace_pdf
+    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; id_s7: string[] | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null; priebeh: RadekPriebehu[] | null }>(
+      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh FROM notifikace_pdf
         WHERE chyba IS NULL AND (id_aktivity = $1 OR ($2::text IS NOT NULL AND $2 = ANY(id_s7)) OR ($3::text IS NOT NULL AND id_objednavky_zaklad = $3))
         ORDER BY (id_aktivity = $1) DESC, ($2::text IS NOT NULL AND $2 = ANY(id_s7)) DESC, vznik DESC LIMIT 1`,
       [idAktivity, s7, zaklad],
     );
     const r = rows[0];
     if (!r) return null;
-    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam };
+    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam, priebeh: Array.isArray(r.priebeh) ? r.priebeh : [] };
   } catch {
     return null; // detail zakázky nesmí spadnout kvůli notifikacím
   }
@@ -208,12 +213,15 @@ export async function importujNotifikace(
   db: Dotaz,
   api: drive_v3.Drive,
   slozkaId: string,
-  deps: { textZPdf?: (pdf: Buffer) => Promise<string>; ted?: () => Date } = {},
+  deps: { textZPdf?: (pdf: Buffer) => Promise<string>; bboxZPdf?: (pdf: Buffer) => Promise<string>; ted?: () => Date } = {},
 ): Promise<VysledekNotifikaci> {
   await priprav(db);
   const naText = deps.textZPdf ?? textZPdf;
-  // neúspěšné soubory se po dni zkusí znovu (výpadek Drive apod.)
-  const { rows } = await db.query<{ soubor_id: string }>("SELECT soubor_id FROM notifikace_pdf WHERE chyba IS NULL OR nacteno > now() - interval '1 day'");
+  const naBbox = deps.bboxZPdf ?? bboxZPdf;
+  // neúspěšné soubory se po dni zkusí znovu (výpadek Drive apod.); PDF načtená starší verzí bez „priebeh“ se přečtou znovu
+  const { rows } = await db.query<{ soubor_id: string }>(
+    "SELECT soubor_id FROM notifikace_pdf WHERE (chyba IS NULL AND priebeh IS NOT NULL) OR (chyba IS NOT NULL AND nacteno > now() - interval '1 day')",
+  );
   const znama = new Set(rows.map((r) => r.soubor_id));
 
   const soubory: drive_v3.Schema$File[] = [];
@@ -236,8 +244,9 @@ export async function importujNotifikace(
     const vznik = new Date(f.createdTime ?? (deps.ted ?? (() => new Date()))());
     try {
       const res = await api.files.get({ fileId: f.id!, alt: "media" }, { responseType: "arraybuffer" });
-      const text = await naText(Buffer.from(res.data as ArrayBuffer));
-      const n = parsujNotifikaci(text, f.name ?? "");
+      const pdf = Buffer.from(res.data as ArrayBuffer);
+      const [text, bbox] = await Promise.all([naText(pdf), naBbox(pdf).catch(() => "")]);
+      const n = parsujNotifikaci(text, f.name ?? "", bbox);
       if (!n) {
         await ulozNotifikaci(db, { souborId: f.id!, nazev: f.name ?? "", vznik, chyba: "v PDF chybí MWF ID aktivity" });
         v.chyb++;
@@ -305,7 +314,7 @@ export async function dohledejNotifikaci(
   slozkaId: string,
   idAktivity: string,
   klice: { idObjednavkyZaklad?: string | null; idS7?: string | null } = {},
-  deps: { textZPdf?: (pdf: Buffer) => Promise<string>; ted?: () => number } = {},
+  deps: { textZPdf?: (pdf: Buffer) => Promise<string>; bboxZPdf?: (pdf: Buffer) => Promise<string>; ted?: () => number } = {},
 ): Promise<UlozenaNotifikace | null> {
   const ted = deps.ted ?? Date.now;
   if (!/^\d+$/.test(idAktivity)) return null;
@@ -324,8 +333,9 @@ export async function dohledejNotifikaci(
       return null;
     }
     const res = await api.files.get({ fileId: f.id, alt: "media" }, { responseType: "arraybuffer" });
-    const text = await (deps.textZPdf ?? textZPdf)(Buffer.from(res.data as ArrayBuffer));
-    const n = parsujNotifikaci(text, f.name ?? "");
+    const pdf = Buffer.from(res.data as ArrayBuffer);
+    const [text, bbox] = await Promise.all([(deps.textZPdf ?? textZPdf)(pdf), (deps.bboxZPdf ?? bboxZPdf)(pdf).catch(() => "")]);
+    const n = parsujNotifikaci(text, f.name ?? "", bbox);
     const vznik = new Date(f.createdTime ?? ted());
     if (!n) {
       await ulozNotifikaci(db, { souborId: f.id, nazev: f.name ?? "", vznik, chyba: "v PDF chybí MWF ID aktivity" });

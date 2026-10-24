@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { parsujKz, parsujNotifikaci } from "../src/ingest/notifikace.js";
+import { kVytvoreni, parsujPriebeh, textBunky } from "../src/ingest/priebeh.js";
 
 // Výřez textu notifikačního PDF (pdftotext -layout) pro O-8555864483_22243701#1-DDWX4YA
 const TEXT = `                                                  CZ_CETIN_Instalace přístupu FTTH
@@ -77,5 +79,18 @@ describe("notifikační PDF z MWF", () => {
     const n = parsujNotifikaci("MWF ID aktivity: 1\nIdentifikátor: O-1_2#3\n", "1.pdf")!;
     expect(n.predpis).toEqual([]);
     expect(n.cpeMode).toBeNull();
+  });
+
+  it("Priebeh optický: sloupce podle záhlaví, řádky podle Z akcia, zalomená slova se spojí", () => {
+    const r = parsujPriebeh(readFileSync("test/fixtures/priebeh-bbox.html", "utf8"));
+    expect(r).toEqual([{ nazovLinky: "ZAMB/CTN/CETIN/CZE-ZAMB/CTN/CETIN/CZEXGSPON 4", aUzol: "ZAMB1 X-31", zAkcia: "Ponechať" }]);
+    expect(kVytvoreni(r)).toEqual([]);
+    expect(kVytvoreni([{ nazovLinky: "L", aUzol: "SPP:000221:PH:Steinerova 1", zAkcia: "Vytvor iť" }]).length).toBe(1);
+  });
+
+  it("textBunky: mezera jen mezi písmenem a číslicí nebo malým a velkým písmenem", () => {
+    const w = (text: string, y: number) => ({ text, x: 10, y, yMin: y - 4, yMax: y + 4, xMin: 5, xMax: 15 });
+    expect(textBunky([w("SPP:00", 10), w("0221:P", 20), w("H:Stein", 30), w("erova", 40), w("1", 50)])).toBe("SPP:000221:PH:Steinerova 1");
+    expect(textBunky([w("Ponech", 10), w("ať", 20)])).toBe("Ponechať");
   });
 });
