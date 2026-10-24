@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS notifikace_pdf (
   id_aktivity   text,                        -- MWF ID aktivity z textu PDF
   id_objednavky text,                        -- Identifikátor O-…
   id_objednavky_zaklad text,                 -- O- bez přípon – stačí shoda O-čísla se zakázkou
+  id_s7         text[],                      -- ID S7 z PDF (ID objednávky/TT, část za # v Identifikátoru) – párování s „ID S7 obj.“
   predpis       text[],                      -- řádky oddílu „Inštalačný predpis k“
   cpe_mode      text,                        -- Zoznam KZ → CPE Mode
   zoznam        text,                        -- Zoznam KZ → Zoznam kompatibilných zariadení

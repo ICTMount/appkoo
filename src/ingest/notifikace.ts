@@ -14,6 +14,8 @@ export interface Notifikace {
   idObjednavky: string | null;
   /** O-… bez přípon – párování se zakázkou (stačí shoda O-čísla) */
   idObjednavkyZaklad: string | null;
+  /** ID S7 z PDF: „ID objednávky/TT“ (1-DDWV6LB) a část za # v Identifikátoru (1-DDWX4YA) – párování s „ID S7 obj.“ */
+  idS7: string[];
   /** řádky oddílu „Inštalačný predpis k“ (bez prázdných) */
   predpis: string[];
   /** Zoznam KZ → CPE Mode (Route / Bridge…) */
@@ -82,6 +84,10 @@ export function parsujNotifikaci(text: string, nazevSouboru = ""): Notifikace | 
   const idAktivity = idZTextu ?? idZNazvu;
   if (!idAktivity) return null;
   const idObjednavky = text.match(/Identifikátor:\s*(O-[\w#-]+)/)?.[1] ?? text.match(/\b(O-\d{6,})\b/)?.[1] ?? null;
+  const idS7 = [...new Set([
+    ...[...text.matchAll(/ID objednávky(?:\/TT)?:\s*(1-[A-Z0-9]{6,})/g)].map((m) => m[1]!.toUpperCase()),
+    ...[...(idObjednavky ?? "").matchAll(/#(1-[A-Z0-9]{6,})/gi)].map((m) => m[1]!.toUpperCase()),
+  ])];
 
   const iPredpis = radky.findIndex((r) => /Inštalačný predpis k/i.test(r));
   const iKz = radky.findIndex((r, i) => i > iPredpis && /Zoznam KZ\s*:/i.test(r));
@@ -98,7 +104,7 @@ export function parsujNotifikaci(text: string, nazevSouboru = ""): Notifikace | 
   }
   const kzRadky = iKz >= 0 ? [radky[iKz]!.replace(/^[\s\S]*?Zoznam KZ\s*:/i, (m) => " ".repeat(m.length)), ...radky.slice(iKz + 1)] : [];
   const { cpeMode, zoznam } = parsujKz(kzRadky);
-  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, predpis: predpis.filter((p) => p !== ""), cpeMode, zoznam };
+  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, idS7, predpis: predpis.filter((p) => p !== ""), cpeMode, zoznam };
 }
 
 /** Text PDF přes poppler (`pdftotext -layout`), v image je balík poppler-utils. */
@@ -123,6 +129,7 @@ const TABULKA = `CREATE TABLE IF NOT EXISTS notifikace_pdf (
   id_aktivity   text,
   id_objednavky text,
   id_objednavky_zaklad text,
+  id_s7         text[],
   predpis       text[],
   cpe_mode      text,
   zoznam        text,
@@ -135,6 +142,7 @@ const priprav = (db: Dotaz) =>
   (pripraveno ??= db
     .query(TABULKA)
     .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_objednavky_zaklad text"))
+    .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_s7 text[]"))
     .then(() => db.query("UPDATE notifikace_pdf SET id_objednavky_zaklad = upper(substring(id_objednavky from '^O-[0-9]+')) WHERE id_objednavky_zaklad IS NULL AND id_objednavky IS NOT NULL"))
     .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC)"))
     .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC)"))
@@ -154,31 +162,32 @@ export async function ulozNotifikaci(db: Dotaz, n: UlozenaNotifikace | { souborI
     return;
   }
   await db.query(
-    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, predpis, cpe_mode, zoznam, chyba)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)
+    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, chyba)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL)
      ON CONFLICT (soubor_id) DO UPDATE SET id_aktivity = EXCLUDED.id_aktivity, id_objednavky = EXCLUDED.id_objednavky, id_objednavky_zaklad = EXCLUDED.id_objednavky_zaklad,
-       predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, chyba = NULL, nacteno = now()`,
-    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.predpis, n.cpeMode, n.zoznam],
+       id_s7 = EXCLUDED.id_s7, predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, chyba = NULL, nacteno = now()`,
+    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.idS7, n.predpis, n.cpeMode, n.zoznam],
   );
 }
 
 /**
- * Nejnovější notifikace k zakázce (null = PDF zatím nedorazilo). Stačí shoda O-čísla (ID obj. v ext. systému);
- * přednost má PDF se stejným MWF ID aktivity, pak nejnovější PDF se stejným O-číslem.
+ * Nejnovější notifikace k zakázce (null = PDF zatím nedorazilo). Pořadí párování:
+ * 1. stejné MWF ID aktivity, 2. ID S7 obj. zakázky je v PDF (ID objednávky/TT nebo část za #), 3. stejné O-číslo.
  */
-export async function nactiNotifikaci(db: Dotaz, idAktivity: string, idObjednavkyZaklad?: string | null): Promise<UlozenaNotifikace | null> {
+export async function nactiNotifikaci(db: Dotaz, idAktivity: string, klice: { idObjednavkyZaklad?: string | null; idS7?: string | null } = {}): Promise<UlozenaNotifikace | null> {
   try {
     await priprav(db);
-    const zaklad = idObjednavkyZaklad ? zakladniCisloObjednavky(idObjednavkyZaklad) : null;
-    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null }>(
-      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, predpis, cpe_mode, zoznam FROM notifikace_pdf
-        WHERE chyba IS NULL AND (id_aktivity = $1 OR ($2::text IS NOT NULL AND id_objednavky_zaklad = $2))
-        ORDER BY (id_aktivity = $1) DESC, vznik DESC LIMIT 1`,
-      [idAktivity, zaklad],
+    const zaklad = klice.idObjednavkyZaklad ? zakladniCisloObjednavky(klice.idObjednavkyZaklad) : null;
+    const s7 = klice.idS7?.trim().toUpperCase() || null;
+    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; id_s7: string[] | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null }>(
+      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam FROM notifikace_pdf
+        WHERE chyba IS NULL AND (id_aktivity = $1 OR ($2::text IS NOT NULL AND $2 = ANY(id_s7)) OR ($3::text IS NOT NULL AND id_objednavky_zaklad = $3))
+        ORDER BY (id_aktivity = $1) DESC, ($2::text IS NOT NULL AND $2 = ANY(id_s7)) DESC, vznik DESC LIMIT 1`,
+      [idAktivity, s7, zaklad],
     );
     const r = rows[0];
     if (!r) return null;
-    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam };
+    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam };
   } catch {
     return null; // detail zakázky nesmí spadnout kvůli notifikacím
   }

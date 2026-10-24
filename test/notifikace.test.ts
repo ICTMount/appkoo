@@ -5,6 +5,8 @@ import { parsujKz, parsujNotifikaci } from "../src/ingest/notifikace.js";
 const TEXT = `                                                  CZ_CETIN_Instalace přístupu FTTH
 Rezervačná                                                                    Termín:                24.10.2026 16:18 - 02.11.2026 00:00
 
+ID objednávky/TT:          1-DDWV6LB                                          Dátum realizácie:      30.10.2026 08:35
+
 Identifikátor:             O-8555864483_22243701#1-DDWX4YA
 
 MWF ID objednávky:         22243701                                           MWF ID aktivity:       19846155
@@ -49,6 +51,7 @@ describe("notifikační PDF z MWF", () => {
     expect(n.idAktivity).toBe("19846155");
     expect(n.idObjednavky).toBe("O-8555864483_22243701#1-DDWX4YA");
     expect(n.idObjednavkyZaklad).toBe("O-8555864483");
+    expect(n.idS7).toEqual(["1-DDWV6LB", "1-DDWX4YA"]);
     expect(n.predpis[0]).toBe("Inštalačný Predpis ACCESS(Ethernet Bearer) Pridaj : Vlastnosti uzla Inštalácia prístupu potrebná : Y");
     expect(n.predpis).toContain("Kód partnera : CETIN");
     expect(n.predpis).toContain("5. Číslo bytu: 7");
