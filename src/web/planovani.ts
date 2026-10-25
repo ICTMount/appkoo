@@ -14,6 +14,8 @@ import { nastaveniPlanovani, type NastaveniPlanovaniApp, type Polozka } from "..
 export interface KontextPlanovani {
   technici: TechnikPlanu[];
   blokovane: Polozka[];
+  /** číselník IRU lokality (město → popis nestandardu, dokument) */
+  iru: Polozka[];
   koordinatorky: Polozka[];
   /** O-číslo → úplná adresa z MWF (místo v kalendáři bývá bez obce) */
   adresyZMwf: Map<string, string>;
@@ -22,7 +24,7 @@ export interface KontextPlanovani {
 }
 
 export async function nactiKontext(db: Dotaz): Promise<KontextPlanovani> {
-  const [technici, blokovane, koordinatorky, adresy, planovani] = await Promise.all([
+  const [technici, blokovane, koordinatorky, adresy, planovani, iru] = await Promise.all([
     nactiCiselnik(db, "technici"),
     nactiCiselnik(db, "blokovaneLokality"),
     nactiCiselnik(db, "koordinatorky"),
@@ -30,10 +32,12 @@ export async function nactiKontext(db: Dotaz): Promise<KontextPlanovani> {
       "SELECT id_objednavky_zaklad AS o, adresa, psc FROM zakazka WHERE uzavreno IS NULL AND adresa IS NOT NULL",
     ),
     nactiCiselnik(db, "nastaveniPlanovani"),
+    nactiCiselnik(db, "iruLokality"),
   ]);
   return {
     technici: techniciZCiselniku(technici),
     blokovane,
+    iru,
     koordinatorky,
     nastaveni: nastaveniPlanovani(planovani),
     adresyZMwf: new Map(adresy.rows.map((r) => [r.o, [r.adresa, (r.psc ?? "").replace(/^=+/, "")].filter(Boolean).join(", ")])),
@@ -192,4 +196,25 @@ export function nestandardZFormulare(f: URLSearchParams, slotOd: Date, slotDo: D
   const do_ = cas(f.get("casDo"), slotDo);
   const platne = od && do_ && do_.getTime() > od.getTime() ? { od, do: do_ } : { od: null, do: null };
   return { nadpis, ...platne };
+}
+
+export interface IruLokalita {
+  mesto: string;
+  popis: string;
+  odkaz: string | null;
+}
+
+const normIru = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+/** IRU lokalita zakázky: město z číselníku se vyskytuje v adrese (jako celé slovo), bez ohledu na diakritiku */
+export function iruLokalita(iru: Polozka[], adresa: string): IruLokalita | null {
+  const a = ` ${normIru(adresa).replace(/[^\p{L}\p{N}]+/gu, " ")} `;
+  for (const p of iru) {
+    if (p.aktivni === false) continue;
+    const mesto = String(p.mesto ?? "").trim();
+    if (!mesto) continue;
+    const m = ` ${normIru(mesto).replace(/[^\p{L}\p{N}]+/gu, " ")} `;
+    if (a.includes(m)) return { mesto, popis: String(p.popis ?? "").trim(), odkaz: String(p.odkaz ?? "").trim() || null };
+  }
+  return null;
 }

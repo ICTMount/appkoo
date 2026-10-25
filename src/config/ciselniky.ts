@@ -25,7 +25,7 @@ export interface Sloupec {
 }
 
 export type CiselnikId =
-  | "technici" | "typyAkci" | "koordinatorky" | "regiony" | "blokovaneLokality" | "kontakty"
+  | "technici" | "typyAkci" | "koordinatorky" | "regiony" | "blokovaneLokality" | "iruLokality" | "kontakty"
   | "pravidlaPriority" | "nastaveniKontaktu" | "nastaveniPlanovani";
 
 export interface Ciselnik {
@@ -125,6 +125,16 @@ export const CISELNIKY: Record<CiselnikId, Ciselnik> = {
       { klic: "infrastruktura", nazev: "Infrastruktura", typ: "vyber", hodnoty: ["", "TMCZ", "CETIN", "VDF"] },
       { klic: "duvod", nazev: "Důvod", typ: "text", povinny: true },
       { klic: "od", nazev: "Od", typ: "text" },
+    ],
+  },
+  iruLokality: {
+    id: "iruLokality",
+    nazev: "IRU lokality",
+    klic: "mesto",
+    sloupce: [
+      { klic: "mesto", nazev: "Město", typ: "text", povinny: true },
+      { klic: "popis", nazev: "Popis nestandardu", typ: "text", povinny: true },
+      { klic: "odkaz", nazev: "Dokument (Google Drive)", typ: "text", aliasy: ["URL", "Odkaz"] },
     ],
   },
   pravidlaPriority: {

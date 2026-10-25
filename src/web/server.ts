@@ -54,7 +54,7 @@ import { hledejNaLokalite, hledejVsude, ocistitDotaz, sLimitem, vyrazyZakazky, t
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
 import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
-import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
+import { chybejiciPotvrzeni, inicialy, iruLokalita, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 import type { OkoliZapisu } from "./html.js";
 import { jeBlok, jeVolneOkno } from "../gcal/kontrola.js";
 import type { TechnikPlanu } from "../plan/planovac.js";
@@ -429,6 +429,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           doplnit,
           presun: presunPlan,
           jenNahled,
+          iru: iruLokalita(kontext.iru, [detail.z.adresa, detail.z.psc].filter(Boolean).join(", ")),
         }));
       }
 

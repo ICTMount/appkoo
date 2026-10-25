@@ -8,13 +8,14 @@ import { esc, stranka } from "./html.js";
 
 /** Pořadí číselníků v Konfiguraci */
 export const PORADI_CISELNIKU: CiselnikId[] = [
-  "koordinatorky", "technici", "blokovaneLokality", "nastaveniPlanovani", "typyAkci", "regiony", "pravidlaPriority", "nastaveniKontaktu", "kontakty",
+  "koordinatorky", "technici", "blokovaneLokality", "iruLokality", "nastaveniPlanovani", "typyAkci", "regiony", "pravidlaPriority", "nastaveniKontaktu", "kontakty",
 ];
 
 const POPIS: Partial<Record<CiselnikId, string>> = {
   koordinatorky: "Kdo smí do aplikace a s jakou rolí (správce / koordinátorka / jen čtení); iniciály do názvu události v kalendáři.",
   technici: "Koho plánovat: kalendář, adresy výjezdu, typy akcí (FTTH / PIV / SAT/TV), aktivní.",
   blokovaneLokality: "Adresy, kam se neplánuje (např. CETIN hard blacklist).",
+  iruLokality: "Města s IRU sítí (nej.cz apod.): popis nestandardu a odkaz na dokument – zobrazí se v detailu zakázky pod vlastníkem sítě.",
   nastaveniPlanovani: "Limity a váhy plánovače: max. zajížďka, zaplnění dne, SLA, preferované okno, horizont nabídky.",
   typyAkci: "Typy aktivit z MWF, skupina a délka práce.",
   regiony: "Regiony a jejich subregiony / PSČ.",
