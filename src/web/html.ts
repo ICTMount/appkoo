@@ -237,13 +237,13 @@ function pruhMigrace(m: Migrace, now: Date): string {
   return `<div class="err migrace-pruh"><b>FIS MOP</b>${caseId} – termín instalace <b>nesmí být před datem portace</b>.${portace}</div>`;
 }
 /** Výrazný pruh u zakázky z webcalendar: termín si vybral zákazník, je jen v MWF – je potřeba ho zapsat do GCAL */
-function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: string): string {
+function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: string, bezTlacitka = false): string {
   const kdy = `${fmtDate(w.at)} ${fmtTime(w.at)}`;
   const termin = w.termin ? ` <b>${esc(w.termin)}</b>` : "";
   if (w.vKalendari) {
     return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – původní termín${termin} (${esc(kdy)}). V kalendáři je zapsaný u <b>${esc(w.vKalendari.technik)}</b> ${esc(`${fmtDate(w.vKalendari.od)} ${fmtTime(w.vKalendari.od)}–${fmtTime(w.vKalendari.do)}`)}.</div>`;
   }
-  return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zákazník si sám vybral termín${termin} (${esc(kdy)}). Termín je <b>jen v MWF, v kalendáři technika chybí</b> – zapište ho do GCAL na dohodnutý, nebo náhradní termín.<a class="btn" href="/zakazka/${encodeURIComponent(idAktivity)}#planovani">Doplánovat do GCAL ↓</a></div>`;
+  return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zákazník si sám vybral termín${termin} (${esc(kdy)}). Termín je <b>jen v MWF, v kalendáři technika chybí</b> – zapište ho do GCAL na dohodnutý, nebo náhradní termín.${bezTlacitka ? "" : `<a class="btn" href="/zakazka/${encodeURIComponent(idAktivity)}#planovani">Doplánovat do GCAL ↓</a>`}</div>`;
 }
 
 /** Sloupec P17: vlastník sítě a pod ním štítky předobjednávky / webcalendar */
@@ -287,7 +287,7 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
 <div class="stred">${cerstvost(stav)}</div>
 <div class="vpravo"><nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav>
 <div class="kdo">${esc(uzivatel)}<!--role--></div><!--konfigurace:${zal === "konfigurace" ? "on" : "off"}--></div></div>
-<nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><a href="/technik" class="${zal === "technik" ? "on" : ""}">Doplnit technika</a></nav>
+<nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><!--doplnit:${zal === "technik" ? "on" : "off"}--></nav>
 <form class="hledani" action="/" method="get"><span class="pole-hledani"><input type="search" name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku" autocomplete="off">${
     o.dotaz
       ? `<a class="zrusit" href="/" title="Zrušit hledání" aria-label="Zrušit hledání">×</a>`
@@ -364,6 +364,8 @@ export interface PlanovaniZakazky {
   zapis: { zapnuty: boolean; smiTechnik: (t: string) => boolean };
   /** plánovač není zapnutý (chybí kalendáře) */
   nedostupne?: boolean;
+  /** role technik: jen detail se zdroji, bez „Kam naplánovat“ */
+  jenNahled?: boolean;
   /** zakázka z webcalendar: termín si vybral zákazník; vKalendari = našla se událost u technika */
   webcal?: (Webcalendar & { vKalendari: { technik: string; od: Date; do: Date } | null }) | null;
   /** režim „Přeplánovat zakázku“ */
@@ -425,7 +427,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
 
   const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${webcalStitek(z)}${migraceStitek(z)}${usedStitek(z)} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
-${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity) : ""}
+${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity, !!plan.jenNahled) : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
@@ -475,9 +477,9 @@ ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 <div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun maly">${historieHtml}</div></div>
 </div>
 </div>
-<div class="konec-detailu"></div>
+${plan.jenNahled ? "" : `<div class="konec-detailu"></div>
 <section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
-${sekcePlanovani(d, plan)}</section>`;
+${sekcePlanovani(d, plan)}</section>`}`;
 
   return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, telo, { dotaz: z.idObjednavky || z.idAktivity });
 }

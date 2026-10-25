@@ -189,7 +189,8 @@ function posli(res: ServerResponse, kod: number, html: string) {
   const role = roleOdpovedi.get(res);
   html = html
     .replace(/<!--konfigurace:(on|off)-->/, (_, on) => (role === "spravce" ? `<a href="/konfigurace" class="konfig${on === "on" ? " on" : ""}">⚙ Konfigurace</a>` : ""))
-    .replace("<!--role-->", role ? ` · ${POPIS_ROLE[role]}` : "");
+    .replace("<!--role-->", role ? ` · ${POPIS_ROLE[role]}` : "")
+    .replace(/<!--doplnit:(on|off)-->/, (_, on) => (role === "technik" ? "" : `<a href="/technik" class="${on === "on" ? "on" : ""}">Doplnit technika</a>`));
   res.writeHead(kod, {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
@@ -261,7 +262,12 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         res.writeHead(302, { location: kam });
         res.end();
       };
-      const zapis = role === "cteni" ? { zapnuty: false, technici: [] as string[] } : (n.zapis ?? { zapnuty: false, technici: [] });
+      const zapis = role === "cteni" || role === "technik" ? { zapnuty: false, technici: [] as string[] } : (n.zapis ?? { zapnuty: false, technici: [] });
+      // technik: jen prohlížení zakázky – plánování, zápis a Doplnit technika nejsou dostupné
+      const jenNahled = role === "technik";
+      if (jenNahled && (url.pathname === "/technik" || /^\/zakazka\/[^/]+\/zapis$/.test(url.pathname))) {
+        return posli(res, 403, strankaChyby(403, "Role technik může zakázky jen prohlížet – plánování není dostupné."));
+      }
       const smiTechnik = (t: string) => smiZapisovat(t, zapis.technici);
 
       // ---------- Plánovat zakázku: hledání → zakázka ----------
@@ -301,7 +307,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const puvodni = presun && kontext.technici.find((t) => t.jmeno === presun.pt && t.kalendar === presun.pk);
         if (!vyb || !technik || (presun && (!puvodni || !detail.z.termin))) return posli(res, 400, strankaChyby(400, "Neplatný výběr slotu – vyberte termín znovu z nabídky."));
         const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presun, doplnit: pp && !presun });
-        const povolen = role !== "cteni" && zapis.zapnuty && smiTechnik(technik.jmeno) && (!puvodni || smiTechnik(puvodni.jmeno)) && !brany.blokace.length;
+        const povolen = role !== "cteni" && role !== "technik" && zapis.zapnuty && smiTechnik(technik.jmeno) && (!puvodni || smiTechnik(puvodni.jmeno)) && !brany.blokace.length;
         // nestandardní úprava: vlastní název / čas události (výrazně označeno, zapíše se do GCAL tak, jak je)
         const nestd = nestandardZFormulare(formular, vyb.od, vyb.do);
         const casOd = nestd?.od ?? vyb.od;
@@ -379,7 +385,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presunPlan, doplnit });
         const odP = url.searchParams.get("od") ?? "";
         const odData = /^\d{4}-\d{2}-\d{2}$/.test(odP) && !Number.isNaN(Date.parse(odP)) && odP > isoDate(now) ? odP : undefined;
-        const spocitat = !brany.blokace.length && !detail.uzavreno && planovac;
+        const spocitat = !brany.blokace.length && !detail.uzavreno && planovac && !jenNahled;
         const adresaZ = [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
         const [zdroje, nabidka, lokalita] = await Promise.all([
           n.zdroje ? hledejVsude(n.zdroje(), vyrazyZakazky(detail.z), now) : Promise.resolve(null),
@@ -422,6 +428,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           preplanovat,
           doplnit,
           presun: presunPlan,
+          jenNahled,
         }));
       }
 

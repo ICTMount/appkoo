@@ -37,7 +37,7 @@ export interface Ciselnik {
 }
 
 /** Role uživatelů: správce = konfigurace a uživatelé; koordinátorka = plánování a zápis; jen čtení = bez zápisu */
-export const ROLE_UZIVATELU = ["správce", "koordinátorka", "jen čtení"] as const;
+export const ROLE_UZIVATELU = ["správce", "koordinátorka", "jen čtení", "technik"] as const;
 
 /** Parametry plánování (číselník Nastavení plánování) – výchozí hodnoty odpovídají dohodě z fáze 1 */
 export const PARAMETRY_PLANOVANI = {

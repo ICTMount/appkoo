@@ -4,11 +4,12 @@
 //   správce        plánování + zápis + Konfigurace (číselníky, uživatelé)
 //   koordinátorka  plánování + zápis do kalendáře
 //   jen čtení      vidí zakázky a nabídky, nezapisuje
+//   technik        vidí jen detail zakázky se všemi zdroji (bez „Kam naplánovat“ a bez „Doplnit technika“)
 
 import { nactiCiselnik } from "../db/ciselniky.js";
 import type { Dotaz } from "../db/db.js";
 
-export type Role = "spravce" | "koordinator" | "cteni";
+export type Role = "spravce" | "koordinator" | "cteni" | "technik";
 
 const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 
@@ -17,10 +18,11 @@ export function roleZCiselniku(v: unknown): Role | null {
   if (r === "spravce" || r === "vedouci") return "spravce";
   if (r === "koordinatorka" || r === "koordinator" || r === "operatorka") return "koordinator";
   if (r === "jen cteni" || r === "cteni") return "cteni";
+  if (r === "technik") return "technik";
   return null;
 }
 
-export const POPIS_ROLE: Record<Role, string> = { spravce: "správce", koordinator: "koordinátorka", cteni: "jen čtení" };
+export const POPIS_ROLE: Record<Role, string> = { spravce: "správce", koordinator: "koordinátorka", cteni: "jen čtení", technik: "technik" };
 
 /**
  * Role přihlášeného uživatele, nebo null = nemá přístup.

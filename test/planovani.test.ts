@@ -359,13 +359,22 @@ describe("uživatelé a Konfigurace", () => {
     expect(uvod).toContain('href="/konfigurace"');
     expect(uvod).toContain("· správce");
 
-    const csv = "E-mail;Jméno;Iniciály;Role;Aktivní\njana@ictmount.com;Jana Hadravová;JH;koordinátorka;ano\npetra@ictmount.com;Petra;PO;jen čtení;ano\nstara@ictmount.com;Stará;SS;koordinátorka;ne";
+    const csv = "E-mail;Jméno;Iniciály;Role;Aktivní\njana@ictmount.com;Jana Hadravová;JH;koordinátorka;ano\npetra@ictmount.com;Petra;PO;jen čtení;ano\nstara@ictmount.com;Stará;SS;koordinátorka;ne\nhristov@ictmount.com;Hristov;HR;technik;ano";
     await ulozImport(db, "koordinatorky", nahledImportu("koordinatorky", csv, []), "test", "test");
     expect((await w.get("/", "jana@ictmount.com")).status).toBe(200);
     expect((await w.get("/", "cizi@ictmount.com")).status).toBe(403);
     expect((await w.get("/", "stara@ictmount.com")).status).toBe(403);
     expect(await (await w.get("/", "petra@ictmount.com")).text()).toContain("· jen čtení");
     expect((await w.get("/")).status).toBe(200); // správce i bez řádku v číselníku
+
+    // technik: detail zakázky se zdroji ano, „Kam naplánovat“, zápis a Doplnit technika ne
+    const t = await (await w.get("/zakazka/P1", "hristov@ictmount.com")).text();
+    expect(t).toContain("· technik");
+    expect(t).not.toContain("Kam naplánovat");
+    expect(t).not.toContain("Doplnit technika");
+    expect((await w.get("/technik", "hristov@ictmount.com")).status).toBe(403);
+    expect((await w.get("/zakazka/P1/zapis?k=K1&e=v1&t=Hristov&od=2026-10-16T10:00:00.000Z&do=2026-10-16T12:00:00.000Z", "hristov@ictmount.com")).status).toBe(403);
+    expect(await (await w.get("/zakazka/P1", "jana@ictmount.com")).text()).toContain("Kam naplánovat");
   });
 
   it("historie uživatelů: hledání, zakázka a odepřený přístup se zapíšou; vidí jen správce", async () => {
