@@ -11,6 +11,7 @@ import { jeVolneOkno, jeVyhrazeneVolno, vytizeniDne, type UdalostTechnika, type 
 import { POVINNA_POTVRZENI } from "./planovani.js";
 import type { Nalez, NalezLokality, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
 import { webcalendar, type Webcalendar } from "../domain/webcalendar.js";
+import { migrace, zasuvkaUsed, type Migrace } from "../domain/migrace.js";
 import type { Zaznam } from "../import/notes.js";
 
 export function esc(s: unknown): string {
