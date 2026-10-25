@@ -225,9 +225,12 @@ export async function importujNotifikace(
   await priprav(db);
   const naText = deps.textZPdf ?? textZPdf;
   const naBbox = deps.bboxZPdf ?? bboxZPdf;
-  // neúspěšné soubory se po dni zkusí znovu (výpadek Drive apod.); PDF načtená starší verzí bez „priebeh“ se přečtou znovu
+  // neúspěšné soubory se po dni zkusí znovu (výpadek Drive apod.); PDF načtená starší verzí (bez tabulky Priebeh,
+  // nebo bez sloupce Typ linky v ní) se přečtou znovu
   const { rows } = await db.query<{ soubor_id: string }>(
-    "SELECT soubor_id FROM notifikace_pdf WHERE (chyba IS NULL AND priebeh IS NOT NULL) OR (chyba IS NOT NULL AND nacteno > now() - interval '1 day')",
+    `SELECT soubor_id FROM notifikace_pdf
+      WHERE (chyba IS NULL AND priebeh IS NOT NULL AND (priebeh = '[]'::jsonb OR priebeh->0 ? 'typLinky'))
+         OR (chyba IS NOT NULL AND nacteno > now() - interval '1 day')`,
   );
   const znama = new Set(rows.map((r) => r.soubor_id));
 
