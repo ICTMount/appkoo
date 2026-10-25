@@ -98,7 +98,6 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-radek{padding:3px 8px;margin:2px 0;border-radius:6px;border-left:3px solid transparent}
 .gc-povinne{background:var(--warn-bg,#fff4d6);border-left-color:#e65100}.gc-povinne .gc-stitek{color:#e65100}.gc-povinne input,.gc-povinne select{border:1px solid #e65100;background:var(--panel)}
 .gc-volitelne{color:var(--muted);border-left-color:var(--line)}.gc-volitelne .gc-stitek{font-weight:500;color:var(--muted)}.gc-volitelne input,.gc-volitelne select{border:1px solid var(--line);background:var(--panel)}
-.gc-tag{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--panel)}.gc-tag.povinne{border-color:#e65100;color:#e65100}
 .gc-vedlejsi{font-size:12px;color:var(--muted);line-height:1.6}.gcal input.gc-ram{border:1px solid #e65100;background:var(--panel);padding:4px 8px}
 .gc-flex label.volba{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:13px;cursor:pointer}.gc-flex label.volba small{color:var(--muted)}.gc-flex label.volba:has(input:checked){border-color:#e65100;background:#e65100;color:#fff}.gc-flex label.volba:has(input:checked) small{color:#ffe0c2}.gc-flex input[type=radio]{margin:0;accent-color:#e65100}.gc-vedlejsi .gc-stitek{font-weight:500;color:var(--muted)}
 .gcal input,.gcal select{padding:2px 6px;font-size:13px;border-radius:4px;background:transparent;border:1px solid transparent;border-bottom:1px solid var(--line)}
@@ -696,8 +695,7 @@ export function strankaZapisu(
   const kdy = `${DNY_CELE[vyb.od.getUTCDay()]} ${vyb.od.getUTCDate()}. ${MESICE[vyb.od.getUTCMonth()]} · ${nestd ? `${esc(casOd)}–${esc(casDo)}` : `${fmtTime(vyb.od)}–${fmtTime(vyb.do)}`}`;
   // řádek popisu události: ŠTÍTEK: hodnota – ve stejném pořadí, jak se zapíše do kalendáře
   // váha = povinne (musí být vyplněno – zvýrazněný řádek se štítkem) | volitelne (doplňkové, ztlumené) | "" (informace)
-  const stitekVahy = (vaha: string) => (vaha === "povinne" ? `<span class="gc-tag povinne">povinné</span>` : vaha === "volitelne" ? `<span class="gc-tag">volitelné</span>` : "");
-  const r = (stitek: string, obsah: string, vaha = "") => `<div class="gc-radek${vaha ? ` gc-${vaha}` : ""}"><span class="gc-stitek">${esc(stitek)}</span>${obsah}${stitekVahy(vaha)}</div>`;
+  const r = (stitek: string, obsah: string, vaha = "") => `<div class="gc-radek${vaha ? ` gc-${vaha}` : ""}"><span class="gc-stitek">${esc(stitek)}</span>${obsah}</div>`;
   const form = `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis" class="gcal">
 <input type="hidden" name="k" value="${esc(vyb.k)}"><input type="hidden" name="e" value="${esc(vyb.e)}"><input type="hidden" name="t" value="${esc(vyb.t)}">
 <input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">${presunPole(vyb.presun)}${vyb.pp && !vyb.presun ? `<input type="hidden" name="pp" value="1">` : ""}
@@ -718,7 +716,7 @@ ${r("Tel:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <input name="ko
 <label class="volba"><input type="radio" name="flex" value="ne"${flex === "ne" ? " checked" : ""}> Pevný termín <small>(není FLEX)</small></label>
 <label class="volba"><input type="radio" name="flex" value="den"${flex === "den" ? " checked" : ""}> FLEX ten den <small>(čas v rámci dne lze posunout)</small></label>
 <label class="volba"><input type="radio" name="flex" value="obecne"${flex === "obecne" ? " checked" : ""}> FLEX obecně <small>(důchodce, rodičovská, často HO)</small></label>
-<input name="flexPozn" placeholder="upřesnění – např. jen do 14 h, odchod k lékaři" value="${h("flexPozn")}" size="36"><span class="gc-tag povinne">povinné</span></div>
+<input name="flexPozn" placeholder="upřesnění – např. jen do 14 h, odchod k lékaři" value="${h("flexPozn")}" size="36"></div>
 ${r("Zásuvka:", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– číslo / foto</span> <input name="zasuvka" placeholder="číslo zásuvky" value="${h("zasuvka")}" size="14">`, "povinne")}
 ${r("Číslo patra a bytu:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`, "povinne")}
 ${r("Patra volně přístupná:", v("patraPristupna", ANO_NE), "volitelne")}
