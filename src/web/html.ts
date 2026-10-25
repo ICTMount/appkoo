@@ -73,7 +73,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}.P0{background:var(--p0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.webcal-pruh .btn{margin-left:8px}
+.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.zaznam:first-child{border-top:0}
@@ -193,6 +193,22 @@ export const predobjStitek = (z: { predobjednavka?: boolean }) =>
 /** Zakázka z webového kalendáře – přišla už s termínem, který si zákazník vybral sám */
 export const webcalStitek = (z: { zaznamy?: Zaznam[] }) =>
   webcalendar(z) ? ` <span class="webcal" title="Webcalendar – zákazník si termín vybral sám, zakázka přišla s dohodnutým termínem">WEBCALENDAR</span>` : "";
+/** SWAP / FIS MOP – migrace s tvrdým pravidlem termínu (zlatá pravidla 4 a 5) */
+export const migraceStitek = (z: Parameters<typeof migrace>[0]) => {
+  const m = migrace(z);
+  return m ? ` <span class="migrace" title="${m.typ === "SWAP" ? "SWAP migrace – instalace do 7 dní od CASEID, jinak zákazník bez internetu" : "FIS MOP – termín instalace nesmí být před datem portace"}">${m.typ}</span>` : "";
+};
+function pruhMigrace(m: Migrace, now: Date): string {
+  const caseId = m.caseId ? ` CASEID <b>${esc(m.caseId)}</b>` : "";
+  if (m.typ === "SWAP") {
+    const lhuta = m.nejpozdeji
+      ? ` – CASEID z ${esc(fmtDate(m.od!))}, instalace <b>nejpozději ${esc(fmtDate(m.nejpozdeji))}</b>${m.nejpozdeji.getTime() < now.getTime() ? ` <b class="c-cerv">(lhůta uplynula)</b>` : ""}`
+      : "";
+    return `<div class="err migrace-pruh"><b>SWAP migrace</b>${caseId}${lhuta}. Instalace <b>do 7 dní od CASEID</b>, jinak je zákazník bez internetu. (Hnízdilovej 603 602 634)</div>`;
+  }
+  const portace = m.portace ? ` Datum portace <b>${esc(fmtDate(m.portace))}</b> – termín <b>až po něm</b>.` : ` Datum portace v poznámce nenalezeno – ověřte v ticketu.`;
+  return `<div class="err migrace-pruh"><b>FIS MOP</b>${caseId} – termín instalace <b>nesmí být před datem portace</b>.${portace}</div>`;
+}
 /** Výrazný pruh u zakázky z webcalendar: termín si vybral zákazník, je jen v MWF – je potřeba ho zapsat do GCAL */
 function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: string): string {
   const kdy = `${fmtDate(w.at)} ${fmtTime(w.at)}`;
@@ -204,8 +220,8 @@ function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: stri
 }
 
 /** Sloupec P17: vlastník sítě a pod ním štítky předobjednávky / webcalendar */
-const p17Bunka = (z: { infrastruktura: string; predobjednavka?: boolean; zaznamy?: Zaznam[] }) =>
-  `${infraStitek(z.infrastruktura)}${z.predobjednavka ? `<br>${predobjStitek(z).trim()}` : ""}${webcalendar(z) ? `<br>${webcalStitek(z).trim()}` : ""}`;
+const p17Bunka = (z: { infrastruktura: string; predobjednavka?: boolean; zaznamy?: Zaznam[]; poznamka?: string; uvodPoznamky?: string }) =>
+  `${infraStitek(z.infrastruktura)}${z.predobjednavka ? `<br>${predobjStitek(z).trim()}` : ""}${webcalendar(z) ? `<br>${webcalStitek(z).trim()}` : ""}${migrace(z) ? `<br>${migraceStitek(z).trim()}` : ""}`;
 
 /** Buňka ID v seznamech: O-ID (+ předobjednávka), pod tím malým písmem ID S7 obj. a u předobjednávky RFS */
 const idBunka = (z: { idAktivity: string; idObjednavky: string; idS7: string; predobjednavka?: boolean; typAktivity: string; rfs?: Date | null }) =>
@@ -380,9 +396,10 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
       }`
     : `<span class="muted">bez historie</span>`;
 
-  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${webcalStitek(z)} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${webcalStitek(z)}${migraceStitek(z)} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity) : ""}
+${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="grid">
 <div class="card"><h2>Zákazník</h2><dl>
