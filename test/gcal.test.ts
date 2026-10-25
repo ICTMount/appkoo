@@ -27,7 +27,7 @@ describe("šablona události", () => {
     expect(u.start).toEqual({ dateTime: "2026-10-16T10:00:00", timeZone: "Europe/Prague" });
     expect(u.description).toContain("TEL: 603354035");
     expect(u.description).toContain("ČÍSLO PATRA A BYTU: 3 / 12");
-    expect(u.description).toContain("SOUHLAS S VRTÁNÍM: NE = dotaz na PEP");
+    expect(u.description).toContain("SOUHLAS S VRTÁNÍM: NE = vrátit na PEP, nebo STORNO");
     expect(u.description).toContain("CASEID: CZ-1");
     expect(u.description).not.toContain("PODB"); // jen pro síť T-Mobile
     expect(u.extendedProperties.private).toEqual({ appkoo: "A1", objednavka: "O-8532577900", s7: "1-D79CTLE" });

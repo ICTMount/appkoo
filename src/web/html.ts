@@ -95,6 +95,8 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-blok{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}.gc-blok>.gc-ikona{flex:none;width:20px;height:20px;color:var(--muted);margin-top:2px}.gc-blok>.gc-ikona svg{width:20px;height:20px}
 .gc-misto{font-size:14px;padding-top:2px}.gc-popis{flex:1;min-width:0;font-size:13.5px;line-height:1.9}
 .gc-radek{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}.gc-stitek{font-weight:600;letter-spacing:.01em}.gc-mezi{color:var(--text)}
+.gc-zasadni{background:var(--warn-bg,#fff4d6);border-left:3px solid #e65100;padding:2px 8px;margin:3px 0;border-radius:4px}.gc-zasadni .gc-stitek{color:#e65100}.gc-zasadni input,.gc-zasadni select{border:1px solid #e65100;background:var(--panel)}
+.gc-vedlejsi{font-size:12px;color:var(--muted);line-height:1.6}.gc-vedlejsi .gc-stitek{font-weight:500;color:var(--muted)}
 .gcal input,.gcal select{padding:2px 6px;font-size:13px;border-radius:4px;background:transparent;border:1px solid transparent;border-bottom:1px solid var(--line)}
 .gcal input:hover,.gcal select:hover,.gcal input:focus,.gcal select:focus{border-color:var(--line);background:var(--panel)}
 .gc-predpis{align-items:flex-start;flex-direction:column;margin-top:6px}.gc-predpis textarea{min-height:140px;font-size:13px;line-height:1.5}
@@ -654,14 +656,25 @@ export function strankaZapisu(
   const z = d.z;
   const h = (n: string) => esc(hodnoty.get(n) ?? "");
   const v = (n: string, moznosti: [string, string][], vychozi = "") => vyber(n, moznosti, hodnoty.get(n) ?? vychozi);
-  // instalační předpis: předvyplnit z notifikačního PDF, když koordinátorka ještě nic nezapsala
-  const predpis = hodnoty.get("predpis") ?? (d.notifikace?.predpis.length ? d.notifikace.predpis.join("\n") : "");
+  // instalační předpis: předvyplnit vším z notifikačního PDF (předpis, KZ, akce technika z Priebeh optický)
+  const n = d.notifikace;
+  const zPdf = n
+    ? [
+        ...n.predpis,
+        ...(n.cpeMode || n.zoznam ? [`Zoznam KZ: CPE Mode ${n.cpeMode ?? "?"}${n.zoznam ? ` · ${n.zoznam}` : ""}`] : []),
+        ...(n.priebeh?.length ? [`Priebeh optický: ${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("; ") : "všude Ponechať"}`] : []),
+      ].join("\n")
+    : "";
+  const predpis = hodnoty.get("predpis") ?? zPdf;
+  // předpojen: když v Priebeh optický není žádná akce technika (vše Ponechať), je přípojka předpojená
+  const predpojenZPdf = n?.priebeh?.length ? (kVytvoreni(n.priebeh).length ? "ne" : "ano") : "";
   const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
   const nadpis = nahled?.summary ?? `${vyb.t} - ${z.typAktivity.includes("PIV") ? "PIV" : "FTTH"}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}`;
   const misto = nahled?.location ?? z.adresa;
   const kdy = `${DNY_CELE[vyb.od.getUTCDay()]} ${vyb.od.getUTCDate()}. ${MESICE[vyb.od.getUTCMonth()]} · ${fmtTime(vyb.od)}–${fmtTime(vyb.do)}`;
   // řádek popisu události: ŠTÍTEK: hodnota – ve stejném pořadí, jak se zapíše do kalendáře
-  const r = (stitek: string, obsah: string) => `<div class="gc-radek"><span class="gc-stitek">${esc(stitek)}</span>${obsah}</div>`;
+  // váha = zasadni (zvýrazněné – bez toho technik nevyjede) | vedlejsi (doplňkové, menší písmo)
+  const r = (stitek: string, obsah: string, vaha = "") => `<div class="gc-radek${vaha ? ` gc-${vaha}` : ""}"><span class="gc-stitek">${esc(stitek)}</span>${obsah}</div>`;
   const form = `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis" class="gcal">
 <input type="hidden" name="k" value="${esc(vyb.k)}"><input type="hidden" name="e" value="${esc(vyb.e)}"><input type="hidden" name="t" value="${esc(vyb.t)}">
 <input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">${presunPole(vyb.presun)}${vyb.pp && !vyb.presun ? `<input type="hidden" name="pp" value="1">` : ""}
@@ -671,20 +684,19 @@ export function strankaZapisu(
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
 ${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span>`)}
-${r("", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– zásuvka</span> <input name="zasuvka" placeholder="číslo / foto" value="${h("zasuvka")}" size="14">`)}
-${r("INSTALACE:", `<span>Optický internet</span> <span class="gc-mezi">/ IPTV</span> ${v("iptv", [["ne", "ne"], ["ano", "ano"]], "ne")}`)}
-${r("ČÍSLO PATRA A BYTU:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`)}
-${r("PATRA VOLNĚ PŘÍSTUPNÁ:", v("patraPristupna", ANO_NE))}
-${r("STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran):", v("stoupacka", ANO_NE_NEVIM, "NEVÍM"))}
-${r("VZDÁLENOST OD STOUPAČKY (řádově):", `<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}" size="5"> <span class="gc-mezi">metrů</span>`)}
-${r("STÁVAJÍCÍ LIŠTY/OMEZENÍ V LIŠTOVÁNÍ OD SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"))}
-${r("SOUHLAS S VRTÁNÍM:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = dotaz na PEP)</span>`)}
+${r("ZÁSUVKA:", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– číslo / foto</span> <input name="zasuvka" placeholder="číslo zásuvky" value="${h("zasuvka")}" size="14">`, "zasadni")}
+${r("ČÍSLO PATRA A BYTU:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`, "zasadni")}
+${r("SOUHLAS S VRTÁNÍM:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = vrátit na PEP, nebo STORNO)</span>`, "zasadni")}
+${r("PATRA VOLNĚ PŘÍSTUPNÁ:", v("patraPristupna", ANO_NE), "vedlejsi")}
+${r("STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran):", v("stoupacka", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
+${r("VZDÁLENOST OD STOUPAČKY (řádově):", `<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}" size="5"> <span class="gc-mezi">metrů</span>`, "vedlejsi")}
+${r("STÁVAJÍCÍ LIŠTY/OMEZENÍ V LIŠTOVÁNÍ OD SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
 ${r("KONCOVÉ ZAŘÍZENÍ UMÍSTÍME V:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– EL. ZÁSUVKA:</span> ${v("elZasuvka", ANO_NE)}`)}
 ${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <span class="gc-mezi">STB:</span> <input name="stb" value="${h("stb")}" size="10">${d.notifikace?.cpeMode ? ` <span class="gc-mezi muted">(z PDF: ${esc(d.notifikace.cpeMode)}${d.notifikace.zoznam ? ` · ${esc(d.notifikace.zoznam)}` : ""})</span>` : ""}`)}
-${r("PŘEDPOJEN:", v("predpojen", ANO_NE))}
+${r("PŘEDPOJEN:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "všude Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`)}
 ${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`)}
 ${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`)}
-<div class="gc-radek gc-predpis"><span class="gc-stitek">INSTALAČNÍ PŘEDPIS:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${d.notifikace?.predpis.length && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(d.notifikace.nazev)}</span>` : ""}</div>
+<div class="gc-radek gc-predpis"><span class="gc-stitek">INSTALAČNÍ PŘEDPIS:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${zPdf && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
 </div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.potvrzeni}</span><div>
 ${POVINNA_POTVRZENI.map((p) => `<label class="check"><input type="checkbox" name="${p.pole}" value="ano"${hodnoty.get(p.pole) === "ano" ? " checked" : ""}> ${esc(p.text)}</label>`).join("")}

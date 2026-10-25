@@ -58,7 +58,7 @@ export function udajeZFormulare(f: URLSearchParams): UdajeHovoru {
   return {
     novaInstalace: f.get("instalace") === "existujici" ? false : f.get("instalace") === "nova" ? true : undefined,
     zasuvka: text(f.get("zasuvka")),
-    iptv: f.get("iptv") === "ano",
+    iptv: f.get("iptv") === "ano", // pole už ve formuláři není (IPTV se neřeší) – zůstává kvůli starým odkazům
     patro: text(f.get("patro")),
     byt: text(f.get("byt")),
     patraPristupna: anoNe(f.get("patraPristupna")),

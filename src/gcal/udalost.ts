@@ -65,7 +65,7 @@ export function sestavUdalost(
     `STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran): ${h.stoupacka ?? "NEVÍM"}`,
     `VZDÁLENOST OD STOUPAČKY (řádově): ${h.vzdalenostOdStoupackyM ?? "?"} metrů`,
     `STÁVAJÍCÍ LIŠTY/OMEZENÍ V LIŠTOVÁNÍ OD SVJ: ${h.listyOmezeniSvj ?? "NEVÍM"}`,
-    `SOUHLAS S VRTÁNÍM: ${ano(h.souhlasSVrtanim)}${h.souhlasSVrtanim === false ? " = dotaz na PEP" : ""}`,
+    `SOUHLAS S VRTÁNÍM: ${ano(h.souhlasSVrtanim)}${h.souhlasSVrtanim === false ? " = vrátit na PEP, nebo STORNO" : ""}`,
     `KONCOVÉ ZAŘÍZENÍ UMÍSTÍME V: ${h.umisteniKz ?? "dle konzultace s technikem"} – EL. ZÁSUVKA: ${ano(h.elZasuvka)}`,
     `KZ: ${h.kz ?? (z.balik || "?")}`,
     `PŘEDPOJEN: ${ano(h.predpojen)}`,
