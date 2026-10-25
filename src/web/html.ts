@@ -694,7 +694,7 @@ export function strankaZapisu(
 <div class="gc-karta">
 <div class="gc-hlava"><span class="gc-barva"></span><div><div class="gc-nadpis">${esc(nadpis)}</div><div class="gc-kdy">${kdy}</div></div></div>
 <div class="gc-nestd">
-<label class="check"><input type="checkbox" name="nestandard" value="1"${nestd ? " checked" : ""}> Nestandardní úprava názvu a času události <span class="muted">(zaškrtnout jen výjimečně)</span></label>
+<label class="check"><input type="checkbox" name="nestandard" value="1"${nestd ? " checked" : ""}> Editace úpravy názvu a času události <span class="muted">(nestandardní zásah)</span></label>
 <div class="gc-nestd-pole">
 <div class="err"><b>POZOR – nestandardní úprava zakázky.</b> Název a čas níže se zapíšou do Google Kalendáře přesně tak, jak jsou zde uvedené, místo standardní šablony. Slot VOLNY se přepíše celý; MWF upravte ručně na stejný čas.</div>
 <label>Název události<input name="nadpis" value="${esc(hodnoty.get("nadpis") ?? nadpis)}" size="90"></label>
@@ -703,8 +703,7 @@ export function strankaZapisu(
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
-${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span>`)}
-${r("U INSTALACE BUDE JINÁ OSOBA:", `<input name="kontakt" class="gc-ram" placeholder="telefon, vztah, jméno – např. 722 060 263 bratr p. Novák" value="${h("kontakt")}" size="48">`, "zasadni")}
+${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <input name="kontakt" class="gc-ram" placeholder="U INSTALACE BUDE JINÁ OSOBA – telefon, vztah, jméno" value="${h("kontakt")}" size="46">`)}
 <div class="gc-radek gc-zasadni gc-flex"><span class="gc-stitek">FLEX:</span>
 <label class="volba"><input type="radio" name="flex" value="ne"${flex === "ne" ? " checked" : ""}> Pevný termín <small>(není FLEX)</small></label>
 <label class="volba"><input type="radio" name="flex" value="den"${flex === "den" ? " checked" : ""}> FLEX ten den <small>(čas v rámci dne lze posunout)</small></label>
