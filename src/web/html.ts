@@ -677,10 +677,12 @@ export function strankaZapisu(
   const n = d.notifikace;
   const zPdf = n
     ? [
-        ...(n.priebeh?.length ? [`Priebeh optický: ${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("; ") : "vše Ponechať"}`] : []),
-        ...n.predpis,
-        ...(n.cpeMode || n.zoznam ? [`Zoznam KZ: CPE Mode ${n.cpeMode ?? "?"}${n.zoznam ? ` · ${n.zoznam}` : ""}`] : []),
-      ].join("\n")
+        n.priebeh?.length ? `Priebeh optický:\n${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("\n") : "vše Ponechať"}` : "",
+        n.predpis.length ? `Inštalačný predpis:\n${n.predpis.join("\n")}` : "",
+        n.cpeMode || n.zoznam ? `Zoznam KZ:\nCPE Mode ${n.cpeMode ?? "?"}${n.zoznam ? ` · ${n.zoznam}` : ""}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n")
     : "";
   const predpis = hodnoty.get("predpis") ?? zPdf;
   const flex = hodnoty.get("flex") ?? "ne";
