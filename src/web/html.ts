@@ -96,7 +96,7 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-misto{font-size:14px;padding-top:2px}.gc-popis{flex:1;min-width:0;font-size:13.5px;line-height:1.9}
 .gc-radek{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}.gc-stitek{font-weight:600;letter-spacing:.01em}.gc-mezi{color:var(--text)}
 .gc-zasadni{background:var(--warn-bg,#fff4d6);border-left:3px solid #e65100;padding:2px 8px;margin:3px 0;border-radius:4px}.gc-zasadni .gc-stitek{color:#e65100}.gc-zasadni input,.gc-zasadni select{border:1px solid #e65100;background:var(--panel)}
-.gc-vedlejsi{font-size:12px;color:var(--muted);line-height:1.6}
+.gc-vedlejsi{font-size:12px;color:var(--muted);line-height:1.6}.gcal input.gc-ram{border:1px solid #e65100;background:var(--panel);padding:4px 8px}
 .gc-flex label.volba{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:13px;cursor:pointer}.gc-flex label.volba small{color:var(--muted)}.gc-flex label.volba:has(input:checked){border-color:#e65100;background:#e65100;color:#fff}.gc-flex label.volba:has(input:checked) small{color:#ffe0c2}.gc-flex input[type=radio]{margin:0;accent-color:#e65100}.gc-vedlejsi .gc-stitek{font-weight:500;color:var(--muted)}
 .gcal input,.gcal select{padding:2px 6px;font-size:13px;border-radius:4px;background:transparent;border:1px solid transparent;border-bottom:1px solid var(--line)}
 .gcal input:hover,.gcal select:hover,.gcal input:focus,.gcal select:focus{border-color:var(--line);background:var(--panel)}
@@ -703,7 +703,8 @@ export function strankaZapisu(
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
-${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <span class="gc-mezi muted">· u instalace bude jiná osoba:</span> <input name="kontakt" placeholder="telefon, vztah, jméno – např. 722 060 263 bratr p. Novák" value="${h("kontakt")}" size="44">`)}
+${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span>`)}
+${r("U INSTALACE BUDE JINÁ OSOBA:", `<input name="kontakt" class="gc-ram" placeholder="telefon, vztah, jméno – např. 722 060 263 bratr p. Novák" value="${h("kontakt")}" size="48">`, "zasadni")}
 <div class="gc-radek gc-zasadni gc-flex"><span class="gc-stitek">FLEX:</span>
 <label class="volba"><input type="radio" name="flex" value="ne"${flex === "ne" ? " checked" : ""}> Pevný termín <small>(není FLEX)</small></label>
 <label class="volba"><input type="radio" name="flex" value="den"${flex === "den" ? " checked" : ""}> FLEX ten den <small>(čas v rámci dne lze posunout)</small></label>
