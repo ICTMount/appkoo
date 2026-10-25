@@ -331,7 +331,7 @@ export function sekceNotifikace(n: Detail["notifikace"]): string {
   // pořadí oddílů jako v PDF: Priebeh optický → Inštalačný predpis → Zoznam KZ
   const telo = !n
     ? `<span class="muted">Notifikační PDF k této aktivitě zatím nedorazilo.</span>`
-    : `<h3>Priebeh optický – akce technika <small class="muted">Názov linky / A uzol / Akcia na linke / Z akcia</small></h3>
+    : `<h3>Priebeh optický – akce technika <small class="muted">Názov linky / A uzol / Akcia na linke / Z akcia / Typ linky</small></h3>
 ${priebeh()}
 <h3>Inštalačný predpis k</h3>
 ${n.predpis.length ? `<ul class="predpis">${n.predpis.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<span class="muted">v PDF chybí</span>`}

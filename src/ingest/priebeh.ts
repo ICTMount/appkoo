@@ -11,6 +11,8 @@ export interface RadekPriebehu {
   /** Akcia na linke (EXIST / NEW) */
   akciaNaLinke?: string;
   zAkcia: string;
+  /** Typ linky (Crossconnect / Patchcord / Cable / Relation) */
+  typLinky?: string;
 }
 
 interface Slovo {
@@ -73,6 +75,7 @@ interface Sloupce {
   aUzol: [number, number];
   akciaNaLinke: [number, number];
   zAkcia: [number, number];
+  typLinky: [number, number];
 }
 
 /** Hranice sloupců ze záhlaví tabulky (středy popisků, hranice = poloviny mezi sousedy) */
@@ -94,6 +97,7 @@ function sloupceZeZahlavi(slova: Slovo[], odY: number): { sloupce: Sloupce; kone
   };
   const cNazov = nazov.x, cAUzol = stred(uzly[0]!), cAPort = stred(porty[0]!), cZUzol = stred(uzly[1]!), cZAkcia = stred(akcia), cTyp = typ.x;
   const cAkcia = akciaNaLinke?.x ?? (cAPort + cZUzol) / 2;
+  const cZPort = porty[1] ? stred(porty[1]) : cTyp + (cTyp - cZAkcia); // „Z port“ hned za „Typ linky“
   const cFarba = farba?.x ?? (cAPort + cAkcia) / 2;
   const konecZahlavi = Math.max(...vZahlavi.map((w) => w.yMax));
   return {
@@ -102,6 +106,7 @@ function sloupceZeZahlavi(slova: Slovo[], odY: number): { sloupce: Sloupce; kone
       aUzol: [(cNazov + cAUzol) / 2, (cAUzol + cAPort) / 2],
       akciaNaLinke: [(cFarba + cAkcia) / 2, (cAkcia + cZUzol) / 2],
       zAkcia: [(cZUzol + cZAkcia) / 2, (cZAkcia + cTyp) / 2],
+      typLinky: [(cZAkcia + cTyp) / 2, (cTyp + cZPort) / 2],
     },
     konecZahlavi,
   };
@@ -156,6 +161,7 @@ export function parsujPriebeh(bboxHtml: string): RadekPriebehu[] {
         aUzol: textBunky(vRadku.filter((w) => vRozsahu(w, sloupce!.aUzol))),
         akciaNaLinke: textBunky(vRadku.filter((w) => vRozsahu(w, sloupce!.akciaNaLinke))),
         zAkcia: textBunky(sk),
+        typLinky: textBunky(vRadku.filter((w) => vRozsahu(w, sloupce!.typLinky))),
       });
     }
     if (doY !== Infinity) vSekci = false; // sekce skončila (další nadpis „Priebeh …“)
@@ -163,8 +169,8 @@ export function parsujPriebeh(bboxHtml: string): RadekPriebehu[] {
   return vysledek;
 }
 
-/** Jeden řádek pro koordinátorku: Názov linky / A uzol / Akcia na linke / Z akcia */
-export const radekPriebehu = (r: RadekPriebehu) => [r.nazovLinky, r.aUzol, r.akciaNaLinke, r.zAkcia].filter((x) => x).join(" / ");
+/** Jeden řádek pro koordinátorku: Názov linky / A uzol / Akcia na linke / Z akcia / Typ linky */
+export const radekPriebehu = (r: RadekPriebehu) => [r.nazovLinky, r.aUzol, r.akciaNaLinke, r.zAkcia, r.typLinky].filter((x) => x).join(" / ");
 
 /** Řádky, kde má technik něco udělat: 5. sloupec „Akcia na linke“ = NEW nebo Vytvoriť (záloha: Z akcia = Vytvoriť) */
 export const kVytvoreni = (radky: RadekPriebehu[]) =>

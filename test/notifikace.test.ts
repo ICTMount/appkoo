@@ -83,9 +83,9 @@ describe("notifikační PDF z MWF", () => {
 
   it("Priebeh optický: sloupce podle záhlaví, řádky podle Z akcia, zalomená slova se spojí", () => {
     const r = parsujPriebeh(readFileSync("test/fixtures/priebeh-bbox.html", "utf8"));
-    expect(r).toEqual([{ nazovLinky: "ZAMB/CTN/CETIN/CZE-ZAMB/CTN/CETIN/CZEXGSPON 4", aUzol: "ZAMB1 X-31", akciaNaLinke: "Ponechať", zAkcia: "Ponechať" }]);
-    expect(radekPriebehu({ nazovLinky: "SPP:000221:PH:1.3.55-G-ODF:0554:PH:38", aUzol: "SPP:000221:PH:Steinerova 1", akciaNaLinke: "NEW", zAkcia: "Vytvoriť" })).toBe(
-      "SPP:000221:PH:1.3.55-G-ODF:0554:PH:38 / SPP:000221:PH:Steinerova 1 / NEW / Vytvoriť",
+    expect(r).toEqual([{ nazovLinky: "ZAMB/CTN/CETIN/CZE-ZAMB/CTN/CETIN/CZEXGSPON 4", aUzol: "ZAMB1 X-31", akciaNaLinke: "Ponechať", zAkcia: "Ponechať", typLinky: "Relation" }]);
+    expect(radekPriebehu({ nazovLinky: "SPP:000325:PH:1.3.32-ODF:0795:PH:32", aUzol: "SPP:000325:PH:Anežky Malé 11", akciaNaLinke: "NEW", zAkcia: "Vytvoriť", typLinky: "Patchcord" })).toBe(
+      "SPP:000325:PH:1.3.32-ODF:0795:PH:32 / SPP:000325:PH:Anežky Malé 11 / NEW / Vytvoriť / Patchcord",
     );
     expect(kVytvoreni(r)).toEqual([]);
     expect(kVytvoreni([{ nazovLinky: "L", aUzol: "SPP:000221:PH:Steinerova 1", zAkcia: "Vytvor iť" }]).length).toBe(1);
