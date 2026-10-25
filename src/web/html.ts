@@ -332,7 +332,7 @@ export function sekceNotifikace(n: Detail["notifikace"]): string {
     if (!n!.priebeh) return `<span class="muted">tabulka se přečte při příštím běhu importu</span>`;
     if (!n!.priebeh.length) return `<span class="muted">tabulka v PDF nenalezena</span>`;
     const v = kVytvoreni(n!.priebeh);
-    if (!v.length) return `<span class="muted">všude Ponechať (${n!.priebeh.length} linek, žádná akce NEW / Vytvoriť)</span>`;
+    if (!v.length) return `<span class="muted">vše Ponechať (${n!.priebeh.length} linek, žádná akce NEW / Vytvoriť)</span>`;
     return `<ul class="predpis">${v.map((r) => `<li>${esc(radekPriebehu(r))}</li>`).join("")}</ul>`;
   };
   // pořadí oddílů jako v PDF: Priebeh optický → Inštalačný predpis → Zoznam KZ
@@ -671,7 +671,7 @@ export function strankaZapisu(
   const n = d.notifikace;
   const zPdf = n
     ? [
-        ...(n.priebeh?.length ? [`Priebeh optický: ${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("; ") : "všude Ponechať"}`] : []),
+        ...(n.priebeh?.length ? [`Priebeh optický: ${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("; ") : "vše Ponechať"}`] : []),
         ...n.predpis,
         ...(n.cpeMode || n.zoznam ? [`Zoznam KZ: CPE Mode ${n.cpeMode ?? "?"}${n.zoznam ? ` · ${n.zoznam}` : ""}`] : []),
       ].join("\n")
@@ -720,7 +720,7 @@ ${r("STÁVAJÍCÍ LIŠTY/OMEZENÍ V LIŠTOVÁNÍ OD SVJ:", v("listy", ANO_NE_NEV
 ${r("SOUHLAS S VRTÁNÍM:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = vrátit na PEP, nebo STORNO)</span>`, "zasadni")}
 ${r("KONCOVÉ ZAŘÍZENÍ UMÍSTÍME V:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– EL. ZÁSUVKA:</span> ${v("elZasuvka", ANO_NE)}`)}
 ${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <span class="gc-mezi">STB:</span> <input name="stb" value="${h("stb")}" size="10">${d.notifikace?.cpeMode ? ` <span class="gc-mezi muted">(z PDF: ${esc(d.notifikace.cpeMode)}${d.notifikace.zoznam ? ` · ${esc(d.notifikace.zoznam)}` : ""})</span>` : ""}`)}
-${r("PŘEDPOJEN:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "všude Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`)}
+${r("PŘEDPOJEN:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`)}
 ${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`)}
 ${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`)}
 <div class="gc-radek gc-predpis"><span class="gc-stitek">INSTALAČNÍ PŘEDPIS:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${zPdf && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
