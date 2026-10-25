@@ -41,9 +41,27 @@ export async function nactiKontext(db: Dotaz): Promise<KontextPlanovani> {
 }
 
 /** Iniciály koordinátorky do názvu události („(AP)“) podle e-mailu v číselníku Koordinátorky */
+/**
+ * Iniciály koordinátorky do názvu události („… SLA 18.10.2026 13:27 (DH)“):
+ * z číselníku Uživatelé (sloupec Iniciály), jinak ze jména („David Hnát“ → DH), jinak z e-mailu
+ * („david.hnat@“ → DH, „davidh@“ → DH = první písmeno + poslední písmeno loginu).
+ */
 export function inicialy(koordinatorky: Polozka[], email: string): string | undefined {
   const k = koordinatorky.find((p) => String(p.email ?? "").toLowerCase() === email.toLowerCase());
-  return k?.inicialy ? String(k.inicialy) : undefined;
+  if (k?.inicialy && String(k.inicialy).trim()) return String(k.inicialy).trim().toUpperCase();
+  const zeSlov = (s: string) =>
+    s
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .map((w) => w[0]!)
+      .join("")
+      .toUpperCase();
+  const jmeno = String(k?.jmeno ?? "").trim();
+  if (jmeno.split(/\s+/).length >= 2) return zeSlov(jmeno);
+  const login = email.split("@")[0] ?? "";
+  if (!login) return undefined;
+  if (/[._-]/.test(login)) return zeSlov(login);
+  return login.length >= 2 ? `${login[0]}${login[login.length - 1]}`.toUpperCase() : login.toUpperCase();
 }
 
 const anoNe = (v: string | null): boolean | null => (v === "ano" ? true : v === "ne" ? false : null);
