@@ -106,7 +106,7 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-nestd{margin:-4px 0 10px;padding:6px 10px;border:1px dashed var(--line);border-radius:8px}.gc-nestd .gc-nestd-pole{display:none;margin-top:8px}.gc-nestd:has(input[name=nestandard]:checked){border:2px solid #c62828;background:rgba(198,40,40,.06)}.gc-nestd:has(input[name=nestandard]:checked) .gc-nestd-pole{display:block}
 .gc-nestd label{display:block}.gc-nestd .gc-nestd-pole input[name=nadpis]{width:100%;border:1px solid #c62828;background:var(--panel);font-size:14px;padding:6px 8px}.gc-nestd .gc-nestd-pole input[name^=cas]{border:1px solid #c62828;background:var(--panel)}
 .gc-den{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.08);padding:14px 16px;margin-bottom:14px}.gc-den h2{font-size:15px;font-weight:600;margin:0 0 10px}
-.gc-ud{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.gc-ud:first-of-type{border-top:0}.gc-cas{flex:none;width:44px;font-size:12px;line-height:1.3;color:var(--text)}
+.gc-ud{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.gc-ud:first-of-type{border-top:0}.gc-cas{flex:none;width:44px;font-size:12px;line-height:1.3;color:var(--text)}.gc-den:last-child .gc-cas{width:78px}.gc-ud.stejny-den .gc-cas b{color:var(--accent)}
 .gc-tel{flex:1;display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:8px;background:rgba(121,85,72,.10);border-left:4px solid #795548}.gc-tel .gc-barva{display:none}
 .gc-ud.volny .gc-tel{background:rgba(46,157,75,.12);border-left-color:#2e9d4b}.gc-ud.tato .gc-tel{background:rgba(31,95,191,.14);border-left-color:var(--accent);outline:2px solid var(--accent)}.gcal label.check{display:block;padding:2px 0}
 .pole label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
@@ -767,10 +767,10 @@ function sekceOkoli(o: OkoliZapisu, vyb: { t: string; e: string; od: Date; do: D
   const okoli = o.bezAdresy
     ? `<div class="muted">Adresu zakázky se nepodařilo najít na mapě – okolí nelze spočítat.</div>`
     : o.okoli.length
-      ? o.okoli.map(({ u, km }) => `<div class="gc-ud"><div class="gc-cas">${fmtTime(u.od)}<br><span class="muted">${fmtTime(u.do)}</span></div><div class="gc-tel"><span class="gc-barva"></span><div><b>${esc(u.technik)}</b> · ${titulek(u)}<div class="muted">${esc(u.location)} · <b>${km} km</b></div></div></div></div>`).join("")
-      : `<div class="muted">Ten den není do 30 km naplánovaná žádná jiná zakázka.</div>`;
+      ? o.okoli.map(({ u, km }) => `<div class="gc-ud${isoDate(u.od) === o.den ? " stejny-den" : ""}"><div class="gc-cas"><b>${esc(`${DNY[u.od.getUTCDay()]} ${u.od.getUTCDate()}.${u.od.getUTCMonth() + 1}.`)}</b><br>${fmtTime(u.od)}–${fmtTime(u.do)}</div><div class="gc-tel"><span class="gc-barva"></span><div><b>${esc(u.technik)}</b> · ${titulek(u)}<div class="muted">${esc(u.location)} · <b>${km} km</b></div></div></div></div>`).join("")
+      : `<div class="muted">±5 dní kolem termínu není do 30 km naplánovaná žádná jiná zakázka.</div>`;
   return `<div class="gc-den"><h2>${esc(vyb.t)} · ${esc(den)}</h2>${udalosti}</div>
-<div class="gc-den"><h2>Naplánováno v okolí <small class="muted">ostatní technici, ${esc(den)}, do 30 km</small></h2>${okoli}</div>`;
+<div class="gc-den"><h2>Naplánováno v okolí <small class="muted">všichni technici, ±5 dní kolem ${esc(fmtDate(vyb.od))}, do 30 km</small></h2>${okoli}</div>`;
 }
 
 const MESICE = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];

@@ -56,6 +56,7 @@ import type { Lokalita } from "./html.js";
 import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
 import { chybejiciPotvrzeni, inicialy, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 import type { OkoliZapisu } from "./html.js";
+import { jeBlok, jeVolneOkno } from "../gcal/kontrola.js";
 import type { TechnikPlanu } from "../plan/planovac.js";
 import type { Zakazka } from "../import/mwfExport.js";
 
@@ -579,19 +580,22 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
   };
 }
 
+const OKOLI_DNI = 5;
+const OKOLI_KM = 30;
+
 /**
  * Pravý sloupec stránky zápisu: události technika v den termínu (s vyznačeným slotem)
- * a zakázky ostatních techniků naplánované ten den do 30 km od adresy zakázky.
+ * a zakázky naplánované ±5 dní kolem termínu do 30 km od adresy zakázky (všichni technici).
  */
 async function okoliZapisu(n: NastaveniWebu, technici: TechnikPlanu[], jmeno: string, vyb: { e: string; od: Date }, z: Zakazka): Promise<OkoliZapisu | null> {
   if (!n.planovac) return null;
   try {
     const zav = await n.planovac();
     const den = isoDate(vyb.od);
-    const { dny } = await prehledDne(zav.api, technici, den);
-    const muj = dny.find((d) => d.technik.jmeno === jmeno);
-    const denTechnika = muj ? [...muj.zakazky, ...muj.volne, ...muj.vyhrazene].sort((a, b) => a.od.getTime() - b.od.getTime()) : [];
-    const cizi = dny.filter((d) => d.technik.jmeno !== jmeno).flatMap((d) => d.zakazky).filter((u) => u.location);
+    // kalendáře všech techniků ±5 dní kolem termínu (cache 30 s)
+    const kal = await nactiKalendare(zav.api, technici, atTime(addDays(den, -OKOLI_DNI), 0), atTime(addDays(den, OKOLI_DNI + 1), 0));
+    const denTechnika = kal.udalosti.filter((u) => u.technik === jmeno && isoDate(u.od) === den).sort((a, b) => a.od.getTime() - b.od.getTime());
+    const cizi = kal.udalosti.filter((u) => u.id !== vyb.e && !jeVolneOkno(u) && !jeBlok(u) && u.location);
     const adresa = [z.adresa, z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
     const body = await geokodujVse(zav.geokoder, [adresa, ...cizi.map((u) => u.location)]);
     const stred = body.get(adresa);
@@ -601,9 +605,9 @@ async function okoliZapisu(n: NastaveniWebu, technici: TechnikPlanu[], jmeno: st
             const b = body.get(u.location);
             return b ? [{ u, km: Math.round(zav.vzdalenosti.km(stred, b) * 10) / 10 }] : [];
           })
-          .filter((x) => x.km <= 30)
-          .sort((a, b) => a.km - b.km)
-          .slice(0, 10)
+          .filter((x) => x.km <= OKOLI_KM)
+          .sort((a, b) => a.km - b.km || a.u.od.getTime() - b.u.od.getTime())
+          .slice(0, 15)
       : [];
     return { den, denTechnika, slotId: vyb.e, okoli, bezAdresy: !stred };
   } catch (e) {
