@@ -251,11 +251,11 @@ export async function hledejZakazky(db: Dotaz, dotaz: string, limit = 30): Promi
   }
   if (q.length < 3) return [];
   // jméno / adresa / ID: porovnání v aplikaci (bez diakritiky, přehozené pořadí slov, překlep) – i uzavřené zakázky
-  const { rows } = await db.query<{ id_aktivity: string; zakaznik: string; adresa: string; psc: string; id_objednavky: string; id_s7: string | null; uzavreno: Date | null }>(
+  const { rows } = await db.query<{ id_aktivity: string; zakaznik: string | null; adresa: string | null; psc: string | null; id_objednavky: string | null; id_s7: string | null; uzavreno: Date | null }>(
     `SELECT id_aktivity, zakaznik, adresa, psc, id_objednavky, id_s7, uzavreno FROM zakazka ORDER BY uzavreno NULLS FIRST, prideleno DESC NULLS LAST`,
   );
   return rows
-    .filter((r) => sediText([r.id_objednavky, r.id_s7 ?? "", r.zakaznik, r.adresa, r.psc].map((x) => x.replace(/^=+/, "")), q))
+    .filter((r) => sediText([r.id_objednavky, r.id_s7, r.zakaznik, r.adresa, r.psc].map((x) => (x ?? "").replace(/^=+/, "")), q))
     .slice(0, limit)
     .map((r) => r.id_aktivity);
 }
