@@ -9,6 +9,8 @@ import { fmtDate, fmtTime } from "../domain/time.js";
 export interface UdajeHovoru {
   novaInstalace?: boolean;
   zasuvka?: string; // číslo nebo „foto“
+  /** předobjednávka: co zákazník popsal (zapíše se hned za ZAKÁZKA) */
+  popisZakaznika?: string;
   /** u instalace bude jiná osoba: „722060263 bratr p. Novák“ – přidá se k TEL */
   kontaktNaMiste?: string;
   /** časová flexibilita zákazníka: ne = pevný termín, den = flex ten den, obecne = flex obecně (důchodce, rodičovská, HO) */
@@ -71,9 +73,12 @@ export function sestavUdalost(
   const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
   const sla = slaKonec ? ` SLA ${fmtDate(slaKonec)} ${fmtTime(slaKonec)}` : "";
   const bridge = /bridge/i.test(h.kz ?? "") ? "Bridge " : "";
+  // předobjednávka: v názvu „RFS“ – realizace až po změně na standardní zakázku (RFS = ready for service)
+  const rfs = z.predobjednavka ? "RFS " : "";
   const ini = koordinatorka ? ` (${koordinatorka})` : "";
   const radky = [
-    `ZAKÁZKA: ${z.idObjednavkyZaklad}${z.idS7 ? ` · S7 ${z.idS7}` : ""}`,
+    `ZAKÁZKA: ${z.idObjednavkyZaklad}${z.idS7 ? ` · S7 ${z.idS7}` : ""}${z.predobjednavka ? " · PŘEDOBJEDNÁVKA (RFS)" : ""}`,
+    ...(h.popisZakaznika ? [`POPIS OD ZÁKAZNÍKA: ${h.popisZakaznika}`] : []),
     `TEL: ${z.telefony.join(", ")}${h.kontaktNaMiste ? ` · u instalace bude: ${h.kontaktNaMiste}` : ""}`,
     ...(h.flex ? [textFlex(h.flex, h.flexPoznamka)] : []),
     `${h.novaInstalace === false ? "Existující" : "Nová instalace"}${h.zasuvka ? ` – zásuvka ${h.zasuvka}` : ""}`,
@@ -94,7 +99,7 @@ export function sestavUdalost(
     h.instalacniPredpis ?? "(zkopírovat z ticketu)",
   ];
   return {
-    summary: `${bridge}${technik} - ${sluzba}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}${sla}${ini}`,
+    summary: `${rfs}${bridge}${technik} - ${sluzba}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}${sla}${ini}`,
     location: [z.adresa, z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
     description: radky.join("\n"),
     start: { dateTime: mistni(od), timeZone: "Europe/Prague" },

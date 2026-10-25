@@ -152,6 +152,12 @@ describe("Google Calendar API", () => {
 });
 
 describe("FLEX v popisu události", () => {
+  it("předobjednávka: název s předponou RFS a popis od zákazníka za ZAKÁZKA", () => {
+    const u = sestavUdalost(zak({ predobjednavka: true }), "Vajc", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { popisZakaznika: "novostavba, přípojka hotová v listopadu" });
+    expect(u.summary.startsWith("RFS Vajc - ")).toBe(true);
+    expect(u.description).toContain("PŘEDOBJEDNÁVKA (RFS)");
+    expect(u.description).toContain("POPIS OD ZÁKAZNÍKA: novostavba, přípojka hotová v listopadu");
+  });
   it("kontakt na místě se přidá za TEL", () => {
     const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { kontaktNaMiste: "722060263 bratr p. Novák" });
     expect(u.description).toContain("· u instalace bude: 722060263 bratr p. Novák");
