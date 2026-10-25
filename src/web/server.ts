@@ -298,12 +298,17 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (!vyb || !technik || (presun && (!puvodni || !detail.z.termin))) return posli(res, 400, strankaChyby(400, "Neplatný výběr slotu – vyberte termín znovu z nabídky."));
         const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presun, doplnit: pp && !presun });
         const povolen = role !== "cteni" && zapis.zapnuty && smiTechnik(technik.jmeno) && (!puvodni || smiTechnik(puvodni.jmeno)) && !brany.blokace.length;
-        if (req.method === "GET") return posli(res, 200, strankaZapisu(detail, vyb, brany, povolen, stav, email));
+        // náhled události (nadpis a místo tak, jak budou v kalendáři) – formulář vypadá jako událost v Google Kalendáři
+        const nahled = (() => {
+          const u = sestavUdalost(detail.z, technik.nazevVKalendari, vyb.od, vyb.do, udajeZFormulare(formular), slaKonec(detail.z, stav.posledniExport ?? now), inicialy(kontext.koordinatorky, email));
+          return { summary: u.summary, location: u.location ?? "" };
+        })();
+        if (req.method === "GET") return posli(res, 200, strankaZapisu(detail, vyb, brany, povolen, stav, email, [], url.searchParams, nahled));
 
         if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
         if (!povolen) return posli(res, 403, strankaChyby(403, brany.blokace[0] ?? "Zápis do kalendáře tohoto technika není povolený."));
         const chybi = chybejiciPotvrzeni(formular);
-        if (chybi.length) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, chybi.map((c) => `Chybí potvrzení: ${c}`), formular));
+        if (chybi.length) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, chybi.map((c) => `Chybí potvrzení: ${c}`), formular, nahled));
         if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendář není dostupný."));
 
         const sla = slaKonec(detail.z, stav.posledniExport ?? now);
@@ -332,7 +337,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           return posli(res, 200, strankaZapsano(detail, technik.jmeno, vyb.od, vyb.do, textProMwf(detail.z.zakaznik, vyb.od, vyb.do), r.htmlLink, stav, email, vysledekPresunu));
         } catch (e) {
           zapomenKalendar(api, technik.kalendar); // po konfliktu ukázat čerstvý stav kalendáře
-          if (e instanceof SlotObsazen) return posli(res, 409, strankaZapisu(detail, vyb, brany, povolen, stav, email, [e.message], formular));
+          if (e instanceof SlotObsazen) return posli(res, 409, strankaZapisu(detail, vyb, brany, povolen, stav, email, [e.message], formular, nahled));
           throw e;
         }
       }

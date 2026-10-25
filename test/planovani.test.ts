@@ -254,7 +254,7 @@ describe("web: nabídka a zápis termínu", () => {
     expect(html).toContain("Pozdější termíny →");
     expect(await (await w.get("/zakazka/P1?od=2026-10-19")).text()).toContain("Hledáno <b>19.10.2026");
     const f = await w.get(`/zakazka/P1/zapis?${new URLSearchParams(vyber)}`);
-    expect(await f.text()).toContain("Zapsat termín do kalendáře");
+    expect(await f.text()).toContain("Uložit do kalendáře");
     const blok = await (await w.get("/zakazka/P2")).text();
     expect(blok).toContain("Termín teď nelze naplánovat");
   });

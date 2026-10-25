@@ -88,6 +88,16 @@ a.btn:hover{text-decoration:none;opacity:.9}button[disabled]{opacity:.45;cursor:
 
 fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:0 0 12px}legend{font-weight:600;padding:0 4px}
 .pole{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.gc-karta{max-width:860px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.10);padding:18px 22px 16px}
+.gc-hlava{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}.gc-barva{flex:none;width:16px;height:16px;border-radius:4px;background:#795548;margin-top:9px}
+.gc-nadpis{font-size:22px;font-weight:400;line-height:1.25}.gc-kdy{color:var(--muted);font-size:14px;margin-top:4px}
+.gc-blok{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}.gc-blok>.gc-ikona{flex:none;width:20px;height:20px;color:var(--muted);margin-top:2px}.gc-blok>.gc-ikona svg{width:20px;height:20px}
+.gc-misto{font-size:14px;padding-top:2px}.gc-popis{flex:1;min-width:0;font-size:13.5px;line-height:1.9}
+.gc-radek{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}.gc-stitek{font-weight:600;letter-spacing:.01em}.gc-mezi{color:var(--text)}
+.gcal input,.gcal select{padding:2px 6px;font-size:13px;border-radius:4px;background:transparent;border:1px solid transparent;border-bottom:1px solid var(--line)}
+.gcal input:hover,.gcal select:hover,.gcal input:focus,.gcal select:focus{border-color:var(--line);background:var(--panel)}
+.gc-predpis{align-items:flex-start;flex-direction:column;margin-top:6px}.gc-predpis textarea{min-height:140px;font-size:13px;line-height:1.5}
+.gc-pata{padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}.gcal label.check{display:block;padding:2px 0}
 .pole label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
 .pole input,.pole select,textarea{color:var(--text)}textarea{width:100%;min-height:90px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
 .check{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
@@ -638,42 +648,49 @@ export function strankaZapisu(
   uzivatel: string,
   chyby: string[] = [],
   hodnoty: URLSearchParams = new URLSearchParams(),
+  nahled: { summary: string; location: string } | null = null,
 ): string {
   const z = d.z;
   const h = (n: string) => esc(hodnoty.get(n) ?? "");
-  const form = `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis">
+  const v = (n: string, moznosti: [string, string][], vychozi = "") => vyber(n, moznosti, hodnoty.get(n) ?? vychozi);
+  // instalační předpis: předvyplnit z notifikačního PDF, když koordinátorka ještě nic nezapsala
+  const predpis = hodnoty.get("predpis") ?? (d.notifikace?.predpis.length ? d.notifikace.predpis.join("\n") : "");
+  const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
+  const nadpis = nahled?.summary ?? `${vyb.t} - ${z.typAktivity.includes("PIV") ? "PIV" : "FTTH"}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}`;
+  const misto = nahled?.location ?? z.adresa;
+  const kdy = `${DNY_CELE[vyb.od.getUTCDay()]} ${vyb.od.getUTCDate()}. ${MESICE[vyb.od.getUTCMonth()]} · ${fmtTime(vyb.od)}–${fmtTime(vyb.do)}`;
+  // řádek popisu události: ŠTÍTEK: hodnota – ve stejném pořadí, jak se zapíše do kalendáře
+  const r = (stitek: string, obsah: string) => `<div class="gc-radek"><span class="gc-stitek">${esc(stitek)}</span>${obsah}</div>`;
+  const form = `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis" class="gcal">
 <input type="hidden" name="k" value="${esc(vyb.k)}"><input type="hidden" name="e" value="${esc(vyb.e)}"><input type="hidden" name="t" value="${esc(vyb.t)}">
 <input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">${presunPole(vyb.presun)}${vyb.pp && !vyb.presun ? `<input type="hidden" name="pp" value="1">` : ""}
-<fieldset><legend>Zásuvka a instalace</legend><div class="pole">
-<label>Instalace${vyber("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], hodnoty.get("instalace") ?? "nova")}</label>
-<label>Číslo zásuvky / foto<input name="zasuvka" value="${h("zasuvka")}"></label>
-<label>IPTV${vyber("iptv", [["ne", "ne"], ["ano", "ano"]], hodnoty.get("iptv") ?? "ne")}</label>
-<label>CASEID (SWAP / FIS MOP)<input name="caseid" value="${h("caseid")}"></label>
-</div></fieldset>
-<fieldset><legend>Byt a trasa</legend><div class="pole">
-<label>Patro<input name="patro" value="${h("patro")}"></label>
-<label>Byt<input name="byt" value="${h("byt")}"></label>
-<label>Patra volně přístupná${vyber("patraPristupna", ANO_NE, hodnoty.get("patraPristupna") ?? "")}</label>
-<label>Stoupačka zajištěna${vyber("stoupacka", ANO_NE_NEVIM, hodnoty.get("stoupacka") ?? "NEVÍM")}</label>
-<label>Vzdálenost od stoupačky (m)<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}"></label>
-<label>Lišty / omezení SVJ${vyber("listy", ANO_NE_NEVIM, hodnoty.get("listy") ?? "NEVÍM")}</label>
-<label>Souhlas s vrtáním${vyber("vrtani", ANO_NE, hodnoty.get("vrtani") ?? "")}</label>
-</div></fieldset>
-<fieldset><legend>Koncové zařízení</legend><div class="pole">
-<label>Umístění KZ<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}"></label>
-<label>El. zásuvka u KZ${vyber("elZasuvka", ANO_NE, hodnoty.get("elZasuvka") ?? "")}</label>
-<label>KZ${vyber("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]], hodnoty.get("kz") ?? "")}</label>
-<label>STB<input name="stb" value="${h("stb")}"></label>
-<label>Předpojen${vyber("predpojen", ANO_NE, hodnoty.get("predpojen") ?? "")}</label>
-<label>PODB (T-Mobile)<input name="podb" value="${h("podb")}"></label>
-</div>
-<label class="muted" style="display:block;margin-top:8px">Instalační předpis (zkopírovat z ticketu)<textarea name="predpis">${h("predpis")}</textarea></label>
-</fieldset>
-<fieldset><legend>Potvrzení</legend>
+<div class="gc-karta">
+<div class="gc-hlava"><span class="gc-barva"></span><div><div class="gc-nadpis">${esc(nadpis)}</div><div class="gc-kdy">${esc(kdy)}</div></div></div>
+<div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
+<div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
+${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
+${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span>`)}
+${r("", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– zásuvka</span> <input name="zasuvka" placeholder="číslo / foto" value="${h("zasuvka")}" size="14">`)}
+${r("INSTALACE:", `<span>Optický internet</span> <span class="gc-mezi">/ IPTV</span> ${v("iptv", [["ne", "ne"], ["ano", "ano"]], "ne")}`)}
+${r("ČÍSLO PATRA A BYTU:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`)}
+${r("PATRA VOLNĚ PŘÍSTUPNÁ:", v("patraPristupna", ANO_NE))}
+${r("STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran):", v("stoupacka", ANO_NE_NEVIM, "NEVÍM"))}
+${r("VZDÁLENOST OD STOUPAČKY (řádově):", `<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}" size="5"> <span class="gc-mezi">metrů</span>`)}
+${r("STÁVAJÍCÍ LIŠTY/OMEZENÍ V LIŠTOVÁNÍ OD SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"))}
+${r("SOUHLAS S VRTÁNÍM:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = dotaz na PEP)</span>`)}
+${r("KONCOVÉ ZAŘÍZENÍ UMÍSTÍME V:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– EL. ZÁSUVKA:</span> ${v("elZasuvka", ANO_NE)}`)}
+${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <span class="gc-mezi">STB:</span> <input name="stb" value="${h("stb")}" size="10">${d.notifikace?.cpeMode ? ` <span class="gc-mezi muted">(z PDF: ${esc(d.notifikace.cpeMode)}${d.notifikace.zoznam ? ` · ${esc(d.notifikace.zoznam)}` : ""})</span>` : ""}`)}
+${r("PŘEDPOJEN:", v("predpojen", ANO_NE))}
+${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`)}
+${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`)}
+<div class="gc-radek gc-predpis"><span class="gc-stitek">INSTALAČNÍ PŘEDPIS:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${d.notifikace?.predpis.length && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(d.notifikace.nazev)}</span>` : ""}</div>
+</div></div>
+<div class="gc-blok"><span class="gc-ikona">${IKONA_GC.potvrzeni}</span><div>
 ${POVINNA_POTVRZENI.map((p) => `<label class="check"><input type="checkbox" name="${p.pole}" value="ano"${hodnoty.get(p.pole) === "ano" ? " checked" : ""}> ${esc(p.text)}</label>`).join("")}
-</fieldset>
-<button class="btn"${zapisPovolen ? "" : " disabled"}>Zapsat termín do kalendáře</button>
-${zapisPovolen ? "" : `<span class="muted"> Zápis do kalendáře je vypnutý (pilotní režim) – formulář slouží jen k náhledu.</span>`}
+</div></div>
+<div class="gc-pata"><button class="btn"${zapisPovolen ? "" : " disabled"}>Uložit do kalendáře</button>
+${zapisPovolen ? "" : `<span class="muted"> Zápis do kalendáře je vypnutý (pilotní režim) – formulář slouží jen k náhledu.</span>`}</div>
+</div>
 </form>`;
 
   const telo = `${hlavickaZakazky(d)}
@@ -685,6 +702,13 @@ ${brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join(
 ${form}`;
   return stranka("Zápis termínu", uzivatel, stav, telo);
 }
+
+const MESICE = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
+const IKONA_GC = {
+  misto: svg('<path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>'),
+  popis: svg('<path d="M4 7h16M4 12h16M4 17h10"/>'),
+  potvrzeni: svg('<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>'),
+};
 
 export function strankaZapsano(
   d: Detail,
