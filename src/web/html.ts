@@ -705,22 +705,22 @@ export function strankaZapisu(
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
-${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <input name="kontakt" class="gc-ram" placeholder="U INSTALACE BUDE JINÁ OSOBA – telefon, vztah, jméno" value="${h("kontakt")}" size="46">`)}
-<div class="gc-radek gc-zasadni gc-flex"><span class="gc-stitek">FLEX:</span>
+${r("Tel:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <input name="kontakt" class="gc-ram" placeholder="U instalace bude jiná osoba – telefon, vztah, jméno" value="${h("kontakt")}" size="46">`)}
+<div class="gc-radek gc-zasadni gc-flex"><span class="gc-stitek">Flex:</span>
 <label class="volba"><input type="radio" name="flex" value="ne"${flex === "ne" ? " checked" : ""}> Pevný termín <small>(není FLEX)</small></label>
 <label class="volba"><input type="radio" name="flex" value="den"${flex === "den" ? " checked" : ""}> FLEX ten den <small>(čas v rámci dne lze posunout)</small></label>
 <label class="volba"><input type="radio" name="flex" value="obecne"${flex === "obecne" ? " checked" : ""}> FLEX obecně <small>(důchodce, rodičovská, často HO)</small></label>
 <input name="flexPozn" placeholder="upřesnění – např. jen do 14 h, odchod k lékaři" value="${h("flexPozn")}" size="36"></div>
-${r("ZÁSUVKA:", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– číslo / foto</span> <input name="zasuvka" placeholder="číslo zásuvky" value="${h("zasuvka")}" size="14">`, "zasadni")}
-${r("ČÍSLO PATRA A BYTU:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`, "zasadni")}
-${r("PATRA VOLNĚ PŘÍSTUPNÁ:", v("patraPristupna", ANO_NE), "vedlejsi")}
-${r("STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran):", v("stoupacka", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
-${r("VZDÁLENOST OD STOUPAČKY (řádově):", `<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}" size="5"> <span class="gc-mezi">metrů</span>`, "vedlejsi")}
-${r("STÁVAJÍCÍ LIŠTY/OMEZENÍ V LIŠTOVÁNÍ OD SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
-${r("SOUHLAS S VRTÁNÍM:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = vrátit na PEP, nebo STORNO)</span>`, "zasadni")}
-${r("KONCOVÉ ZAŘÍZENÍ UMÍSTÍME V:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– EL. ZÁSUVKA:</span> ${v("elZasuvka", ANO_NE)}`)}
+${r("Zásuvka:", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– číslo / foto</span> <input name="zasuvka" placeholder="číslo zásuvky" value="${h("zasuvka")}" size="14">`, "zasadni")}
+${r("Číslo patra a bytu:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`, "zasadni")}
+${r("Patra volně přístupná:", v("patraPristupna", ANO_NE), "vedlejsi")}
+${r("Stoupačka je zajištěna (nebo jen čtyřhran):", v("stoupacka", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
+${r("Vzdálenost od stoupačky (řádově):", `<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}" size="5"> <span class="gc-mezi">metrů</span>`, "vedlejsi")}
+${r("Stávající lišty / omezení v lištování od SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
+${r("Souhlas s vrtáním:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = vrátit na PEP, nebo STORNO)</span>`, "zasadni")}
+${r("Koncové zařízení umístíme v:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– el. zásuvka:</span> ${v("elZasuvka", ANO_NE)}`)}
 ${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <span class="gc-mezi">STB:</span> <input name="stb" value="${h("stb")}" size="10">${d.notifikace?.cpeMode ? ` <span class="gc-mezi muted">(z PDF: ${esc(d.notifikace.cpeMode)}${d.notifikace.zoznam ? ` · ${esc(d.notifikace.zoznam)}` : ""})</span>` : ""}`)}
-${r("PŘEDPOJEN:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`)}
+${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`)}
 ${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`)}
 ${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`)}
 <div class="gc-radek gc-predpis"><span class="gc-stitek">INSTALAČNÍ PŘEDPIS:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${zPdf && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
