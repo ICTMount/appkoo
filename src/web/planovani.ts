@@ -122,7 +122,6 @@ export const POVINNA_POLE: { pole: string; nazev: string }[] = [
   { pole: "umisteni", nazev: "Koncové zařízení umístíme v" },
   { pole: "elZasuvka", nazev: "El. zásuvka u KZ" },
   { pole: "kz", nazev: "KZ" },
-  { pole: "predpojen", nazev: "Předpojen" },
 ];
 
 export function chybejiciPole(f: URLSearchParams): string[] {
