@@ -125,15 +125,15 @@ export async function nactiPravidla(db: Dotaz): Promise<PravidloPriority[]> {
   return pravidla.length ? pravidla : VYCHOZI_PRAVIDLA;
 }
 
-const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+import { norm, sediText } from "../domain/hledani.js";
 
+/** Zakázka odpovídá dotazu: ID, jméno (i přehozené, s překlepem), adresa, PSČ, telefon */
 export function hodiSe(z: Zakazka, hledat: string): boolean {
   const q = norm(hledat.trim());
   if (!q) return true;
   const qCisla = q.replace(/\D/g, "");
-  const pole = [z.idObjednavky, z.idS7, z.idAktivity, z.zakaznik, z.adresa, z.psc].map((x) => norm(x.replace(/^=+/, "")));
-  if (pole.some((p) => p.includes(q))) return true;
-  return qCisla.length >= 6 && z.telefony.some((t) => t.replace(/\D/g, "").includes(qCisla));
+  if (qCisla.length >= 6 && z.telefony.some((t) => t.replace(/\D/g, "").includes(qCisla))) return true;
+  return sediText([z.idObjednavky, z.idS7, z.idAktivity, z.zakaznik, z.adresa, z.psc].map((x) => x.replace(/^=+/, "")), q);
 }
 
 /** Fronta k volání: otevřené zakázky s prioritou, seřazené P1 → P0 a podle dalšího pokusu */
@@ -250,14 +250,14 @@ export async function hledejZakazky(db: Dotaz, dotaz: string, limit = 30): Promi
     return rows.map((r) => r.id_aktivity);
   }
   if (q.length < 3) return [];
-  const vzor = `%${q.replace(/[%_]/g, "")}%`;
-  const { rows } = await db.query<{ id_aktivity: string }>(
-    `SELECT id_aktivity FROM zakazka
-      WHERE zakaznik ILIKE $1 OR adresa ILIKE $1 OR id_objednavky ILIKE $1 OR id_s7 ILIKE $1
-      ORDER BY uzavreno NULLS FIRST, prideleno DESC NULLS LAST LIMIT $2`,
-    [vzor, limit],
+  // jméno / adresa / ID: porovnání v aplikaci (bez diakritiky, přehozené pořadí slov, překlep) – i uzavřené zakázky
+  const { rows } = await db.query<{ id_aktivity: string; zakaznik: string; adresa: string; psc: string; id_objednavky: string; id_s7: string | null; uzavreno: Date | null }>(
+    `SELECT id_aktivity, zakaznik, adresa, psc, id_objednavky, id_s7, uzavreno FROM zakazka ORDER BY uzavreno NULLS FIRST, prideleno DESC NULLS LAST`,
   );
-  return rows.map((r) => r.id_aktivity);
+  return rows
+    .filter((r) => sediText([r.id_objednavky, r.id_s7 ?? "", r.zakaznik, r.adresa, r.psc].map((x) => x.replace(/^=+/, "")), q))
+    .slice(0, limit)
+    .map((r) => r.id_aktivity);
 }
 
 export interface StavImportu {
