@@ -9,6 +9,8 @@ import { fmtDate, fmtTime } from "../domain/time.js";
 export interface UdajeHovoru {
   novaInstalace?: boolean;
   zasuvka?: string; // číslo nebo „foto“
+  /** u instalace bude jiná osoba: „722060263 bratr p. Novák“ – přidá se k TEL */
+  kontaktNaMiste?: string;
   /** časová flexibilita zákazníka: ne = pevný termín, den = flex ten den, obecne = flex obecně (důchodce, rodičovská, HO) */
   flex?: "ne" | "den" | "obecne";
   /** upřesnění flexu („jen do 14 h – odchod k lékaři“) */
@@ -72,7 +74,7 @@ export function sestavUdalost(
   const ini = koordinatorka ? ` (${koordinatorka})` : "";
   const radky = [
     `ZAKÁZKA: ${z.idObjednavkyZaklad}${z.idS7 ? ` · S7 ${z.idS7}` : ""}`,
-    `TEL: ${z.telefony.join(", ")}`,
+    `TEL: ${z.telefony.join(", ")}${h.kontaktNaMiste ? ` · u instalace bude: ${h.kontaktNaMiste}` : ""}`,
     ...(h.flex ? [textFlex(h.flex, h.flexPoznamka)] : []),
     `${h.novaInstalace === false ? "Existující" : "Nová instalace"}${h.zasuvka ? ` – zásuvka ${h.zasuvka}` : ""}`,
     `INSTALACE: Optický internet${h.iptv ? " / IPTV" : ""}`,

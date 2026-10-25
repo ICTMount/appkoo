@@ -76,6 +76,7 @@ export function udajeZFormulare(f: URLSearchParams): UdajeHovoru {
   return {
     novaInstalace: f.get("instalace") === "existujici" ? false : f.get("instalace") === "nova" ? true : undefined,
     zasuvka: text(f.get("zasuvka")),
+    kontaktNaMiste: text(f.get("kontakt")),
     flex: f.get("flex") === "ne" || f.get("flex") === "den" || f.get("flex") === "obecne" ? (f.get("flex") as "ne" | "den" | "obecne") : undefined,
     flexPoznamka: text(f.get("flexPozn")),
     iptv: f.get("iptv") === "ano", // pole už ve formuláři není (IPTV se neřeší) – zůstává kvůli starým odkazům

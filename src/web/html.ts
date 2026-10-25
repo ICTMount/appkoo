@@ -685,7 +685,7 @@ export function strankaZapisu(
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
-${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span>`)}
+${r("TEL:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <span class="gc-mezi muted">· u instalace bude jiná osoba:</span> <input name="kontakt" placeholder="telefon, vztah, jméno – např. 722 060 263 bratr p. Novák" value="${h("kontakt")}" size="44">`)}
 <div class="gc-radek gc-zasadni gc-flex"><span class="gc-stitek">FLEX:</span>
 <label class="volba"><input type="radio" name="flex" value="ne"${flex === "ne" ? " checked" : ""}> Pevný termín <small>(není FLEX)</small></label>
 <label class="volba"><input type="radio" name="flex" value="den"${flex === "den" ? " checked" : ""}> FLEX ten den <small>(čas v rámci dne lze posunout)</small></label>

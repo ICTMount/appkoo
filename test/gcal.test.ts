@@ -152,6 +152,10 @@ describe("Google Calendar API", () => {
 });
 
 describe("FLEX v popisu události", () => {
+  it("kontakt na místě se přidá za TEL", () => {
+    const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { kontaktNaMiste: "722060263 bratr p. Novák" });
+    expect(u.description).toContain("· u instalace bude: 722060263 bratr p. Novák");
+  });
   it("pevný termín plánovač nepovažuje za flex, FLEX ten den / obecně ano", () => {
     expect(jeFlex(textFlex("ne"))).toBe(false);
     expect(textFlex("ne")).toBe("Pevný termín"); // bez slova FLEX – hledání „FLEX“ v kalendáři najde jen flexibilní
