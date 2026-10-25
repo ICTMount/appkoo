@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { nactiUdalosti, zapisUdalost } from "../src/gcal/kalendar.js";
+import { jeFlex } from "../src/plan/doplneni.js";
 import { podobnostAdres, volnaOkna, zkontroluj, type UdalostTechnika } from "../src/gcal/kontrola.js";
-import { sestavUdalost } from "../src/gcal/udalost.js";
+import { sestavUdalost, textFlex } from "../src/gcal/udalost.js";
 import { local } from "../src/domain/time.js";
 import type { Zakazka } from "../src/import/mwfExport.js";
 
@@ -148,4 +149,13 @@ describe("Google Calendar API", () => {
     ]);
   });
 
+});
+
+describe("FLEX v popisu události", () => {
+  it("pevný termín plánovač nepovažuje za flex, FLEX ten den / obecně ano", () => {
+    expect(jeFlex(textFlex("ne"))).toBe(false);
+    expect(jeFlex(textFlex("den", "jen do 14 h"))).toBe(true);
+    expect(jeFlex(textFlex("obecne"))).toBe(true);
+    expect(textFlex("den", "jen do 14 h")).toBe("FLEX ten den – jen do 14 h");
+  });
 });

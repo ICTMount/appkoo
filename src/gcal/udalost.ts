@@ -9,6 +9,10 @@ import { fmtDate, fmtTime } from "../domain/time.js";
 export interface UdajeHovoru {
   novaInstalace?: boolean;
   zasuvka?: string; // číslo nebo „foto“
+  /** časová flexibilita zákazníka: ne = pevný termín, den = flex ten den, obecne = flex obecně (důchodce, rodičovská, HO) */
+  flex?: "ne" | "den" | "obecne";
+  /** upřesnění flexu („jen do 14 h – odchod k lékaři“) */
+  flexPoznamka?: string;
   iptv?: boolean;
   patro?: string;
   byt?: string;
@@ -39,6 +43,14 @@ const ano = (v: boolean | null | undefined) => (v === true ? "ANO" : v === false
 /** Date („Praha v UTC“) → "2026-10-16T10:00:00" pro pole s timeZone Europe/Prague */
 const mistni = (d: Date) => d.toISOString().slice(0, 19);
 
+/** Řádek FLEX v popisu události – plánovač pozná „flex“ a zakázku nabídne k přesunu; „FLEX: NE“ pozná jako pevný termín */
+export function textFlex(flex: NonNullable<UdajeHovoru["flex"]>, poznamka?: string): string {
+  const p = poznamka ? ` – ${poznamka}` : "";
+  if (flex === "ne") return `FLEX: NE – pevný termín${p}`;
+  if (flex === "den") return `FLEX ten den${p}`;
+  return `FLEX obecně (důchodce / rodičovská / HO)${p}`;
+}
+
 export function sestavUdalost(
   z: Zakazka,
   technik: string,
@@ -58,6 +70,7 @@ export function sestavUdalost(
   const radky = [
     `ZAKÁZKA: ${z.idObjednavkyZaklad}${z.idS7 ? ` · S7 ${z.idS7}` : ""}`,
     `TEL: ${z.telefony.join(", ")}`,
+    ...(h.flex ? [textFlex(h.flex, h.flexPoznamka)] : []),
     `${h.novaInstalace === false ? "Existující" : "Nová instalace"}${h.zasuvka ? ` – zásuvka ${h.zasuvka}` : ""}`,
     `INSTALACE: Optický internet${h.iptv ? " / IPTV" : ""}`,
     `ČÍSLO PATRA A BYTU: ${h.patro ?? "?"} / ${h.byt ?? "?"}`,
