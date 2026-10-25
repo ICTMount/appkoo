@@ -108,7 +108,7 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-den{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.08);padding:14px 16px;margin-bottom:14px}.gc-den h2{font-size:15px;font-weight:600;margin:0 0 10px}
 .gc-ud{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.gc-ud:first-of-type{border-top:0}.gc-cas{flex:none;width:44px;font-size:12px;line-height:1.3;color:var(--text)}.gc-den:last-child .gc-cas{width:78px}.gc-ud.stejny-den .gc-cas b{color:var(--accent)}
 .gc-tel{flex:1;display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:8px;background:rgba(121,85,72,.10);border-left:4px solid #795548}.gc-tel .gc-barva{display:none}
-.gc-ud.volny .gc-tel{background:rgba(46,157,75,.12);border-left-color:#2e9d4b}.gc-ud.tato .gc-tel{background:rgba(31,95,191,.14);border-left-color:var(--accent);outline:2px solid var(--accent)}.gcal label.check{display:block;padding:2px 0}
+.gc-ud.volny .gc-tel{background:rgba(46,157,75,.12);border-left-color:#2e9d4b}iframe.trasa-mapa{height:300px}.legenda{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.7}.legenda .zast.tato{color:var(--accent);font-weight:700}.gc-ud.tato .gc-tel{background:rgba(31,95,191,.14);border-left-color:var(--accent);outline:2px solid var(--accent)}.gcal label.check{display:block;padding:2px 0}
 .pole label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
 .pole input,.pole select,textarea{color:var(--text)}textarea{width:100%;min-height:90px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
 .check{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
@@ -753,6 +753,8 @@ export interface OkoliZapisu {
   slotId: string;
   okoli: { u: UdalostTechnika; km: number }[];
   bezAdresy: boolean;
+  /** adresa plánované zakázky (do mapy trasy) */
+  adresaZakazky: string;
 }
 
 function sekceOkoli(o: OkoliZapisu, vyb: { t: string; e: string; od: Date; do: Date }, nadpis: string): string {
@@ -771,7 +773,22 @@ function sekceOkoli(o: OkoliZapisu, vyb: { t: string; e: string; od: Date; do: D
     : o.okoli.length
       ? o.okoli.map(({ u, km }) => `<div class="gc-ud${isoDate(u.od) === o.den ? " stejny-den" : ""}"><div class="gc-cas"><b>${esc(`${DNY[u.od.getUTCDay()]} ${u.od.getUTCDate()}.${u.od.getUTCMonth() + 1}.`)}</b><br>${fmtTime(u.od)}–${fmtTime(u.do)}</div><div class="gc-tel"><span class="gc-barva"></span><div><b>${esc(u.technik)}</b> · ${titulek(u)}<div class="muted">${esc(u.location)} · <b>${km} km</b></div></div></div></div>`).join("")
       : `<div class="muted">±5 dní kolem termínu není do 30 km naplánovaná žádná jiná zakázka.</div>`;
+  // orientační mapa trasy technika v den termínu: zakázky v pořadí podle času + tato zakázka na místě slotu
+  const zastavky = o.denTechnika
+    .filter((u) => (u.id === vyb.e || (!jeVolneOkno(u) && u.location)))
+    .map((u) => (u.id === vyb.e ? { adresa: o.adresaZakazky, tato: true, od: u.od } : { adresa: u.location, tato: false, od: u.od }))
+    .filter((z) => z.adresa);
+  if (!zastavky.some((z) => z.tato) && o.adresaZakazky) zastavky.push({ adresa: o.adresaZakazky, tato: true, od: vyb.od });
+  zastavky.sort((a, b) => a.od.getTime() - b.od.getTime());
+  const mapa = (() => {
+    if (zastavky.length < 2) return zastavky.length === 1 ? `<iframe class="mapa" title="Mapa" loading="lazy" referrerpolicy="no-referrer" src="https://www.google.com/maps?q=${esc(encodeURIComponent(zastavky[0]!.adresa))}&amp;z=12&amp;output=embed"></iframe>` : `<div class="muted">Bez adres – mapu nelze sestavit.</div>`;
+    const [prvni, ...dalsi] = zastavky;
+    const src = `https://www.google.com/maps?saddr=${encodeURIComponent(prvni!.adresa)}&daddr=${encodeURIComponent(dalsi.map((z) => z.adresa).join(" to:"))}&output=embed`;
+    return `<iframe class="mapa trasa-mapa" title="Trasa technika" loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}"></iframe>`;
+  })();
+  const legenda = zastavky.map((z, i) => `<span class="${z.tato ? "zast tato" : "zast"}">${i + 1}. ${fmtTime(z.od)} ${esc(z.adresa)}</span>`).join(" → ");
   return `<div class="gc-den"><h2>${esc(vyb.t)} · ${esc(den)}</h2>${udalosti}</div>
+<div class="gc-den"><h2>Trasa technika <small class="muted">${esc(den)}, orientačně podle času zakázek</small></h2>${mapa}<div class="legenda">${legenda}</div></div>
 <div class="gc-den"><h2>Naplánováno v okolí <small class="muted">všichni technici, ±5 dní kolem ${esc(fmtDate(vyb.od))}, do 30 km</small></h2>${okoli}</div>`;
 }
 

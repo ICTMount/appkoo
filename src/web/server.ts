@@ -616,7 +616,7 @@ async function okoliZapisu(n: NastaveniWebu, technici: TechnikPlanu[], jmeno: st
           .sort((a, b) => a.km - b.km || a.u.od.getTime() - b.u.od.getTime())
           .slice(0, 15)
       : [];
-    return { den, denTechnika, slotId: vyb.e, okoli, bezAdresy: !stred };
+    return { den, denTechnika, slotId: vyb.e, okoli, bezAdresy: !stred, adresaZakazky: adresa };
   } catch (e) {
     console.log(JSON.stringify({ severity: "WARNING", message: `Okolí zápisu se nepodařilo načíst: ${e instanceof Error ? e.message : String(e)}` }));
     return null;
