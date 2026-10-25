@@ -713,7 +713,7 @@ export function strankaZapisu(
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>${z.predobjednavka ? `${predobjStitek(z)} <span class="gc-mezi muted">– v kalendáři s předponou RFS${z.rfs ? `, RFS ${esc(den(z.rfs))}` : ""}</span>` : ""}`)}
-${z.predobjednavka ? r("Popis od zákazníka:", `<input name="popisZakaznika" class="gc-ram" placeholder="co zákazník popsal – např. novostavba, přípojka bude hotová v listopadu" value="${h("popisZakaznika")}" size="60">`, "povinne") : ""}
+${z.predobjednavka ? r("", `<input name="popisZakaznika" class="gc-ram" placeholder="Popis od zákazníka" value="${h("popisZakaznika")}" size="70">`, "povinne") : ""}
 ${r("Tel:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <input name="kontakt" class="gc-ram" placeholder="U instalace bude jiná osoba – telefon, vztah, jméno" value="${h("kontakt")}" size="46">`)}
 <div class="gc-radek gc-povinne gc-flex"><span class="gc-stitek">Flex:</span>
 <label class="volba"><input type="radio" name="flex" value="ne"${flex === "ne" ? " checked" : ""}> Pevný termín <small>(není FLEX)</small></label>
