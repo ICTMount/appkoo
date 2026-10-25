@@ -154,6 +154,7 @@ describe("Google Calendar API", () => {
 describe("FLEX v popisu události", () => {
   it("pevný termín plánovač nepovažuje za flex, FLEX ten den / obecně ano", () => {
     expect(jeFlex(textFlex("ne"))).toBe(false);
+    expect(textFlex("ne")).toBe("Pevný termín"); // bez slova FLEX – hledání „FLEX“ v kalendáři najde jen flexibilní
     expect(jeFlex(textFlex("den", "jen do 14 h"))).toBe(true);
     expect(jeFlex(textFlex("obecne"))).toBe(true);
     expect(textFlex("den", "jen do 14 h")).toBe("FLEX ten den – jen do 14 h");

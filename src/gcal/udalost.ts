@@ -43,10 +43,13 @@ const ano = (v: boolean | null | undefined) => (v === true ? "ANO" : v === false
 /** Date („Praha v UTC“) → "2026-10-16T10:00:00" pro pole s timeZone Europe/Prague */
 const mistni = (d: Date) => d.toISOString().slice(0, 19);
 
-/** Řádek FLEX v popisu události – plánovač pozná „flex“ a zakázku nabídne k přesunu; „FLEX: NE“ pozná jako pevný termín */
+/**
+ * Řádek o flexibilitě v popisu události. Slovo „FLEX“ je jen u flexibilních zákazníků – v kalendáři se podle něj
+ * hledá (a plánovač podle něj nabízí zakázku k přesunu); pevný termín se zapíše bez něj: „Pevný termín“.
+ */
 export function textFlex(flex: NonNullable<UdajeHovoru["flex"]>, poznamka?: string): string {
   const p = poznamka ? ` – ${poznamka}` : "";
-  if (flex === "ne") return `FLEX: NE – pevný termín${p}`;
+  if (flex === "ne") return `Pevný termín${p}`;
   if (flex === "den") return `FLEX ten den${p}`;
   return `FLEX obecně (důchodce / rodičovská / HO)${p}`;
 }
