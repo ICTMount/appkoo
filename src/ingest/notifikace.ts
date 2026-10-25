@@ -141,20 +141,27 @@ const TABULKA = `CREATE TABLE IF NOT EXISTS notifikace_pdf (
   nacteno       timestamptz NOT NULL DEFAULT now()
 )`;
 
-let pripraveno: Promise<unknown> | null = null;
-const priprav = (db: Dotaz) =>
-  (pripraveno ??= db
-    .query(TABULKA)
-    .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_objednavky_zaklad text"))
-    .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_s7 text[]"))
-    .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS priebeh jsonb"))
-    .then(() => db.query("UPDATE notifikace_pdf SET id_objednavky_zaklad = upper(substring(id_objednavky from '^O-[0-9]+')) WHERE id_objednavky_zaklad IS NULL AND id_objednavky IS NOT NULL"))
-    .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC)"))
-    .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC)"))
-    .catch((e) => {
-      pripraveno = null;
-      throw e;
-    }));
+// příprava tabulky jednou na každé připojení (v testech běží víc databází vedle sebe)
+const pripraveno = new WeakMap<Dotaz, Promise<unknown>>();
+function priprav(db: Dotaz): Promise<unknown> {
+  let p = pripraveno.get(db);
+  if (!p) {
+    p = db
+      .query(TABULKA)
+      .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_objednavky_zaklad text"))
+      .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_s7 text[]"))
+      .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS priebeh jsonb"))
+      .then(() => db.query("UPDATE notifikace_pdf SET id_objednavky_zaklad = upper(substring(id_objednavky from '^O-[0-9]+')) WHERE id_objednavky_zaklad IS NULL AND id_objednavky IS NOT NULL"))
+      .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC)"))
+      .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC)"))
+      .catch((e) => {
+        pripraveno.delete(db);
+        throw e;
+      });
+    pripraveno.set(db, p);
+  }
+  return p;
+}
 
 export async function ulozNotifikaci(db: Dotaz, n: UlozenaNotifikace | { souborId: string; nazev: string; vznik: Date; chyba: string }): Promise<void> {
   await priprav(db);
@@ -240,29 +247,50 @@ export async function importujNotifikace(
 
   const v: VysledekNotifikaci = { veSlozce: soubory.length, nacteno: 0, chyb: 0, zprávy: [] };
   if (!soubory.length) v.zprávy.push("Ve složce není vidět žádné PDF – je složka nasdílená servisnímu účtu jobu jako Čtenář?");
-  for (const f of soubory.filter((s) => !znama.has(s.id!)).slice(0, MAX_PDF_NA_BEH)) {
-    const vznik = new Date(f.createdTime ?? (deps.ted ?? (() => new Date()))());
-    try {
-      const res = await api.files.get({ fileId: f.id!, alt: "media" }, { responseType: "arraybuffer" });
-      const pdf = Buffer.from(res.data as ArrayBuffer);
-      const [text, bbox] = await Promise.all([naText(pdf), naBbox(pdf).catch(() => "")]);
-      const n = parsujNotifikaci(text, f.name ?? "", bbox);
-      if (!n) {
-        await ulozNotifikaci(db, { souborId: f.id!, nazev: f.name ?? "", vznik, chyba: "v PDF chybí MWF ID aktivity" });
-        v.chyb++;
-        v.zprávy.push(`${f.name}: není notifikace z MWF`);
-        continue;
+  const fronta = soubory.filter((s) => !znama.has(s.id!)).slice(0, MAX_PDF_NA_BEH);
+  // několik souborů najednou (stažení + 2× pdftotext na soubor), ale ne víc – job má omezené CPU
+  await Promise.all(
+    Array.from({ length: Math.min(SOUBEZNE, fronta.length) }, async () => {
+      for (let f = fronta.shift(); f; f = fronta.shift()) {
+        const r = await nactiAUloz(db, api, f, { ...deps, ted: deps.ted ? () => deps.ted!().getTime() : undefined });
+        if (r.ok) v.nacteno++;
+        else {
+          v.chyb++;
+          v.zprávy.push(`${f.name}: ${r.chyba}`);
+        }
       }
-      await ulozNotifikaci(db, { ...n, souborId: f.id!, nazev: f.name ?? "", vznik });
-      v.nacteno++;
-    } catch (e) {
-      const zprava = e instanceof Error ? e.message : String(e);
-      await ulozNotifikaci(db, { souborId: f.id!, nazev: f.name ?? "", vznik, chyba: zprava.slice(0, 500) }).catch(() => undefined);
-      v.chyb++;
-      v.zprávy.push(`${f.name}: ${zprava}`);
-    }
-  }
+    }),
+  );
   return v;
+}
+
+const SOUBEZNE = 4;
+
+/** Stáhne PDF z Drive, přečte ho a uloží (i s chybou, aby se nestahovalo pořád dokola) */
+async function nactiAUloz(
+  db: Dotaz,
+  api: drive_v3.Drive,
+  f: drive_v3.Schema$File,
+  deps: { textZPdf?: (pdf: Buffer) => Promise<string>; bboxZPdf?: (pdf: Buffer) => Promise<string>; ted?: () => number },
+): Promise<{ ok: true; n: Notifikace } | { ok: false; chyba: string }> {
+  const vznik = new Date(f.createdTime ?? (deps.ted ?? Date.now)());
+  const nazev = f.name ?? "";
+  try {
+    const res = await api.files.get({ fileId: f.id!, alt: "media" }, { responseType: "arraybuffer" });
+    const pdf = Buffer.from(res.data as ArrayBuffer);
+    const [text, bbox] = await Promise.all([(deps.textZPdf ?? textZPdf)(pdf), (deps.bboxZPdf ?? bboxZPdf)(pdf).catch(() => "")]);
+    const n = parsujNotifikaci(text, nazev, bbox);
+    if (!n) {
+      await ulozNotifikaci(db, { souborId: f.id!, nazev, vznik, chyba: "v PDF chybí MWF ID aktivity" });
+      return { ok: false, chyba: "není notifikace z MWF" };
+    }
+    await ulozNotifikaci(db, { ...n, souborId: f.id!, nazev, vznik });
+    return { ok: true, n };
+  } catch (e) {
+    const chyba = e instanceof Error ? e.message : String(e);
+    await ulozNotifikaci(db, { souborId: f.id!, nazev, vznik, chyba: chyba.slice(0, 500) }).catch(() => undefined);
+    return { ok: false, chyba };
+  }
 }
 
 export interface RadekPrehleduNotifikaci {
@@ -323,28 +351,25 @@ export async function dohledejNotifikaci(
   if (stavajici?.priebeh) return stavajici; // už kompletní
   if (kdy && ted() - kdy < NENALEZENO_MS) return stavajici;
   try {
-    const { data } = await api.files.list({
-      q: `'${slozkaId}' in parents and trashed = false and name = '${idAktivity}.pdf'`,
-      orderBy: "createdTime desc",
-      pageSize: 3,
-      fields: "files(id,name,createdTime)",
-    });
-    const f = data.files?.[0];
+    let f: drive_v3.Schema$File | undefined;
+    if (stavajici) {
+      // PDF už máme (jen bez tabulky Priebeh) – přečíst znovu stejný soubor
+      f = { id: stavajici.souborId, name: stavajici.nazev, createdTime: stavajici.vznik.toISOString() };
+    } else {
+      const { data } = await api.files.list({
+        q: `'${slozkaId}' in parents and trashed = false and name = '${idAktivity}.pdf'`,
+        orderBy: "createdTime desc",
+        pageSize: 3,
+        fields: "files(id,name,createdTime)",
+      });
+      f = data.files?.[0];
+    }
     if (!f?.id) {
       nenalezeno.set(idAktivity, ted());
-      return stavajici;
+      return null;
     }
-    const res = await api.files.get({ fileId: f.id, alt: "media" }, { responseType: "arraybuffer" });
-    const pdf = Buffer.from(res.data as ArrayBuffer);
-    const [text, bbox] = await Promise.all([(deps.textZPdf ?? textZPdf)(pdf), (deps.bboxZPdf ?? bboxZPdf)(pdf).catch(() => "")]);
-    const n = parsujNotifikaci(text, f.name ?? "", bbox);
-    const vznik = new Date(f.createdTime ?? ted());
-    if (!n) {
-      await ulozNotifikaci(db, { souborId: f.id, nazev: f.name ?? "", vznik, chyba: "v PDF chybí MWF ID aktivity" });
-      return stavajici;
-    }
-    await ulozNotifikaci(db, { ...n, souborId: f.id, nazev: f.name ?? "", vznik });
-    return nactiNotifikaci(db, idAktivity, klice);
+    const r = await nactiAUloz(db, api, f, deps);
+    return r.ok ? nactiNotifikaci(db, idAktivity, klice) : stavajici;
   } catch (e) {
     console.log(JSON.stringify({ severity: "WARNING", message: `Notifikační PDF ${idAktivity} nejde dohledat: ${e instanceof Error ? e.message : String(e)}` }));
     return stavajici;

@@ -29,7 +29,8 @@ export function migrace(z: { poznamka?: string; uvodPoznamky?: string; zaznamy?:
   const fisMop = /FIS\s*MOP|\bMOP\b/i.test(cely);
   const swap = /\bSWAP\b/i.test(cely);
   if (!fisMop && !swap) return null;
-  const caseId = cely.match(/CASE\s*ID\s*[:.]?\s*([A-Z0-9-]{4,})/i)?.[1] ?? null;
+  // CASEID musí obsahovat číslici („CASEID 123456789“, „CASE ID: ABC-4455“), ne slovo za ním („CASEID doplní PEP“)
+  const caseId = cely.match(/CASE\s*ID\s*[:.]?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,})/i)?.[1] ?? null;
   // záznam, kde se migrace / CASEID objevuje poprvé (nejstarší) – od něj běží lhůta
   const relevantni = zaznamy.filter((r) => /\bSWAP\b|FIS\s*MOP|\bMOP\b|CASE\s*ID/i.test(r.text)).sort((a, b) => a.at.getTime() - b.at.getTime());
   const od = relevantni[0]?.at ?? null;
