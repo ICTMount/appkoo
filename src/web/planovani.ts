@@ -112,6 +112,23 @@ export function chybejiciPotvrzeni(f: URLSearchParams): string[] {
   return POVINNA_POTVRZENI.filter((p) => f.get(p.pole) !== "ano").map((p) => p.text);
 }
 
+/** Povinná pole formuláře (bez nich technik nevyjede) – kontrolují se při zápisu do kalendáře */
+export const POVINNA_POLE: { pole: string; nazev: string }[] = [
+  { pole: "flex", nazev: "Flex" },
+  { pole: "instalace", nazev: "Zásuvka" },
+  { pole: "patro", nazev: "Číslo patra" },
+  { pole: "byt", nazev: "Číslo bytu" },
+  { pole: "vrtani", nazev: "Souhlas s vrtáním" },
+  { pole: "umisteni", nazev: "Koncové zařízení umístíme v" },
+  { pole: "elZasuvka", nazev: "El. zásuvka u KZ" },
+  { pole: "kz", nazev: "KZ" },
+  { pole: "predpojen", nazev: "Předpojen" },
+];
+
+export function chybejiciPole(f: URLSearchParams): string[] {
+  return POVINNA_POLE.filter((p) => !(f.get(p.pole) ?? "").trim()).map((p) => p.nazev);
+}
+
 /** Evidence události vytvořené aplikací (párování MWF ↔ kalendář, kontrola rozporů) */
 export async function ulozUdalost(db: Dotaz, idAktivity: string, kalendar: string, eventId: string, od: Date, do_: Date) {
   await db.query(

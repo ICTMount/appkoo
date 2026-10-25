@@ -20,3 +20,12 @@ describe("nestandardní úprava události", () => {
     expect(n.od).toBeNull();
   });
 });
+
+describe("povinná pole formuláře hovoru", async () => {
+  const { chybejiciPole } = await import("../src/web/planovani.js");
+  it("vyjmenuje chybějící povinné údaje", () => {
+    expect(chybejiciPole(new URLSearchParams({ flex: "ne", instalace: "nova", patro: "1", byt: "2", vrtani: "ano", umisteni: "chodba", elZasuvka: "ano", kz: "ROUTE", predpojen: "ne" }))).toEqual([]);
+    expect(chybejiciPole(new URLSearchParams({ flex: "ne", patro: " " }))).toContain("Číslo patra");
+    expect(chybejiciPole(new URLSearchParams({ flex: "ne", patro: " " }))).toContain("KZ");
+  });
+});

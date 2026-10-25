@@ -54,7 +54,7 @@ import { hledejNaLokalite, hledejVsude, ocistitDotaz, sLimitem, vyrazyZakazky, t
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
 import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
-import { chybejiciPotvrzeni, inicialy, iruLokalita, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
+import { chybejiciPole, chybejiciPotvrzeni, inicialy, iruLokalita, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 import type { OkoliZapisu } from "./html.js";
 import { jeBlok, jeVolneOkno } from "../gcal/kontrola.js";
 import type { TechnikPlanu } from "../plan/planovac.js";
@@ -323,8 +323,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
 
         if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
         if (!povolen) return posli(res, 403, strankaChyby(403, brany.blokace[0] ?? "Zápis do kalendáře tohoto technika není povolený."));
-        const chybi = chybejiciPotvrzeni(formular);
-        if (chybi.length) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, chybi.map((c) => `Chybí potvrzení: ${c}`), formular, nahled, okoli));
+        const chybi = [...chybejiciPole(formular).map((c) => `Chybí povinný údaj: ${c}`), ...chybejiciPotvrzeni(formular).map((c) => `Chybí potvrzení: ${c}`)];
+        if (chybi.length) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, chybi, formular, nahled, okoli));
         if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendář není dostupný."));
 
         const sla = slaKonec(detail.z, stav.posledniExport ?? now);

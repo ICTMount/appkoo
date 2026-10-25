@@ -95,7 +95,10 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-blok{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}.gc-blok>.gc-ikona{flex:none;width:20px;height:20px;color:var(--muted);margin-top:2px}.gc-blok>.gc-ikona svg{width:20px;height:20px}
 .gc-misto{font-size:14px;padding-top:2px}.gc-popis{flex:1;min-width:0;font-size:13.5px;line-height:1.9}
 .gc-radek{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}.gc-stitek{font-weight:600;letter-spacing:.01em}.gc-mezi{color:var(--text)}
-.gc-zasadni{background:var(--warn-bg,#fff4d6);border-left:3px solid #e65100;padding:2px 8px;margin:3px 0;border-radius:4px}.gc-zasadni .gc-stitek{color:#e65100}.gc-zasadni input,.gc-zasadni select{border:1px solid #e65100;background:var(--panel)}
+.gc-radek{padding:3px 8px;margin:2px 0;border-radius:6px;border-left:3px solid transparent}
+.gc-povinne{background:var(--warn-bg,#fff4d6);border-left-color:#e65100}.gc-povinne .gc-stitek{color:#e65100}.gc-povinne input,.gc-povinne select{border:1px solid #e65100;background:var(--panel)}
+.gc-volitelne{color:var(--muted);border-left-color:var(--line)}.gc-volitelne .gc-stitek{font-weight:500;color:var(--muted)}.gc-volitelne input,.gc-volitelne select{border:1px solid var(--line);background:var(--panel)}
+.gc-tag{margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--panel)}.gc-tag.povinne{border-color:#e65100;color:#e65100}
 .gc-vedlejsi{font-size:12px;color:var(--muted);line-height:1.6}.gcal input.gc-ram{border:1px solid #e65100;background:var(--panel);padding:4px 8px}
 .gc-flex label.volba{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:13px;cursor:pointer}.gc-flex label.volba small{color:var(--muted)}.gc-flex label.volba:has(input:checked){border-color:#e65100;background:#e65100;color:#fff}.gc-flex label.volba:has(input:checked) small{color:#ffe0c2}.gc-flex input[type=radio]{margin:0;accent-color:#e65100}.gc-vedlejsi .gc-stitek{font-weight:500;color:var(--muted)}
 .gcal input,.gcal select{padding:2px 6px;font-size:13px;border-radius:4px;background:transparent;border:1px solid transparent;border-bottom:1px solid var(--line)}
@@ -692,8 +695,9 @@ export function strankaZapisu(
   const casDo = hodnoty.get("casDo") || fmtTime(vyb.do);
   const kdy = `${DNY_CELE[vyb.od.getUTCDay()]} ${vyb.od.getUTCDate()}. ${MESICE[vyb.od.getUTCMonth()]} · ${nestd ? `${esc(casOd)}–${esc(casDo)}` : `${fmtTime(vyb.od)}–${fmtTime(vyb.do)}`}`;
   // řádek popisu události: ŠTÍTEK: hodnota – ve stejném pořadí, jak se zapíše do kalendáře
-  // váha = zasadni (zvýrazněné – bez toho technik nevyjede) | vedlejsi (doplňkové, menší písmo)
-  const r = (stitek: string, obsah: string, vaha = "") => `<div class="gc-radek${vaha ? ` gc-${vaha}` : ""}"><span class="gc-stitek">${esc(stitek)}</span>${obsah}</div>`;
+  // váha = povinne (musí být vyplněno – zvýrazněný řádek se štítkem) | volitelne (doplňkové, ztlumené) | "" (informace)
+  const stitekVahy = (vaha: string) => (vaha === "povinne" ? `<span class="gc-tag povinne">povinné</span>` : vaha === "volitelne" ? `<span class="gc-tag">volitelné</span>` : "");
+  const r = (stitek: string, obsah: string, vaha = "") => `<div class="gc-radek${vaha ? ` gc-${vaha}` : ""}"><span class="gc-stitek">${esc(stitek)}</span>${obsah}${stitekVahy(vaha)}</div>`;
   const form = `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis" class="gcal">
 <input type="hidden" name="k" value="${esc(vyb.k)}"><input type="hidden" name="e" value="${esc(vyb.e)}"><input type="hidden" name="t" value="${esc(vyb.t)}">
 <input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">${presunPole(vyb.presun)}${vyb.pp && !vyb.presun ? `<input type="hidden" name="pp" value="1">` : ""}
@@ -710,23 +714,23 @@ export function strankaZapisu(
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
 ${r("Tel:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <input name="kontakt" class="gc-ram" placeholder="U instalace bude jiná osoba – telefon, vztah, jméno" value="${h("kontakt")}" size="46">`)}
-<div class="gc-radek gc-zasadni gc-flex"><span class="gc-stitek">Flex:</span>
+<div class="gc-radek gc-povinne gc-flex"><span class="gc-stitek">Flex:</span>
 <label class="volba"><input type="radio" name="flex" value="ne"${flex === "ne" ? " checked" : ""}> Pevný termín <small>(není FLEX)</small></label>
 <label class="volba"><input type="radio" name="flex" value="den"${flex === "den" ? " checked" : ""}> FLEX ten den <small>(čas v rámci dne lze posunout)</small></label>
 <label class="volba"><input type="radio" name="flex" value="obecne"${flex === "obecne" ? " checked" : ""}> FLEX obecně <small>(důchodce, rodičovská, často HO)</small></label>
-<input name="flexPozn" placeholder="upřesnění – např. jen do 14 h, odchod k lékaři" value="${h("flexPozn")}" size="36"></div>
-${r("Zásuvka:", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– číslo / foto</span> <input name="zasuvka" placeholder="číslo zásuvky" value="${h("zasuvka")}" size="14">`, "zasadni")}
-${r("Číslo patra a bytu:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`, "zasadni")}
-${r("Patra volně přístupná:", v("patraPristupna", ANO_NE), "vedlejsi")}
-${r("Stoupačka je zajištěna (nebo jen čtyřhran):", v("stoupacka", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
-${r("Vzdálenost od stoupačky (řádově):", `<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}" size="5"> <span class="gc-mezi">metrů</span>`, "vedlejsi")}
-${r("Stávající lišty / omezení v lištování od SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"), "vedlejsi")}
-${r("Souhlas s vrtáním:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = vrátit na PEP, nebo STORNO)</span>`, "zasadni")}
-${r("Koncové zařízení umístíme v:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– el. zásuvka:</span> ${v("elZasuvka", ANO_NE)}`)}
-${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <span class="gc-mezi">STB:</span> <input name="stb" value="${h("stb")}" size="10">${d.notifikace?.cpeMode ? ` <span class="gc-mezi muted">(z PDF: ${esc(d.notifikace.cpeMode)}${d.notifikace.zoznam ? ` · ${esc(d.notifikace.zoznam)}` : ""})</span>` : ""}`)}
-${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`)}
-${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`)}
-${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`)}
+<input name="flexPozn" placeholder="upřesnění – např. jen do 14 h, odchod k lékaři" value="${h("flexPozn")}" size="36"><span class="gc-tag povinne">povinné</span></div>
+${r("Zásuvka:", `${v("instalace", [["nova", "Nová instalace"], ["existujici", "Existující zásuvka"]], "nova")} <span class="gc-mezi">– číslo / foto</span> <input name="zasuvka" placeholder="číslo zásuvky" value="${h("zasuvka")}" size="14">`, "povinne")}
+${r("Číslo patra a bytu:", `<input name="patro" placeholder="patro" value="${h("patro")}" size="6"> <span class="gc-mezi">/</span> <input name="byt" placeholder="byt" value="${h("byt")}" size="6">`, "povinne")}
+${r("Patra volně přístupná:", v("patraPristupna", ANO_NE), "volitelne")}
+${r("Stoupačka je zajištěna (nebo jen čtyřhran):", v("stoupacka", ANO_NE_NEVIM, "NEVÍM"), "volitelne")}
+${r("Vzdálenost od stoupačky (řádově):", `<input name="vzdalenost" inputmode="numeric" value="${h("vzdalenost")}" size="5"> <span class="gc-mezi">metrů</span>`, "volitelne")}
+${r("Stávající lišty / omezení v lištování od SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"), "volitelne")}
+${r("Souhlas s vrtáním:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = vrátit na PEP, nebo STORNO)</span>`, "povinne")}
+${r("Koncové zařízení umístíme v:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– el. zásuvka:</span> ${v("elZasuvka", ANO_NE)}`, "povinne")}
+${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <span class="gc-mezi">STB:</span> <input name="stb" value="${h("stb")}" size="10">${d.notifikace?.cpeMode ? ` <span class="gc-mezi muted">(z PDF: ${esc(d.notifikace.cpeMode)}${d.notifikace.zoznam ? ` · ${esc(d.notifikace.zoznam)}` : ""})</span>` : ""}`, "povinne")}
+${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`, "povinne")}
+${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`, "volitelne")}
+${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`, "volitelne")}
 <div class="gc-radek gc-predpis"><span class="gc-stitek">INSTALAČNÍ PŘEDPIS:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${zPdf && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
 </div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.potvrzeni}</span><div>

@@ -238,7 +238,8 @@ describe("web: nabídka a zápis termínu", () => {
   }
 
   const vyber = { k: "K1", e: "v1", t: "Hristov", od: local(2026, 10, 16, 10, 0).toISOString(), do: local(2026, 10, 16, 12, 0).toISOString() };
-  const potvrzeno = { overenoJmeno: "ano", overenaZasuvka: "ano", zakaznikSouhlasi: "ano" };
+  // potvrzení + povinná pole hovoru (bez nich zápis vrátí 422)
+  const potvrzeno = { overenoJmeno: "ano", overenaZasuvka: "ano", zakaznikSouhlasi: "ano", flex: "ne", instalace: "nova", patro: "2", byt: "9", vrtani: "ano", umisteni: "obývací pokoj", elZasuvka: "ano", kz: "ROUTE", predpojen: "ano" };
 
   it("nabídka termínů a formulář", async () => {
     const w = await spust();

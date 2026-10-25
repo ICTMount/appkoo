@@ -69,7 +69,11 @@ export function parsujKz(radky: string[]): { cpeMode: string | null; zoznam: str
         else if (s.od >= cpeOd - 2) cpe.push(s.text);
       }
     }
-    if (cpe.length || zoz.length) return { cpeMode: cpe.join(" ") || null, zoznam: zoz.join(" ") || null };
+    if (cpe.length || zoz.length) {
+      // do sloupce CPE Mode občas spadnou i slova z okolí („Spôsob inštalácie Technik“) – když je tam známý režim, vzít jen ten
+      const rezim = cpe.find((t) => ZNAME_REZIMY.test(t));
+      return { cpeMode: rezim ?? (cpe.join(" ") || null), zoznam: zoz.join(" ") || null };
+    }
   }
   // text bez sloupců (např. slitý do jednoho řádku): režim je známé slovo, zařízení jsou za ním
   const tokeny = uklid(radky.join(" ")).split(" ");
