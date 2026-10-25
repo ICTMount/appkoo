@@ -170,3 +170,26 @@ export async function mestskeCasti(geokoder: Geokoder | null, adresy: (string | 
   );
   return vysledek;
 }
+
+/** Nestandardní úprava události (zaškrtnuté „nestandardní úprava“): vlastní název a čas; null = standardní zápis */
+export interface Nestandard {
+  nadpis: string | null;
+  od: Date | null;
+  do: Date | null;
+}
+
+export function nestandardZFormulare(f: URLSearchParams, slotOd: Date, slotDo: Date): Nestandard | null {
+  if (f.get("nestandard") !== "1") return null;
+  const cas = (v: string | null, zaklad: Date): Date | null => {
+    const m = v?.trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const d = new Date(zaklad);
+    d.setUTCHours(+m[1]!, +m[2]!, 0, 0);
+    return d;
+  };
+  const nadpis = text(f.get("nadpis"))?.slice(0, 200) ?? null;
+  const od = cas(f.get("casOd"), slotOd);
+  const do_ = cas(f.get("casDo"), slotDo);
+  const platne = od && do_ && do_.getTime() > od.getTime() ? { od, do: do_ } : { od: null, do: null };
+  return { nadpis, ...platne };
+}

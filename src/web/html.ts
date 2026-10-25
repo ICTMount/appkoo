@@ -101,7 +101,14 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gcal input,.gcal select{padding:2px 6px;font-size:13px;border-radius:4px;background:transparent;border:1px solid transparent;border-bottom:1px solid var(--line)}
 .gcal input:hover,.gcal select:hover,.gcal input:focus,.gcal select:focus{border-color:var(--line);background:var(--panel)}
 .gc-predpis{align-items:flex-start;flex-direction:column;margin-top:6px}.gc-predpis textarea{min-height:140px;font-size:13px;line-height:1.5}
-.gc-pata{padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}.gcal label.check{display:block;padding:2px 0}
+.gc-pata{padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.zapis-dva{display:grid;grid-template-columns:minmax(0,860px) minmax(320px,1fr);gap:16px;align-items:start}@media (max-width:1100px){.zapis-dva{grid-template-columns:1fr}}
+.gc-nestd{margin:-4px 0 10px;padding:6px 10px;border:1px dashed var(--line);border-radius:8px}.gc-nestd .gc-nestd-pole{display:none;margin-top:8px}.gc-nestd:has(input[name=nestandard]:checked){border:2px solid #c62828;background:rgba(198,40,40,.06)}.gc-nestd:has(input[name=nestandard]:checked) .gc-nestd-pole{display:block}
+.gc-nestd label{display:block}.gc-nestd .gc-nestd-pole input[name=nadpis]{width:100%;border:1px solid #c62828;background:var(--panel);font-size:14px;padding:6px 8px}.gc-nestd .gc-nestd-pole input[name^=cas]{border:1px solid #c62828;background:var(--panel)}
+.gc-den{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.08);padding:14px 16px;margin-bottom:14px}.gc-den h2{font-size:15px;font-weight:600;margin:0 0 10px}
+.gc-ud{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--line);font-size:13px}.gc-ud:first-of-type{border-top:0}.gc-cas{flex:none;width:44px;font-size:12px;line-height:1.3;color:var(--text)}
+.gc-tel{flex:1;display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border-radius:8px;background:rgba(121,85,72,.10);border-left:4px solid #795548}.gc-tel .gc-barva{display:none}
+.gc-ud.volny .gc-tel{background:rgba(46,157,75,.12);border-left-color:#2e9d4b}.gc-ud.tato .gc-tel{background:rgba(31,95,191,.14);border-left-color:var(--accent);outline:2px solid var(--accent)}.gcal label.check{display:block;padding:2px 0}
 .pole label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}
 .pole input,.pole select,textarea{color:var(--text)}textarea{width:100%;min-height:90px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
 .check{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
@@ -653,6 +660,7 @@ export function strankaZapisu(
   chyby: string[] = [],
   hodnoty: URLSearchParams = new URLSearchParams(),
   nahled: { summary: string; location: string } | null = null,
+  okoli: OkoliZapisu | null = null,
 ): string {
   const z = d.z;
   const h = (n: string) => esc(hodnoty.get(n) ?? "");
@@ -661,9 +669,9 @@ export function strankaZapisu(
   const n = d.notifikace;
   const zPdf = n
     ? [
+        ...(n.priebeh?.length ? [`Priebeh optický: ${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("; ") : "všude Ponechať"}`] : []),
         ...n.predpis,
         ...(n.cpeMode || n.zoznam ? [`Zoznam KZ: CPE Mode ${n.cpeMode ?? "?"}${n.zoznam ? ` · ${n.zoznam}` : ""}`] : []),
-        ...(n.priebeh?.length ? [`Priebeh optický: ${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("; ") : "všude Ponechať"}`] : []),
       ].join("\n")
     : "";
   const predpis = hodnoty.get("predpis") ?? zPdf;
@@ -673,7 +681,10 @@ export function strankaZapisu(
   const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
   const nadpis = nahled?.summary ?? `${vyb.t} - ${z.typAktivity.includes("PIV") ? "PIV" : "FTTH"}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}`;
   const misto = nahled?.location ?? z.adresa;
-  const kdy = `${DNY_CELE[vyb.od.getUTCDay()]} ${vyb.od.getUTCDate()}. ${MESICE[vyb.od.getUTCMonth()]} · ${fmtTime(vyb.od)}–${fmtTime(vyb.do)}`;
+  const nestd = hodnoty.get("nestandard") === "1";
+  const casOd = hodnoty.get("casOd") || fmtTime(vyb.od);
+  const casDo = hodnoty.get("casDo") || fmtTime(vyb.do);
+  const kdy = `${DNY_CELE[vyb.od.getUTCDay()]} ${vyb.od.getUTCDate()}. ${MESICE[vyb.od.getUTCMonth()]} · ${nestd ? `${esc(casOd)}–${esc(casDo)}` : `${fmtTime(vyb.od)}–${fmtTime(vyb.do)}`}`;
   // řádek popisu události: ŠTÍTEK: hodnota – ve stejném pořadí, jak se zapíše do kalendáře
   // váha = zasadni (zvýrazněné – bez toho technik nevyjede) | vedlejsi (doplňkové, menší písmo)
   const r = (stitek: string, obsah: string, vaha = "") => `<div class="gc-radek${vaha ? ` gc-${vaha}` : ""}"><span class="gc-stitek">${esc(stitek)}</span>${obsah}</div>`;
@@ -681,7 +692,14 @@ export function strankaZapisu(
 <input type="hidden" name="k" value="${esc(vyb.k)}"><input type="hidden" name="e" value="${esc(vyb.e)}"><input type="hidden" name="t" value="${esc(vyb.t)}">
 <input type="hidden" name="od" value="${esc(vyb.od.toISOString())}"><input type="hidden" name="do" value="${esc(vyb.do.toISOString())}">${presunPole(vyb.presun)}${vyb.pp && !vyb.presun ? `<input type="hidden" name="pp" value="1">` : ""}
 <div class="gc-karta">
-<div class="gc-hlava"><span class="gc-barva"></span><div><div class="gc-nadpis">${esc(nadpis)}</div><div class="gc-kdy">${esc(kdy)}</div></div></div>
+<div class="gc-hlava"><span class="gc-barva"></span><div><div class="gc-nadpis">${esc(nadpis)}</div><div class="gc-kdy">${kdy}</div></div></div>
+<div class="gc-nestd">
+<label class="check"><input type="checkbox" name="nestandard" value="1"${nestd ? " checked" : ""}> Nestandardní úprava názvu a času události <span class="muted">(zaškrtnout jen výjimečně)</span></label>
+<div class="gc-nestd-pole">
+<div class="err"><b>POZOR – nestandardní úprava zakázky.</b> Název a čas níže se zapíšou do Google Kalendáře přesně tak, jak jsou zde uvedené, místo standardní šablony. Slot VOLNY se přepíše celý; MWF upravte ručně na stejný čas.</div>
+<label>Název události<input name="nadpis" value="${esc(hodnoty.get("nadpis") ?? nadpis)}" size="90"></label>
+<div class="gc-radek"><span class="gc-stitek">Čas:</span> <input name="casOd" value="${esc(casOd)}" size="5" placeholder="HH:MM"> <span class="gc-mezi">–</span> <input name="casDo" value="${esc(casDo)}" size="5" placeholder="HH:MM"> <span class="muted">(den zůstává ${esc(fmtDate(vyb.od))})</span></div>
+</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
 ${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>`)}
@@ -719,8 +737,40 @@ ${zapisPovolen ? "" : `<span class="muted"> Zápis do kalendáře je vypnutý (p
   }</div>
 ${chyby.length ? `<div class="err">${chyby.map(esc).join("<br>")}</div>` : ""}
 ${brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join("<br>")}</div>` : ""}
-${form}`;
+<div class="zapis-dva">
+<div>${form}</div>
+<div>${okoli ? sekceOkoli(okoli, vyb, nadpis) : ""}</div>
+</div>`;
   return stranka("Zápis termínu", uzivatel, stav, telo);
+}
+
+/** Pravý sloupec zápisu: den technika (vzhled Google Kalendáře) s vyznačeným slotem a zakázky v okolí */
+export interface OkoliZapisu {
+  den: string;
+  denTechnika: UdalostTechnika[];
+  slotId: string;
+  okoli: { u: UdalostTechnika; km: number }[];
+  bezAdresy: boolean;
+}
+
+function sekceOkoli(o: OkoliZapisu, vyb: { t: string; e: string; od: Date; do: Date }, nadpis: string): string {
+  const titulek = (u: UdalostTechnika) => esc(u.summary.replace(/^[^-]+-\s*/, ""));
+  const radek = (u: UdalostTechnika) => {
+    const tato = u.id === vyb.e;
+    const volny = jeVolneOkno(u);
+    const trida = tato ? "gc-ud tato" : volny ? "gc-ud volny" : "gc-ud";
+    const text = tato ? `<b>${esc(nadpis)}</b><div class="muted">← tato zakázka (přepíše slot ${titulek(u)})</div>` : `${titulek(u)}${u.location ? `<div class="muted">${esc(u.location)}</div>` : ""}`;
+    return `<div class="${trida}"><div class="gc-cas">${fmtTime(u.od)}<br><span class="muted">${fmtTime(u.do)}</span></div><div class="gc-tel"><span class="gc-barva ${volny && !tato ? "b-vol" : ""}"></span><div>${text}</div></div></div>`;
+  };
+  const den = `${DNY_CELE[vyb.od.getUTCDay()]} ${fmtDate(vyb.od)}`;
+  const udalosti = o.denTechnika.length ? o.denTechnika.map(radek).join("") : `<div class="muted">V kalendáři technika ten den nic není.</div>`;
+  const okoli = o.bezAdresy
+    ? `<div class="muted">Adresu zakázky se nepodařilo najít na mapě – okolí nelze spočítat.</div>`
+    : o.okoli.length
+      ? o.okoli.map(({ u, km }) => `<div class="gc-ud"><div class="gc-cas">${fmtTime(u.od)}<br><span class="muted">${fmtTime(u.do)}</span></div><div class="gc-tel"><span class="gc-barva"></span><div><b>${esc(u.technik)}</b> · ${titulek(u)}<div class="muted">${esc(u.location)} · <b>${km} km</b></div></div></div></div>`).join("")
+      : `<div class="muted">Ten den není do 30 km naplánovaná žádná jiná zakázka.</div>`;
+  return `<div class="gc-den"><h2>${esc(vyb.t)} · ${esc(den)}</h2>${udalosti}</div>
+<div class="gc-den"><h2>Naplánováno v okolí <small class="muted">ostatní technici, ${esc(den)}, do 30 km</small></h2>${okoli}</div>`;
 }
 
 const MESICE = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
