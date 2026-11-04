@@ -470,12 +470,12 @@ ${radek("P3: Typ balíčku", esc(z.balik) || `<span class="muted">neuvedeno</spa
 ${prioritySvisible ? radek("Priorita", `${prio(d.priorita)} ${esc(d.duvod)}`) : ""}
 ${radek("Preferované datum", esc(den(z.preferovanyDatum)))}
 ${radek("Datum RFS", esc(den(z.rfs)))}
-${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
 ${plan.slozka?.zapnuto ? radekOddeleny("Dokumenty", plan.slozka.zaznam
     ? `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">otevřít složku na Disku</a> <small class="muted">${esc(plan.slozka.zaznam.cesta)}</small>`
     : plan.slozka.smiZalozit
       ? `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/slozka" class="inline"><button class="btn maly">Založit složku</button> <small class="muted">${esc(`${slozkaTyden(z.termin?.od ?? new Date())} / APPKOO / ${z.idObjednavkyZaklad}`)}</small></form>`
       : `<span class="muted">složka zatím není založená</span>`) : ""}
+${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
 </dl></div>
 ${mapa}
 </div>
