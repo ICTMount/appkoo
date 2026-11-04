@@ -21,7 +21,25 @@ export interface Nalez {
   odkaz?: string | null;
   /** chat: zpráva ve vlákně, kde se zakázka zmiňuje, ale sama číslo neobsahuje */
   veVlakne?: boolean;
+  /** fotky, PDF a další soubory u zprávy (chat, e-mail) – k uložení do složky zakázky */
+  prilohy?: Priloha[];
 }
+
+/** Příloha zprávy; `ref` říká, odkud ji lze stáhnout (krok 2: uložení do složky zakázky) */
+export interface Priloha {
+  nazev: string;
+  /** MIME typ, např. image/jpeg */
+  typ: string;
+  /** bajty, když je zdroj udává */
+  velikost: number | null;
+  /** odkaz pro uživatele (Chat: downloadUri, Disk: soubor) */
+  odkaz: string | null;
+  ref:
+    | { zdroj: "chat"; /** attachmentDataRef.resourceName – nahraný soubor (Chat media.download) */ media?: string; /** driveDataRef.driveFileId – soubor vložený z Disku */ driveId?: string }
+    | { zdroj: "email"; zprava: string; priloha: string };
+}
+
+export const jeObrazek = (p: Priloha) => /^image\//.test(p.typ);
 
 export interface VysledekZdroje {
   zdroj: Zdroj;
@@ -97,6 +115,20 @@ export function teloZpravy(p: gmail_v1.Schema$MessagePart | undefined): string {
   return t.replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim().slice(0, 5000);
 }
 
+/** Přílohy e-mailu: části s názvem souboru a attachmentId (vložené obrázky bez názvu se přeskočí) */
+export function prilohyEmailu(idZpravy: string, p: gmail_v1.Schema$MessagePart | undefined): Priloha[] {
+  const v: Priloha[] = [];
+  const projdi = (x: gmail_v1.Schema$MessagePart | undefined) => {
+    if (!x) return;
+    if (x.filename && x.body?.attachmentId) {
+      v.push({ nazev: x.filename, typ: (x.mimeType ?? "application/octet-stream").toLowerCase(), velikost: x.body.size ?? null, odkaz: null, ref: { zdroj: "email", zprava: idZpravy, priloha: x.body.attachmentId } });
+    }
+    for (const c of x.parts ?? []) projdi(c);
+  };
+  projdi(p);
+  return v;
+}
+
 export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max = 15, skupiny = INTERNI_SKUPINY): Promise<Nalez[]> {
   if (!vyrazy.length) return [];
   const bezSkupin = skupiny.map((s) => ` -to:${s} -cc:${s} -list:${s}`).join("");
@@ -116,6 +148,7 @@ export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max 
         kdo: h("From"),
         text: teloZpravy(m.payload) || m.snippet || "",
         odkaz,
+        prilohy: prilohyEmailu(m.id ?? id!, m.payload),
       };
     }),
   );
@@ -178,12 +211,38 @@ export async function hledejKalendar(cal: calendar_v3.Calendar, vyrazy: string[]
 
 // ---------- Google Chat ----------
 
+interface ChatPriloha {
+  name?: string;
+  contentName?: string;
+  contentType?: string;
+  downloadUri?: string;
+  attachmentDataRef?: { resourceName?: string };
+  driveDataRef?: { driveFileId?: string };
+}
+
 interface ChatZprava {
   name: string;
   text?: string;
   createTime?: string;
   sender?: { displayName?: string; name?: string };
   thread?: { name?: string };
+  attachment?: ChatPriloha[];
+}
+
+/** Přílohy chatové zprávy: nahrané soubory (media) i soubory vložené z Disku */
+export function prilohyChatu(a: ChatPriloha[] | undefined): Priloha[] {
+  return (a ?? []).flatMap((x) => {
+    const media = x.attachmentDataRef?.resourceName;
+    const driveId = x.driveDataRef?.driveFileId;
+    if (!media && !driveId) return [];
+    return [{
+      nazev: x.contentName || (driveId ? "soubor z Disku" : "příloha"),
+      typ: (x.contentType ?? "application/octet-stream").toLowerCase(),
+      velikost: null,
+      odkaz: x.downloadUri ?? (driveId ? `https://drive.google.com/file/d/${driveId}/view` : null),
+      ref: { zdroj: "chat", ...(media ? { media } : {}), ...(driveId ? { driveId } : {}) },
+    }];
+  });
 }
 
 /** Zprávy prostoru za posledních N dní – krátká cache, aby opakované hledání nečetlo vše znovu */
@@ -240,6 +299,7 @@ export async function hledejChat(prostory: string[], vyrazy: string[], token: st
         text: (m.text ?? "").slice(0, 5000),
         odkaz: `https://mail.google.com/chat/u/0/#chat/space/${idProstoru}${idVlakna ? `/${idVlakna}` : ""}`,
         veVlakne: !shoda,
+        prilohy: prilohyChatu(m.attachment),
       });
     }
   }

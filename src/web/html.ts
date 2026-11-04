@@ -16,7 +16,7 @@ const slozkaTyden = (d: Date) => {
   const { rok, tyden } = isoTyden(d);
   return `${rok} / ${nazevTydne(rok, tyden)}`;
 };
-import type { Nalez, NalezLokality, VysledekZdroje, Zdroj } from "../zdroje/hledani.js";
+import { jeObrazek, type Nalez, type NalezLokality, type VysledekZdroje, type Zdroj } from "../zdroje/hledani.js";
 import { webcalendar, type Webcalendar } from "../domain/webcalendar.js";
 import { migrace, zasuvkaUsed, type Migrace } from "../domain/migrace.js";
 import type { Zaznam } from "../import/notes.js";
@@ -84,7 +84,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
-.zaznam{border-top:1px solid var(--line);padding:6px 0}.zaznam:first-child{border-top:0}
+.zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
 .nowrap{white-space:nowrap}
@@ -523,7 +523,20 @@ function nalez(n: Nalez): string {
     n.kdo ? ` · ${esc(n.kdo)}` : ""
   }${n.kde && n.kde !== n.titulek ? ` · ${esc(n.kde)}` : ""}${n.veVlakne ? " · ve vlákně" : ""}${
     n.odkaz ? ` · <a href="${esc(n.odkaz)}" target="_blank" rel="noopener">otevřít</a>` : ""
-  }</div><div class="plny">${odkazyOId(esc(n.text))}</div></div>`;
+  }</div><div class="plny">${odkazyOId(esc(n.text))}</div>${prilohyNalezu(n)}</div>`;
+}
+
+const velikost = (b: number | null) => (b == null ? "" : b < 1_000_000 ? ` (${Math.max(1, Math.round(b / 1000))} kB)` : ` (${(b / 1_000_000).toFixed(1)} MB)`);
+
+/** Přílohy zprávy (fotky, PDF…): název, velikost, odkaz – krok 2 přidá výběr a uložení do složky zakázky */
+function prilohyNalezu(n: Nalez): string {
+  if (!n.prilohy?.length) return "";
+  return `<div class="prilohy">📎 ${n.prilohy
+    .map((p) => {
+      const t = `${esc(p.nazev)}${velikost(p.velikost)}`;
+      return `<span class="priloha${jeObrazek(p) ? " obr" : ""}">${p.odkaz ? `<a href="${esc(p.odkaz)}" target="_blank" rel="noopener">${t}</a>` : t}</span>`;
+    })
+    .join(" · ")}</div>`;
 }
 
 /** O-ID v textu (e-mail, kalendář, chat) jako odkaz na plánování zakázky */

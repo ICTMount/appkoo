@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { delegace } from "../src/google/delegace.js";
-import { hledejChat, hledejEmaily, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, poDavkach, uliceCislo, vycistitCacheKalendaru, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
+import { hledejChat, hledejEmaily, prilohyChatu, prilohyEmailu, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, poDavkach, uliceCislo, vycistitCacheKalendaru, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
 import { sekceZdroju } from "../src/web/html.js";
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -231,5 +231,41 @@ describe("seznam kalendářů v cache", () => {
     vycistitCacheKalendaru(cal);
     await hledejKalendar(cal, ["O-1234567"], od, new Date("2026-12-31T00:00:00Z"));
     expect(seznamu).toBe(2);
+  });
+});
+
+describe("přílohy zpráv (fotky, PDF) – krok 1: zobrazit", () => {
+  it("e-mail: části s názvem a attachmentId, vložené obrázky bez názvu ne", () => {
+    const p = prilohyEmailu("m9", {
+      mimeType: "multipart/mixed",
+      parts: [
+        { mimeType: "text/plain", body: { data: "aGk=" } },
+        { mimeType: "image/jpeg", filename: "IMG_2041.jpg", body: { attachmentId: "A1", size: 2_300_000 } },
+        { mimeType: "image/png", filename: "", body: { attachmentId: "A2", size: 500 } },
+        { mimeType: "multipart/alternative", parts: [{ mimeType: "application/pdf", filename: "protokol.pdf", body: { attachmentId: "A3", size: 90_000 } }] },
+      ],
+    });
+    expect(p).toEqual([
+      { nazev: "IMG_2041.jpg", typ: "image/jpeg", velikost: 2_300_000, odkaz: null, ref: { zdroj: "email", zprava: "m9", priloha: "A1" } },
+      { nazev: "protokol.pdf", typ: "application/pdf", velikost: 90_000, odkaz: null, ref: { zdroj: "email", zprava: "m9", priloha: "A3" } },
+    ]);
+  });
+
+  it("chat: nahraný soubor (media) i soubor z Disku; bez reference se přeskočí", () => {
+    const p = prilohyChatu([
+      { contentName: "foto.jpg", contentType: "image/jpeg", downloadUri: "https://chat.google.com/dl/1", attachmentDataRef: { resourceName: "spaces/S1/messages/m1/attachments/a1" } },
+      { contentType: "video/mp4", driveDataRef: { driveFileId: "D1" } },
+      { contentName: "nic" },
+    ]);
+    expect(p).toEqual([
+      { nazev: "foto.jpg", typ: "image/jpeg", velikost: null, odkaz: "https://chat.google.com/dl/1", ref: { zdroj: "chat", media: "spaces/S1/messages/m1/attachments/a1" } },
+      { nazev: "soubor z Disku", typ: "video/mp4", velikost: null, odkaz: "https://drive.google.com/file/d/D1/view", ref: { zdroj: "chat", driveId: "D1" } },
+    ]);
+  });
+
+  it("karta zdroje ukáže přílohy s velikostí a odkazem", () => {
+    const html = sekceZdroju([{ zdroj: "chat", nalezy: [{ zdroj: "chat", cas: null, titulek: "NEDOKONCENE", text: "foto", prilohy: [{ nazev: "foto.jpg", typ: "image/jpeg", velikost: 2_300_000, odkaz: "https://chat.google.com/dl/1", ref: { zdroj: "chat", media: "x" } }] }] }]);
+    expect(html).toContain("📎");
+    expect(html).toContain('<a href="https://chat.google.com/dl/1" target="_blank" rel="noopener">foto.jpg (2.3 MB)</a>');
   });
 });
