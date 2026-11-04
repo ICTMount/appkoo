@@ -21,6 +21,7 @@
 //   SERVISNI_UCET        e-mail servisního účtu aplikace (appkoo-runner@appkoo.iam.gserviceaccount.com)
 //   CHAT_PROSTORY        chatové prostory k prohledání, čárkami (spaces/AAQA…)
 
+import { gzipSync } from "node:zlib";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
 import { OAuth2Client } from "google-auth-library";
@@ -178,6 +179,8 @@ async function uzivatel(req: IncomingMessage, n: NastaveniWebu): Promise<string 
 }
 
 /** Vzhled zvolený přepínačem (cookie „tema“): light / dark; bez cookie podle systému */
+/** prohlížeč přijme gzip (Accept-Encoding) – nastaví se na začátku požadavku */
+const gzipOdpovedi = new WeakMap<ServerResponse, boolean>();
 const temaOdpovedi = new WeakMap<ServerResponse, "light" | "dark">();
 /** Role přihlášeného uživatele – do lišty se doplní role a (správci) záložka Konfigurace */
 const roleOdpovedi = new WeakMap<ServerResponse, Role>();
@@ -194,14 +197,23 @@ function posli(res: ServerResponse, kod: number, html: string) {
     .replace(/<!--konfigurace:(on|off)-->/, (_, on) => (role === "spravce" ? `<a href="/konfigurace" class="konfig${on === "on" ? " on" : ""}">⚙ Konfigurace</a>` : ""))
     .replace("<!--role-->", role ? ` · ${POPIS_ROLE[role]}` : "")
     .replace(/<!--doplnit:(on|off)-->/, (_, on) => (role === "technik" ? "" : `<a href="/technik" class="${on === "on" ? "on" : ""}">Doplnit technika</a>`));
-  res.writeHead(kod, {
+  const hlavicky: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
     "x-content-type-options": "nosniff",
     "referrer-policy": "same-origin",
     // mapa adresy: jen vložená Google mapa (iframe), jinak nic z cizích domén
     "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-src https://www.google.com; form-action 'self'; frame-ancestors 'none'",
-  });
+    vary: "accept-encoding",
+  };
+  // gzip: stránky zakázky mají i stovky kB HTML (zdroje, nabídka) – komprese je zmenší cca 5×
+  if (gzipOdpovedi.get(res) && html.length > 1024) {
+    hlavicky["content-encoding"] = "gzip";
+    res.writeHead(kod, hlavicky);
+    res.end(gzipSync(html));
+    return;
+  }
+  res.writeHead(kod, hlavicky);
   res.end(html);
 }
 
@@ -218,6 +230,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
     const url = new URL(req.url ?? "/", "http://localhost");
     const tema = temaZCookie(req.headers.cookie);
     if (tema) temaOdpovedi.set(res, tema);
+    if (/\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) gzipOdpovedi.set(res, true);
     try {
       if (url.pathname === "/healthz") {
         res.writeHead(200, { "content-type": "text/plain" });
@@ -692,9 +705,12 @@ function main() {
         ? (() => {
             const d = delegace(env.SERVISNI_UCET!, env.DELEGACE_UZIVATEL!);
             const prostory = (env.CHAT_PROSTORY ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+            // API objekty jednou na běh (klient delegace jen obnovuje token) – drží cache seznamu kalendářů
+            let gmail: ReturnType<typeof gmailApi> | null = null;
+            let kalendar: ReturnType<typeof calendarApi> | null = null;
             return () => ({
-              gmail: async () => gmailApi({ version: "v1", auth: (await d.klient()) as never }),
-              kalendar: async () => calendarApi({ version: "v3", auth: (await d.klient()) as never }),
+              gmail: async () => (gmail ??= gmailApi({ version: "v1", auth: (await d.klient()) as never })),
+              kalendar: async () => (kalendar ??= calendarApi({ version: "v3", auth: (await d.klient()) as never })),
               chatToken: async () => (await (await d.klient()).getAccessToken()).token ?? "",
               prostory,
             });

@@ -136,10 +136,23 @@ export async function poDavkach<T>(ulohy: (() => Promise<T>)[], soubezne = 8): P
   return vysledky;
 }
 
+/** Seznam kalendářů techniků se mění zřídka – cache 10 min na API objekt (dva dotazy méně na každý detail zakázky) */
+const SEZNAM_CACHE_MS = 10 * 60_000;
+const seznamCache = new WeakMap<calendar_v3.Calendar, { do: number; p: Promise<calendar_v3.Schema$CalendarListEntry[]> }>();
+export const vycistitCacheKalendaru = (cal: calendar_v3.Calendar) => seznamCache.delete(cal);
+
+async function seznamKalendaru(cal: calendar_v3.Calendar): Promise<calendar_v3.Schema$CalendarListEntry[]> {
+  const hit = seznamCache.get(cal);
+  if (hit && hit.do > Date.now()) return hit.p;
+  const p = cal.calendarList.list({ maxResults: 250 }).then(({ data }) => (data.items ?? []).filter((k) => k.id && !k.id.endsWith("@group.v.calendar.google.com"))); // bez svátků
+  seznamCache.set(cal, { do: Date.now() + SEZNAM_CACHE_MS, p });
+  p.catch(() => seznamCache.delete(cal));
+  return p;
+}
+
 export async function hledejKalendar(cal: calendar_v3.Calendar, vyrazy: string[], od: Date, do_: Date): Promise<Nalez[]> {
   if (!vyrazy.length) return [];
-  const { data } = await cal.calendarList.list({ maxResults: 250 });
-  const kalendare = (data.items ?? []).filter((k) => k.id && !k.id.endsWith("@group.v.calendar.google.com")); // bez svátků
+  const kalendare = await seznamKalendaru(cal);
   const nalezy = new Map<string, Nalez>();
   await poDavkach(
     kalendare.flatMap((k) =>
@@ -289,8 +302,7 @@ export async function hledejNaLokalite(cal: calendar_v3.Calendar, adresa: string
   const dotaz = `${uc.ulice} ${uc.cp}`;
   const ulice = bezDiakritiky(uc.ulice);
   const cislo = new RegExp(`(^|[^\\d])${uc.cp}(/|[^\\d]|$)`);
-  const { data } = await cal.calendarList.list({ maxResults: 250 });
-  const kalendare = (data.items ?? []).filter((k) => k.id && !k.id.endsWith("@group.v.calendar.google.com"));
+  const kalendare = await seznamKalendaru(cal);
   const nalezy = new Map<string, NalezLokality>();
   await poDavkach(
     kalendare.map((k) => async () => {

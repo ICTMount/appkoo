@@ -44,8 +44,15 @@ export function delegace(
   const adcToken = deps.adcToken ?? (async () => (await adc.getAccessToken()) ?? "");
   let cache: { token: string; vyprsi: number } | null = null;
 
+  let probiha: Promise<string> | null = null;
+  /** Platný token z cache; obnova běží jen jednou i při deseti souběžných požadavcích */
   async function token(): Promise<string> {
     if (cache && cache.vyprsi - 5 * 60_000 > ted()) return cache.token;
+    if (!probiha) probiha = obnov().finally(() => (probiha = null));
+    return probiha;
+  }
+
+  async function obnov(): Promise<string> {
     const iat = Math.floor(ted() / 1000);
     const payload = { iss: servisniUcet, sub: uzivatel, scope: scopy.join(" "), aud: "https://oauth2.googleapis.com/token", iat, exp: iat + 3600 };
 

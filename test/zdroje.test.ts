@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { delegace } from "../src/google/delegace.js";
-import { hledejChat, hledejEmaily, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, poDavkach, uliceCislo, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
+import { hledejChat, hledejEmaily, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, poDavkach, uliceCislo, vycistitCacheKalendaru, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
 import { sekceZdroju } from "../src/web/html.js";
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -35,6 +35,10 @@ describe("delegace jménem tmcz01", () => {
     ted += 56 * 60_000; // 4 min před vypršením → obnovit
     await d.klient();
     expect(volani).toHaveLength(4);
+    // deset souběžných požadavků po vypršení → jen jedna obnova (podpis + výměna)
+    ted += 60 * 60_000;
+    await Promise.all(Array.from({ length: 10 }, () => d.klient()));
+    expect(volani).toHaveLength(6);
   });
 
   it("chybějící delegace v adminu dá srozumitelnou chybu", async () => {
@@ -209,5 +213,23 @@ describe("poDavkach: omezený souběh dotazů na kalendáře", () => {
     expect(v).toEqual(ulohy.map((_, i) => i * 2));
     expect(max).toBe(4);
     expect(await poDavkach([], 4)).toEqual([]);
+  });
+});
+
+describe("seznam kalendářů v cache", () => {
+  it("calendarList.list se volá jednou za 10 min na stejný API objekt, hledání i lokalita ho sdílí", async () => {
+    let seznamu = 0;
+    const cal = {
+      calendarList: { list: async () => (seznamu++, { data: { items: [{ id: "K1", summary: "Hristov Anton" }] } }) },
+      events: { list: async () => ({ data: { items: [] } }) },
+    } as never;
+    const od = new Date("2026-01-01T00:00:00Z");
+    await hledejKalendar(cal, ["O-1234567"], od, new Date("2026-12-31T00:00:00Z"));
+    await hledejKalendar(cal, ["O-7654321"], od, new Date("2026-12-31T00:00:00Z"));
+    await hledejNaLokalite(cal, "Praha, Krčská 991/63", "O-1", new Date("2026-11-04T10:00:00Z"));
+    expect(seznamu).toBe(1);
+    vycistitCacheKalendaru(cal);
+    await hledejKalendar(cal, ["O-1234567"], od, new Date("2026-12-31T00:00:00Z"));
+    expect(seznamu).toBe(2);
   });
 });
