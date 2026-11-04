@@ -525,8 +525,34 @@ ${plan.jenNahled ? "" : `<div class="konec-detailu"></div>
 <section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
 ${sekcePlanovani(d, plan)}</section>`}`;
 
-  return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, telo, { dotaz: z.idObjednavky || z.idAktivity });
+  // Technik v terénu: zákazník, adresa, telefon, patro/byt, předpis – to vše má v události v kalendáři.
+  // Tady jen to, co tam není: upozornění, poznámky MWF, Chat a e-mail s přílohami, akce z notifikačního PDF, lokalita.
+  const teloTechnik = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${migraceStitek(z)}${usedStitek(z)} <small>${esc(z.zakaznik)}</small></h1>
+${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
+${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
+${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
+${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
+<div class="card"><dl>
+${radek("Stav MWF", esc(z.stavMwf))}
+${radek("Dohodnutý termín", esc(z.termin ? `${dt(z.termin.od)} – ${fmtTime(z.termin.do)}` : ""))}
+${radek("Důvod parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniNestandardni && `nestandardní: ${z.parkovaniNestandardni}`].filter(Boolean).join(" · ")))}
+${plan.iru ? radek("IRU lokalita", `<span class="iru"><b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
+${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
+${plan.slozka?.zaznam ? radek("Dokumenty", `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">složka zakázky na Disku</a>`) : ""}
+${d.souvisejici.length ? radek("Další aktivity", d.souvisejici.map((s) => `<a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> ${esc(s.typ_aktivity)}${s.uzavreno ? " (uzavřeno)" : ""}`).join("<br>")) : ""}
+</dl></div>
+<div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
+${sekceZdroju(zdroje ? [...zdroje].sort((a, b) => PORADI_TECHNIK[a.zdroj] - PORADI_TECHNIK[b.zdroj]) : zdroje, plan.prilohy)}
+<div class="grid" style="margin-top:12px">
+${sekceNotifikace(d.notifikace)}
+<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
+</div>`;
+
+  return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, plan.jenNahled ? teloTechnik : telo, { dotaz: z.idObjednavky || z.idAktivity });
 }
+
+/** Technik v terénu čte nejdřív Chat (hlášení kolegů a koordinace), pak e-mail; kalendář má v telefonu */
+const PORADI_TECHNIK: Record<Zdroj, number> = { chat: 0, email: 1, kalendar: 2 };
 
 /** Ikony služeb Google Workspace (obecné, bez log): obálka = e-mail, kalendář, bublina = chat */
 const svg = (cesta: string) =>
