@@ -26,6 +26,9 @@ export interface Delegace {
 
 type Fetch = typeof fetch;
 
+/** Složky zakázek na Disku: najít složky roku / týdne a založit APPKOO / O-… (v adminu musí být povolený i tento rozsah) */
+export const SCOPY_DISK = ["https://www.googleapis.com/auth/drive"];
+
 /** Plánování: čtení a zápis událostí v kalendářích techniků (v adminu musí být povolený i tento rozsah) */
 export const SCOPY_KALENDAR = ["https://www.googleapis.com/auth/calendar.events"];
 

@@ -9,6 +9,8 @@ import { fmtDate, fmtTime } from "../domain/time.js";
 export interface UdajeHovoru {
   novaInstalace?: boolean;
   zasuvka?: string; // číslo nebo „foto“
+  /** odkaz na složku zakázky na Disku (když je založená) */
+  dokumenty?: string;
   /** předobjednávka: co zákazník popsal (zapíše se hned za ZAKÁZKA) */
   popisZakaznika?: string;
   /** u instalace bude jiná osoba: „722060263 bratr p. Novák“ – přidá se k TEL */
@@ -94,6 +96,7 @@ export function sestavUdalost(
     `PŘEDPOJEN: ${ano(h.predpojen)}`,
     ...(z.infrastruktura === "TMCZ" ? [`PODB (adresa): ${h.podb ?? ""}`] : []),
     ...(h.caseid ? [`CASEID: ${h.caseid}`] : []),
+    ...(h.dokumenty ? [`DOKUMENTY: ${h.dokumenty}`] : []),
     "",
     "INSTALAČNÍ PŘEDPIS:",
     h.instalacniPredpis ?? "(zkopírovat z ticketu)",

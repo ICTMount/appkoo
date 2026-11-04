@@ -49,7 +49,8 @@ import { addDays, atTime, isoDate } from "../domain/time.js";
 import { isWorkday } from "../domain/workdays.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
 import { gmail as gmailApi } from "@googleapis/gmail";
-import { delegace, SCOPY_KALENDAR } from "../google/delegace.js";
+import { delegace, SCOPY_DISK, SCOPY_KALENDAR } from "../google/delegace.js";
+import { nactiSlozku, odkazSlozky, ulozSlozku, zalozSlozkuZakazky } from "../google/slozky.js";
 import { hledejNaLokalite, hledejVsude, ocistitDotaz, sLimitem, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
@@ -73,6 +74,8 @@ export interface NastaveniWebu {
   zdroje?: () => ZavislostiZdroju;
   /** správci (e-maily) – vždy role správce, i když nejsou v číselníku Uživatelé */
   spravci?: string[];
+  /** složky zakázek na Disku (SLOZKA_ZAKAZEK + delegace s rozsahem drive) – zakládají se jen tlačítkem */
+  slozky?: () => Promise<{ drive: import("@googleapis/drive").drive_v3.Drive; koren: string }>;
   /** dohledání notifikačního PDF na Drive, když ho detail ještě nemá (web má NOTIFIKACE_SLOZKA) */
   notifikace?: (idAktivity: string, klice: { idObjednavkyZaklad?: string | null; idS7?: string | null }) => Promise<UlozenaNotifikace | null>;
 }
@@ -258,6 +261,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       const now = ted();
       const stav = await nactiStavImportu(db, now);
 
+      const nactSlozkuBezpecne = (o: string) => nactiSlozku(db, o);
       const presmeruj = (kam: string) => {
         res.writeHead(302, { location: kam });
         res.end();
@@ -289,6 +293,30 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       if (url.pathname === "/planovani" || url.pathname === "/planovani/slot") return presmeruj(`/technik?${url.searchParams}`);
       const mt = url.pathname.match(/^\/zakazka\/([^/]+)\/terminy$/);
       if (mt) return presmeruj(`/zakazka/${mt[1]}#planovani`);
+
+      // Založit složku zakázky na Disku (jen na vyžádání koordinátorky)
+      const ms = url.pathname.match(/^\/zakazka\/([^/]+)\/slozka$/);
+      if (ms) {
+        if (req.method !== "POST") return presmeruj(`/zakazka/${ms[1]}`);
+        if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
+        if (role === "cteni" || role === "technik") return posli(res, 403, strankaChyby(403, "Složku zakázky může založit jen koordinátorka nebo správce."));
+        if (!n.slozky) return posli(res, 503, strankaChyby(503, "Složky zakázek nejsou nastavené (SLOZKA_ZAKAZEK)."));
+        const detail = await nactiDetail(db, decodeURIComponent(ms[1]!), now);
+        if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
+        const o = detail.z.idObjednavkyZaklad;
+        if (!(await nactiSlozku(db, o))) {
+          try {
+            const { drive, koren } = await n.slozky();
+            // týden podle termínu instalace; bez termínu týden založení
+            const s = await zalozSlozkuZakazky(drive, koren, o, detail.z.termin?.od ?? now);
+            await ulozSlozku(db, { objednavka: o, slozkaId: s.slozkaId, cesta: s.cesta, zalozil: email });
+            console.log(JSON.stringify({ severity: "INFO", message: `Složka zakázky ${s.novaSlozka ? "založena" : "nalezena"}: ${s.cesta}`, uzivatel: email, objednavka: o, slozka: odkazSlozky(s.slozkaId) }));
+          } catch (e) {
+            return posli(res, 502, strankaChyby(502, `Složku se nepodařilo založit: ${e instanceof Error ? e.message : String(e)}`));
+          }
+        }
+        return presmeruj(`/zakazka/${ms[1]}`);
+      }
 
       const mp = url.pathname.match(/^\/zakazka\/([^/]+)\/(zapis)$/);
       if (mp) {
@@ -328,7 +356,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendář není dostupný."));
 
         const sla = slaKonec(detail.z, stav.posledniExport ?? now);
-        const udalost = sestavUdalost(detail.z, technik.nazevVKalendari, casOd, casDo, udajeZFormulare(formular), sla, inicialy(kontext.koordinatorky, email));
+        const slozkaZak = await nactiSlozku(db, detail.z.idObjednavkyZaklad);
+        const udalost = sestavUdalost(detail.z, technik.nazevVKalendari, casOd, casDo, { ...udajeZFormulare(formular), ...(slozkaZak ? { dokumenty: slozkaZak.odkaz } : {}) }, sla, inicialy(kontext.koordinatorky, email));
         if (nestd?.nadpis) udalost.summary = nestd.nadpis;
         const { api } = await n.planovac();
         try {
@@ -430,6 +459,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           presun: presunPlan,
           jenNahled,
           iru: iruLokalita(kontext.iru, [detail.z.adresa, detail.z.psc].filter(Boolean).join(", ")),
+          slozka: { zaznam: await nactSlozkuBezpecne(detail.z.idObjednavkyZaklad), zapnuto: !!n.slozky, smiZalozit: role !== "cteni" && role !== "technik" },
         }));
       }
 
@@ -668,6 +698,13 @@ function main() {
               chatToken: async () => (await (await d.klient()).getAccessToken()).token ?? "",
               prostory,
             });
+          })()
+        : undefined,
+    slozky:
+      env.SLOZKA_ZAKAZEK && env.DELEGACE_UZIVATEL && env.SERVISNI_UCET
+        ? (() => {
+            const d = delegace(env.SERVISNI_UCET!, env.DELEGACE_UZIVATEL!, SCOPY_DISK);
+            return async () => ({ drive: driveApi({ version: "v3", auth: (await d.klient()) as never }), koren: env.SLOZKA_ZAKAZEK! });
           })()
         : undefined,
     zapis: {
