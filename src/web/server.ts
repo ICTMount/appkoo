@@ -339,8 +339,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       }
 
       // Příloha zprávy (fotka z Chatu, soubor z e-mailu) – stáhne se jménem tmcz01 a předá prohlížeči
-      const mpr = url.pathname.match(/^\/zakazka\/([^/]+)\/priloha$/);
-      if (mpr) {
+      if (url.pathname === "/priloha") {
         const v = dekodujVyber(url.searchParams.get("p") ?? "");
         if (!v) return posli(res, 400, strankaChyby(400, "Neplatný odkaz na přílohu."));
         if (!n.zdroje) return posli(res, 503, strankaChyby(503, "Zdroje (Chat, e-mail) nejsou nastavené."));

@@ -266,6 +266,7 @@ describe("přílohy zpráv (fotky, PDF) – krok 1: zobrazit", () => {
   it("karta zdroje ukáže přílohy s velikostí a odkazem", () => {
     const html = sekceZdroju([{ zdroj: "chat", nalezy: [{ zdroj: "chat", cas: null, titulek: "NEDOKONCENE", text: "foto", prilohy: [{ nazev: "foto.jpg", typ: "image/jpeg", velikost: 2_300_000, odkaz: "https://chat.google.com/dl/1", ref: { zdroj: "chat", media: "x" } }] }] }]);
     expect(html).toContain("📎");
-    expect(html).toContain('<a href="https://chat.google.com/dl/1" target="_blank" rel="noopener">foto.jpg (2.3 MB)</a>');
+    // odkaz z Chat API platí jen pro tmcz01 – příloha se otevírá přes aplikaci
+    expect(html).toMatch(/<a href="\/priloha\?p=[A-Za-z0-9_-]+" target="_blank" rel="noopener">foto\.jpg \(2\.3 MB\)<\/a>/);
   });
 });

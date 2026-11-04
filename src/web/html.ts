@@ -551,7 +551,7 @@ function prilohyNalezu(n: Nalez, u?: UkladaniPriloh): string {
       const kod = kodujVyber({ priloha: p, den, kdo: n.kdo ?? null });
       const t = `${esc(p.nazev)}${velikost(p.velikost)}`;
       // soubor z Disku se otevře přímo; nahraný soubor a e-mailová příloha přes aplikaci (odkaz z Chat API platí jen pro tmcz01)
-      const href = p.ref.zdroj === "chat" && !p.ref.media && p.ref.driveId ? p.odkaz : u ? `/zakazka/${encodeURIComponent(u.idAktivity)}/priloha?p=${kod}` : null;
+      const href = p.ref.zdroj === "chat" && !p.ref.media && p.ref.driveId ? p.odkaz : `/priloha?p=${kod}`;
       const odkaz = href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${t}</a>` : t;
       const ulozeny = u?.ulozene.get(klicPrilohy(p.ref));
       const stav = ulozeny
