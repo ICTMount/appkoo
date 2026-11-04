@@ -10,6 +10,7 @@ import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, TechnikPla
 import { jeVolneOkno, jeVyhrazeneVolno, vytizeniDne, type UdalostTechnika, type VytizeniDne } from "../gcal/kontrola.js";
 import { POVINNA_POTVRZENI, type IruLokalita } from "./planovani.js";
 import { isoTyden, nazevSlozkyZakazky, nazevTydne, type SlozkaZakazky } from "../google/slozky.js";
+import { klicPrilohy, kodujVyber, odkazSouboru, type UlozenySoubor } from "../google/prilohy.js";
 
 /** „2026 / 2026_45“ – kam se složka zakázky založí (týden termínu, jinak dnešní) */
 const slozkaTyden = (d: Date) => {
@@ -84,7 +85,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
-.zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
+.zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy input{vertical-align:middle;margin:0 2px 0 0}.prilohy .na-disku{color:#2e7d32;text-decoration:none;font-weight:600}.ulozit-prilohy{margin-top:8px}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
 .nowrap{white-space:nowrap}
@@ -365,6 +366,10 @@ export interface Lokalita {
 
 export interface PlanovaniZakazky {
   lokalita?: Lokalita | null;
+  /** přílohy zpráv → složka zakázky (kdo smí, co už je uložené) */
+  prilohy?: UkladaniPriloh;
+  /** hlášení po uložení příloh („3 soubory uloženy do složky“) */
+  zprava?: string | null;
   /** městské části adres na stránce */
   casti?: Casti;
   /** „jiné termíny“: hledá se od tohoto dne (YYYY-MM-DD) */
@@ -447,6 +452,7 @@ ${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity, !!plan.jenNahled) : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
+${plan.zprava ? `<div class="ok">${esc(plan.zprava)}</div>` : ""}
 <div class="grid">
 <div class="card"><h2>Zákazník</h2><dl>
 ${radek("Zákazník", esc(z.zakaznik))}
@@ -471,7 +477,7 @@ ${prioritySvisible ? radek("Priorita", `${prio(d.priorita)} ${esc(d.duvod)}`) : 
 ${radek("Preferované datum", esc(den(z.preferovanyDatum)))}
 ${radek("Datum RFS", esc(den(z.rfs)))}
 ${plan.slozka?.zapnuto ? radekOddeleny("Dokumenty", plan.slozka.zaznam
-    ? `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">otevřít složku na Disku</a> <small class="muted">${esc(plan.slozka.zaznam.cesta)}</small>`
+    ? `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">otevřít složku na Disku</a> <small class="muted">${esc(plan.slozka.zaznam.cesta)}${plan.prilohy?.ulozene.size ? ` · ${plan.prilohy.ulozene.size} ${plan.prilohy.ulozene.size === 1 ? "soubor" : plan.prilohy.ulozene.size < 5 ? "soubory" : "souborů"} z AppKoo` : ""}</small>`
     : plan.slozka.smiZalozit
       ? `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/slozka" class="inline"><button class="btn maly">Založit složku</button> <small class="muted">${esc(`${slozkaTyden(z.termin?.od ?? new Date())} / APPKOO / ${nazevSlozkyZakazky(z.idObjednavkyZaklad)}`)}</small></form>`
       : `<span class="muted">složka zatím není založená</span>`) : ""}
@@ -483,7 +489,7 @@ ${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další 
     .map((s) => `<div>ID aktivity <a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> · ${esc(s.typ_aktivity)} · ${esc(s.stav_mwf)}${s.uzavreno ? " · uzavřeno" : ""}</div>`)
     .join("")}</div>` : ""}
 <div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
-${sekceZdroju(zdroje)}
+${sekceZdroju(zdroje, plan.prilohy)}
 <div class="grid tretiny" style="margin-top:12px">
 ${sekceNotifikace(d.notifikace)}
 <div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
@@ -518,23 +524,42 @@ const IKONA: Record<Zdroj | "drive", string> = {
 
 const NAZEV_ZDROJE: Record<Zdroj, string> = { email: "E-mail (koordinace)", kalendar: "Kalendáře techniků", chat: "Google Chat" };
 
-function nalez(n: Nalez): string {
+function nalez(n: Nalez, u?: UkladaniPriloh): string {
   return `<div class="zaznam${n.veVlakne ? " muted" : ""}"><div class="hl"><b>${odkazyOId(esc(n.titulek))}</b>${n.cas ? ` · ${esc(dt(n.cas))}` : ""}${
     n.kdo ? ` · ${esc(n.kdo)}` : ""
   }${n.kde && n.kde !== n.titulek ? ` · ${esc(n.kde)}` : ""}${n.veVlakne ? " · ve vlákně" : ""}${
     n.odkaz ? ` · <a href="${esc(n.odkaz)}" target="_blank" rel="noopener">otevřít</a>` : ""
-  }</div><div class="plny">${odkazyOId(esc(n.text))}</div>${prilohyNalezu(n)}</div>`;
+  }</div><div class="plny">${odkazyOId(esc(n.text))}</div>${prilohyNalezu(n, u)}</div>`;
 }
 
 const velikost = (b: number | null) => (b == null ? "" : b < 1_000_000 ? ` (${Math.max(1, Math.round(b / 1000))} kB)` : ` (${(b / 1_000_000).toFixed(1)} MB)`);
 
-/** Přílohy zprávy (fotky, PDF…): název, velikost, odkaz – krok 2 přidá výběr a uložení do složky zakázky */
-function prilohyNalezu(n: Nalez): string {
+/** Ukládání příloh do složky zakázky: kdo smí, co už na Disku je */
+export interface UkladaniPriloh {
+  idAktivity: string;
+  /** klíč přílohy (klicPrilohy) → uložený soubor */
+  ulozene: Map<string, UlozenySoubor>;
+  smiUkladat: boolean;
+}
+
+/** Přílohy zprávy (fotky, PDF…): odkaz přes aplikaci, zaškrtnutí k uložení do složky zakázky, značka „na Disku“ */
+function prilohyNalezu(n: Nalez, u?: UkladaniPriloh): string {
   if (!n.prilohy?.length) return "";
+  const den = n.cas ? n.cas.toISOString().slice(0, 10) : null;
   return `<div class="prilohy">📎 ${n.prilohy
     .map((p) => {
+      const kod = kodujVyber({ priloha: p, den, kdo: n.kdo ?? null });
       const t = `${esc(p.nazev)}${velikost(p.velikost)}`;
-      return `<span class="priloha${jeObrazek(p) ? " obr" : ""}">${p.odkaz ? `<a href="${esc(p.odkaz)}" target="_blank" rel="noopener">${t}</a>` : t}</span>`;
+      // soubor z Disku se otevře přímo; nahraný soubor a e-mailová příloha přes aplikaci (odkaz z Chat API platí jen pro tmcz01)
+      const href = p.ref.zdroj === "chat" && !p.ref.media && p.ref.driveId ? p.odkaz : u ? `/zakazka/${encodeURIComponent(u.idAktivity)}/priloha?p=${kod}` : null;
+      const odkaz = href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${t}</a>` : t;
+      const ulozeny = u?.ulozene.get(klicPrilohy(p.ref));
+      const stav = ulozeny
+        ? ` <a class="na-disku" href="${esc(odkazSouboru(ulozeny.driveId))}" target="_blank" rel="noopener" title="uložil ${esc(ulozeny.ulozil)} ${esc(dt(ulozeny.ulozeno))}">✓ na Disku</a>`
+        : u?.smiUkladat
+          ? `<input type="checkbox" name="p" value="${kod}" form="ulozit-prilohy" title="uložit do složky zakázky"> `
+          : "";
+      return `<span class="priloha${jeObrazek(p) ? " obr" : ""}">${ulozeny || !u?.smiUkladat ? "" : stav}${odkaz}${ulozeny ? stav : ""}</span>`;
     })
     .join(" · ")}</div>`;
 }
@@ -543,19 +568,24 @@ function prilohyNalezu(n: Nalez): string {
 const odkazyOId = (html: string) => html.replace(/O-\d{8,}/g, (o) => `<a href="/?q=${o}">${o}</a>`);
 
 /** Nálezy z e-mailu, kalendářů a chatu – každý zdroj vlastní karta, chyba zdroje nezablokuje ostatní */
-export function sekceZdroju(zdroje: VysledekZdroje[] | null): string {
+export function sekceZdroju(zdroje: VysledekZdroje[] | null, u?: UkladaniPriloh): string {
   if (!zdroje) return `<div class="card" style="margin-top:12px"><h2>Ostatní zdroje</h2><span class="muted">Hledání v e-mailu, kalendářích a chatu zatím není zapnuté (chybí delegace účtu tmcz01).</span></div>`;
+  const kUlozeni = !!u?.smiUkladat && zdroje.some((v) => v.nalezy.slice(0, 30).some((n) => n.prilohy?.some((p) => !u.ulozene.has(klicPrilohy(p.ref)))));
   return `<div class="grid" style="margin-top:12px">${zdroje
     .map((v) => {
       const obsah = v.chyba
         ? `<div class="err">Zdroj nedostupný: ${esc(v.chyba)}</div>`
         : v.nalezy.length
-          ? v.nalezy.slice(0, 30).map(nalez).join("") + (v.nalezy.length > 30 ? `<p class="muted">… a dalších ${v.nalezy.length - 30}</p>` : "")
+          ? v.nalezy.slice(0, 30).map((n) => nalez(n, u)).join("") + (v.nalezy.length > 30 ? `<p class="muted">… a dalších ${v.nalezy.length - 30}</p>` : "")
           : `<span class="muted">nic nenalezeno</span>`;
       // dlouhý seznam (hlavně e-mail) se neroztahuje přes celou stránku – roluje uvnitř karty
       return `<div class="card kompakt"><h2 class="s-ikonou"><span class="i-${v.zdroj}">${IKONA[v.zdroj]}</span>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}</h2><div class="posun zdroj">${obsah}</div></div>`;
     })
-    .join("")}</div>`;
+    .join("")}</div>${
+    kUlozeni
+      ? `<form id="ulozit-prilohy" method="post" action="/zakazka/${encodeURIComponent(u!.idAktivity)}/prilohy" class="ulozit-prilohy"><button class="btn maly">Uložit zaškrtnuté přílohy do složky zakázky</button> <small class="muted">složka se založí, pokud ještě není; už uložené soubory mají značku ✓ na Disku</small></form>`
+      : ""
+  }`;
 }
 
 export function strankaChyby(kod: number, zprava: string): string {

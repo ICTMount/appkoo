@@ -52,6 +52,8 @@ import { calendar as calendarApi } from "@googleapis/calendar";
 import { gmail as gmailApi } from "@googleapis/gmail";
 import { delegace, SCOPY_DISK, SCOPY_KALENDAR } from "../google/delegace.js";
 import { nactiSlozku, odkazSlozky, ulozSlozku, zalozSlozkuZakazky } from "../google/slozky.js";
+import { dekodujVyber, klicPrilohy, nactiSoubory, nazevSouboru, stahniPrilohu, ulozPrilohuNaDisk, ulozSoubor } from "../google/prilohy.js";
+import { pipeline } from "node:stream/promises";
 import { hledejNaLokalite, hledejVsude, ocistitDotaz, sLimitem, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
@@ -237,7 +239,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         res.end("ok");
         return;
       }
-      const postCesta = /^\/zakazka\/[^/]+\/(zapis|slozka)$/.test(url.pathname) || /^\/konfigurace\/[A-Za-z]+\/(nahled|ulozit)$/.test(url.pathname);
+      const postCesta = /^\/zakazka\/[^/]+\/(zapis|slozka|prilohy)$/.test(url.pathname) || /^\/konfigurace\/[A-Za-z]+\/(nahled|ulozit)$/.test(url.pathname);
       if (req.method !== "GET" && !(req.method === "POST" && postCesta)) return posli(res, 405, strankaChyby(405, "Nepovolená operace."));
 
       const email = await uzivatel(req, n);
@@ -275,6 +277,18 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
       const stav = await nactiStavImportu(db, now);
 
       const nactSlozkuBezpecne = (o: string) => nactiSlozku(db, o);
+      /** Složka zakázky na Disku: existující z evidence, jinak založit (týden podle termínu instalace, bez termínu týden založení) */
+      const zajistiSlozku = async (z: { idObjednavkyZaklad: string; termin: { od: Date } | null }) => {
+        const o = z.idObjednavkyZaklad;
+        const ex = await nactiSlozku(db, o);
+        if (ex) return { slozkaId: ex.slozkaId, cesta: ex.cesta };
+        if (!n.slozky) throw new Error("Složky zakázek nejsou nastavené (SLOZKA_ZAKAZEK).");
+        const { drive, koren } = await n.slozky();
+        const s = await zalozSlozkuZakazky(drive, koren, o, z.termin?.od ?? now);
+        await ulozSlozku(db, { objednavka: o, slozkaId: s.slozkaId, cesta: s.cesta, zalozil: email });
+        console.log(JSON.stringify({ severity: "INFO", message: `Složka zakázky ${s.novaSlozka ? "založena" : "nalezena"}: ${s.cesta}`, uzivatel: email, objednavka: o, slozka: odkazSlozky(s.slozkaId) }));
+        return { slozkaId: s.slozkaId, cesta: s.cesta };
+      };
       const presmeruj = (kam: string) => {
         res.writeHead(302, { location: kam });
         res.end();
@@ -316,19 +330,78 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (!n.slozky) return posli(res, 503, strankaChyby(503, "Složky zakázek nejsou nastavené (SLOZKA_ZAKAZEK)."));
         const detail = await nactiDetail(db, decodeURIComponent(ms[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
-        const o = detail.z.idObjednavkyZaklad;
-        if (!(await nactiSlozku(db, o))) {
-          try {
-            const { drive, koren } = await n.slozky();
-            // týden podle termínu instalace; bez termínu týden založení
-            const s = await zalozSlozkuZakazky(drive, koren, o, detail.z.termin?.od ?? now);
-            await ulozSlozku(db, { objednavka: o, slozkaId: s.slozkaId, cesta: s.cesta, zalozil: email });
-            console.log(JSON.stringify({ severity: "INFO", message: `Složka zakázky ${s.novaSlozka ? "založena" : "nalezena"}: ${s.cesta}`, uzivatel: email, objednavka: o, slozka: odkazSlozky(s.slozkaId) }));
-          } catch (e) {
-            return posli(res, 502, strankaChyby(502, `Složku se nepodařilo založit: ${e instanceof Error ? e.message : String(e)}`));
-          }
+        try {
+          await zajistiSlozku(detail.z);
+        } catch (e) {
+          return posli(res, 502, strankaChyby(502, `Složku se nepodařilo založit: ${e instanceof Error ? e.message : String(e)}`));
         }
         return presmeruj(`/zakazka/${ms[1]}`);
+      }
+
+      // Příloha zprávy (fotka z Chatu, soubor z e-mailu) – stáhne se jménem tmcz01 a předá prohlížeči
+      const mpr = url.pathname.match(/^\/zakazka\/([^/]+)\/priloha$/);
+      if (mpr) {
+        const v = dekodujVyber(url.searchParams.get("p") ?? "");
+        if (!v) return posli(res, 400, strankaChyby(400, "Neplatný odkaz na přílohu."));
+        if (!n.zdroje) return posli(res, 503, strankaChyby(503, "Zdroje (Chat, e-mail) nejsou nastavené."));
+        try {
+          const { proud, typ, delka } = await stahniPrilohu(n.zdroje(), v.priloha);
+          res.writeHead(200, {
+            "content-type": /^(image\/|application\/pdf|video\/|audio\/)/.test(typ) ? typ : "application/octet-stream",
+            "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(v.priloha.nazev)}`,
+            "cache-control": "private, max-age=3600",
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "default-src 'none'; sandbox",
+            ...(delka ? { "content-length": String(delka) } : {}),
+          });
+          await pipeline(proud, res);
+        } catch (e) {
+          if (res.headersSent) return res.destroy();
+          return posli(res, 502, strankaChyby(502, `Přílohu se nepodařilo načíst: ${e instanceof Error ? e.message : String(e)}`));
+        }
+        return;
+      }
+
+      // Uložit zaškrtnuté přílohy do složky zakázky (Chat media / Disk / Gmail → Disk) + evidence
+      const mpu = url.pathname.match(/^\/zakazka\/([^/]+)\/prilohy$/);
+      if (mpu) {
+        if (req.method !== "POST") return presmeruj(`/zakazka/${mpu[1]}`);
+        if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
+        if (role === "cteni" || role === "technik") return posli(res, 403, strankaChyby(403, "Přílohy do složky může ukládat jen koordinátorka nebo správce."));
+        if (!n.slozky) return posli(res, 503, strankaChyby(503, "Složky zakázek nejsou nastavené (SLOZKA_ZAKAZEK)."));
+        if (!n.zdroje) return posli(res, 503, strankaChyby(503, "Zdroje (Chat, e-mail) nejsou nastavené."));
+        const detail = await nactiDetail(db, decodeURIComponent(mpu[1]!), now);
+        if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
+        const formular = await ctiFormular(req, 64 * 1024);
+        const vybrane = formular.getAll("p").map(dekodujVyber).filter((v): v is NonNullable<typeof v> => v !== null);
+        if (!vybrane.length) return presmeruj(`/zakazka/${mpu[1]}`);
+        const o = detail.z.idObjednavkyZaklad;
+        let slozka: Awaited<ReturnType<typeof zajistiSlozku>>;
+        try {
+          slozka = await zajistiSlozku(detail.z);
+        } catch (e) {
+          return posli(res, 502, strankaChyby(502, `Složku se nepodařilo založit: ${e instanceof Error ? e.message : String(e)}`));
+        }
+        const { drive } = await n.slozky();
+        const uz = await nactiSoubory(db, o);
+        const zav = n.zdroje();
+        let ulozeno = 0;
+        const chyby: string[] = [];
+        // po jednom – fotky bývají megabajty, souběh by jen soupeřil o paměť instance
+        for (const v of vybrane) {
+          const klic = klicPrilohy(v.priloha.ref);
+          if (uz.has(klic)) continue;
+          try {
+            const driveId = await ulozPrilohuNaDisk(zav, drive, slozka.slozkaId, v);
+            await ulozSoubor(db, { objednavka: o, klic, driveId, nazev: nazevSouboru(v), ulozil: email });
+            ulozeno++;
+          } catch (e) {
+            chyby.push(`${v.priloha.nazev}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        console.log(JSON.stringify({ severity: chyby.length ? "WARNING" : "INFO", message: `Přílohy do složky zakázky: uloženo ${ulozeno}, chyb ${chyby.length}`, uzivatel: email, objednavka: o, chyby }));
+        if (chyby.length) return posli(res, 502, strankaChyby(502, `Uloženo ${ulozeno}, nepodařilo se: ${chyby.join("; ")}`));
+        return presmeruj(`/zakazka/${mpu[1]}?prilohy=${ulozeno}`);
       }
 
       const mp = url.pathname.match(/^\/zakazka\/([^/]+)\/(zapis)$/);
@@ -473,6 +546,11 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           jenNahled,
           iru: iruLokalita(kontext.iru, [detail.z.adresa, detail.z.psc].filter(Boolean).join(", ")),
           slozka: { zaznam: await nactSlozkuBezpecne(detail.z.idObjednavkyZaklad), zapnuto: !!n.slozky, smiZalozit: role !== "cteni" && role !== "technik" },
+          prilohy: n.zdroje ? { idAktivity: detail.z.idAktivity, ulozene: await nactiSoubory(db, detail.z.idObjednavkyZaklad), smiUkladat: !!n.slozky && role !== "cteni" && role !== "technik" } : undefined,
+          zprava: (() => {
+            const k = Number(url.searchParams.get("prilohy"));
+            return Number.isInteger(k) && k >= 0 && url.searchParams.has("prilohy") ? (k === 0 ? "Nic nového k uložení – vybrané přílohy už ve složce jsou." : `${k} ${k === 1 ? "soubor uložen" : k < 5 ? "soubory uloženy" : "souborů uloženo"} do složky zakázky.`) : null;
+          })(),
         }));
       }
 

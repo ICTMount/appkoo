@@ -286,6 +286,10 @@ describe("web: nabídka a zápis termínu", () => {
     const w = await spust();
     expect((await w.post("/zakazka/P1/slozka", {}, null)).status).toBe(403);
     expect((await w.post("/zakazka/P1/slozka", {})).status).toBe(503);
+    // přílohy: neplatný odkaz 400, uložení bez složek 503, cizí původ 403
+    expect((await w.get("/zakazka/P1/priloha?p=nesmysl")).status).toBe(400);
+    expect((await w.post("/zakazka/P1/prilohy", { p: "x" }, null)).status).toBe(403);
+    expect((await w.post("/zakazka/P1/prilohy", { p: "x" })).status).toBe(503);
   });
 
   it("zápis vypnutý nebo jiný technik → nic se nezapíše", async () => {
