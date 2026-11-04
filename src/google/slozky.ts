@@ -1,5 +1,6 @@
 // Složka zakázky na Google Disku – zakládá se jen na vyžádání koordinátorky (tlačítko v detailu zakázky).
-//   Zakázky (SLOZKA_ZAKAZEK) / 2026 / 2026_45 / APPKOO / O-8555864483
+//   Zakázky (SLOZKA_ZAKAZEK) / 2026 / 2026_45 / APPKOO / AppKoo O-8555864483
+// Prefix „AppKoo “ odlišuje složku od složky technika se stejným ID v témže týdnu (hledání na Disku najde obě).
 // Týden = ISO týden termínu instalace, bez termínu týden založení. Rok a týden se dohledají podle názvu,
 // chybějící se založí. Jednou založená složka se nepřesouvá (při přeplánování odkaz platí dál) – ID je v databázi.
 
@@ -54,11 +55,14 @@ export interface SlozkaZakazky {
   objednavka: string;
   slozkaId: string;
   odkaz: string;
-  /** „2026 / 2026_45 / APPKOO / O-8555864483“ */
+  /** „2026 / 2026_45 / APPKOO / AppKoo O-8555864483“ */
   cesta: string;
   zalozil: string;
   zalozeno: Date;
 }
+
+/** Název složky zakázky na Disku: „AppKoo O-8555864483“ (mezera – Disk hledá podle začátků slov, najde i „O-855…“) */
+export const nazevSlozkyZakazky = (objednavka: string) => `AppKoo ${objednavka}`;
 
 export const odkazSlozky = (id: string) => `https://drive.google.com/drive/folders/${id}`;
 
@@ -68,8 +72,9 @@ export async function zalozSlozkuZakazky(drive: drive_v3.Drive, koren: string, o
   const r = await najdiNeboZaloz(drive, koren, String(rok));
   const t = await najdiNeboZaloz(drive, r.id, nazevTydne(rok, tyden));
   const a = await najdiNeboZaloz(drive, t.id, "APPKOO");
-  const z = await najdiNeboZaloz(drive, a.id, objednavka);
-  return { slozkaId: z.id, cesta: `${rok} / ${nazevTydne(rok, tyden)} / APPKOO / ${objednavka}`, novaSlozka: z.zalozena };
+  const nazev = nazevSlozkyZakazky(objednavka);
+  const z = await najdiNeboZaloz(drive, a.id, nazev);
+  return { slozkaId: z.id, cesta: `${rok} / ${nazevTydne(rok, tyden)} / APPKOO / ${nazev}`, novaSlozka: z.zalozena };
 }
 
 // ---------- evidence v databázi ----------

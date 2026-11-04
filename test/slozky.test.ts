@@ -11,7 +11,7 @@ describe("složka zakázky na Disku", () => {
     expect(isoTyden(new Date("2026-11-08T23:30:00Z"))).toEqual({ rok: 2026, tyden: 46 });
   });
 
-  it("dohledá existující rok a týden, chybějící APPKOO a O-… založí; podruhé nic nového", async () => {
+  it("dohledá existující rok a týden, chybějící APPKOO a „AppKoo O-…“ založí; podruhé nic nového", async () => {
     const slozky: { id: string; name: string; parent: string }[] = [
       { id: "rok", name: "2026", parent: "KOREN" },
       { id: "tyd", name: "2026_45", parent: "rok" },
@@ -32,9 +32,10 @@ describe("složka zakázky na Disku", () => {
       },
     } as never;
     const s = await zalozSlozkuZakazky(drive, "KOREN", "O-8555864483", new Date(Date.UTC(2026, 10, 4, 10)));
-    expect(s.cesta).toBe("2026 / 2026_45 / APPKOO / O-8555864483");
+    expect(s.cesta).toBe("2026 / 2026_45 / APPKOO / AppKoo O-8555864483");
     expect(s.novaSlozka).toBe(true);
-    expect(n).toBe(2); // APPKOO + O-…
+    expect(n).toBe(2); // APPKOO + AppKoo O-…
+    expect(slozky.at(-1)!.name).toBe("AppKoo O-8555864483");
     const znovu = await zalozSlozkuZakazky(drive, "KOREN", "O-8555864483", new Date(Date.UTC(2026, 10, 5)));
     expect(znovu.slozkaId).toBe(s.slozkaId);
     expect(n).toBe(2);

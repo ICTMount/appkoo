@@ -9,7 +9,7 @@ import { pokusyZakazky } from "./data.js";
 import type { Brany, DenPrehledu, MoznostSlotu, Nabidka, NavrhySlotu, TechnikPlanu, VybranySlot } from "../plan/planovac.js";
 import { jeVolneOkno, jeVyhrazeneVolno, vytizeniDne, type UdalostTechnika, type VytizeniDne } from "../gcal/kontrola.js";
 import { POVINNA_POTVRZENI, type IruLokalita } from "./planovani.js";
-import { isoTyden, nazevTydne, type SlozkaZakazky } from "../google/slozky.js";
+import { isoTyden, nazevSlozkyZakazky, nazevTydne, type SlozkaZakazky } from "../google/slozky.js";
 
 /** „2026 / 2026_45“ – kam se složka zakázky založí (týden termínu, jinak dnešní) */
 const slozkaTyden = (d: Date) => {
@@ -473,7 +473,7 @@ ${radek("Datum RFS", esc(den(z.rfs)))}
 ${plan.slozka?.zapnuto ? radekOddeleny("Dokumenty", plan.slozka.zaznam
     ? `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">otevřít složku na Disku</a> <small class="muted">${esc(plan.slozka.zaznam.cesta)}</small>`
     : plan.slozka.smiZalozit
-      ? `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/slozka" class="inline"><button class="btn maly">Založit složku</button> <small class="muted">${esc(`${slozkaTyden(z.termin?.od ?? new Date())} / APPKOO / ${z.idObjednavkyZaklad}`)}</small></form>`
+      ? `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/slozka" class="inline"><button class="btn maly">Založit složku</button> <small class="muted">${esc(`${slozkaTyden(z.termin?.od ?? new Date())} / APPKOO / ${nazevSlozkyZakazky(z.idObjednavkyZaklad)}`)}</small></form>`
       : `<span class="muted">složka zatím není založená</span>`) : ""}
 ${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
 </dl></div>
