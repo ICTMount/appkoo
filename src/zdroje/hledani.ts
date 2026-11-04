@@ -140,8 +140,8 @@ export async function hledejKalendar(cal: calendar_v3.Calendar, vyrazy: string[]
             cas: zApi(e.start?.dateTime ?? e.start?.date),
             titulek: e.summary ?? "",
             kde: k.summary ?? k.id!,
-            // celý popis události (s řádky) – v kartě se roluje
-            text: [e.location, (e.description ?? "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, 5000)].filter(Boolean).join("\n"),
+            // jen název, čas a adresa – popis události se v detailu nezobrazuje
+            text: e.location ?? "",
             odkaz: e.htmlLink ?? null,
           });
         }
