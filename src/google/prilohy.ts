@@ -25,8 +25,9 @@ export function kodujVyber(v: VyberPrilohy): string {
   return B64(JSON.stringify({ n: v.priloha.nazev, t: v.priloha.typ, r: v.priloha.ref, d: v.den, k: v.kdo }));
 }
 
-// skutečný tvar attachmentDataRef.resourceName se od dokumentace liší – kontrola jen na bezpečné znaky a cestu spaces/…/attachments/…
-const RE_MEDIA = /^spaces\/[\w.=+%-]+\/messages\/[\w.=+%-]+\/attachments\/[\w.=+%/-]{1,400}$/;
+// attachmentDataRef.resourceName z Chat API je neprůhledný řetězec (base64, např. „ClxzcGFj…cw==“), ne cesta spaces/…;
+// dokumentace uvádí cestu – přijímáme obojí, jen bezpečné znaky
+const RE_MEDIA = /^[A-Za-z0-9_.=+/%-]{1,2000}$/;
 const RE_ID = /^[\w-]{1,200}$/;
 
 /** Zpět z hodnoty formuláře; neplatné (podvržené) hodnoty vrátí null */

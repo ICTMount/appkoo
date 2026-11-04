@@ -13,7 +13,9 @@ describe("přílohy → složka zakázky", () => {
     expect(dekodujVyber(kodujVyber(foto))).toEqual(foto);
     expect(dekodujVyber(kodujVyber(mail))).toEqual(mail);
     expect(dekodujVyber("nesmysl")).toBeNull();
-    expect(dekodujVyber(Buffer.from(JSON.stringify({ n: "x", t: "y", r: { zdroj: "chat", media: "../etc/passwd" } })).toString("base64url"))).toBeNull();
+    expect(dekodujVyber(Buffer.from(JSON.stringify({ n: "x", t: "y", r: { zdroj: "chat", media: "x y<z>" } })).toString("base64url"))).toBeNull();
+    // skutečný tvar z Chat API: base64 s „==“ na konci
+    expect(dekodujVyber(Buffer.from(JSON.stringify({ n: "x", t: "y", r: { zdroj: "chat", media: "ClxzcGFjZXMvQUFRQW9QNDNXUWsvbWVzc2FnZXMvcER2b1ZtcnJXZk0ucER2cw==" } })).toString("base64url"))?.priloha.ref).toEqual({ zdroj: "chat", media: "ClxzcGFjZXMvQUFRQW9QNDNXUWsvbWVzc2FnZXMvcER2b1ZtcnJXZk0ucER2cw==" });
     expect(dekodujVyber(Buffer.from(JSON.stringify({ n: "x", t: "y", r: { zdroj: "email", zprava: "a b", priloha: "c" } })).toString("base64url"))).toBeNull();
     expect(dekodujVyber(Buffer.from(JSON.stringify({ n: "x", t: "y", r: { zdroj: "chat", driveId: "1AbC_-9" } })).toString("base64url"))?.priloha.ref).toEqual({ zdroj: "chat", driveId: "1AbC_-9" });
   });
