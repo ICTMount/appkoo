@@ -70,6 +70,33 @@ export function naInterniSkupinu(hlavicky: { name?: string | null; value?: strin
   return skupiny.some((s) => text.includes(s) || text.includes(s.replace("@", ".")));
 }
 
+/** Čitelný text těla e-mailu: text/plain, jinak text/html bez značek; citace starších zpráv se uříznou */
+export function teloZpravy(p: gmail_v1.Schema$MessagePart | undefined): string {
+  const casti: { typ: string; data: string }[] = [];
+  const projdi = (x: gmail_v1.Schema$MessagePart | undefined) => {
+    if (!x) return;
+    if (x.body?.data && /^text\/(plain|html)/i.test(x.mimeType ?? "")) casti.push({ typ: x.mimeType!.toLowerCase(), data: x.body.data });
+    for (const c of x.parts ?? []) projdi(c);
+  };
+  projdi(p);
+  const vyber = casti.find((c) => c.typ.startsWith("text/plain")) ?? casti.find((c) => c.typ.startsWith("text/html"));
+  if (!vyber) return "";
+  let t = Buffer.from(vyber.data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+  if (vyber.typ.startsWith("text/html")) {
+    t = t
+      .replace(/<(style|script)[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<br\s*\/?>|<\/(p|div|tr|li|h\d)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"');
+  }
+  t = t.replace(/\r/g, "").split(/\n(?:On .+wrote:|Dne .+napsal|-{2,} ?Original|> )/)[0]!;
+  return t.replace(/[ \t]+/g, " ").replace(/\n\s*\n\s*\n+/g, "\n\n").trim().slice(0, 5000);
+}
+
 export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max = 15, skupiny = INTERNI_SKUPINY): Promise<Nalez[]> {
   if (!vyrazy.length) return [];
   const bezSkupin = skupiny.map((s) => ` -to:${s} -cc:${s} -list:${s}`).join("");
@@ -78,7 +105,8 @@ export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max 
   const odkaz = `https://mail.google.com/mail/u/0/#search/${encodeURIComponent(`${vyrazy.map((v) => `"${v}"`).join(" OR ")}${bezSkupin}`)}`;
   const zpravy = await Promise.all(
     (data.messages ?? []).map(async ({ id }) => {
-      const m = (await gmail.users.messages.get({ userId: "me", id: id!, format: "metadata", metadataHeaders: ["Subject", "From", "Date", "To", "Cc", "List-Id", "Mailing-list", "X-Original-To"] })).data;
+      // format "full" – celé tělo zprávy (dřív jen náhled ~200 znaků); v kartě se roluje
+      const m = (await gmail.users.messages.get({ userId: "me", id: id!, format: "full" })).data;
       if (naInterniSkupinu(m.payload?.headers ?? [], skupiny)) return null;
       const h = (n: string) => m.payload?.headers?.find((x) => x.name?.toLowerCase() === n.toLowerCase())?.value ?? "";
       return {
@@ -86,7 +114,7 @@ export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max 
         cas: m.internalDate ? tedPraha(new Date(Number(m.internalDate))) : null,
         titulek: h("Subject") || "(bez předmětu)",
         kdo: h("From"),
-        text: m.snippet ?? "",
+        text: teloZpravy(m.payload) || m.snippet || "",
         odkaz,
       };
     }),
@@ -112,7 +140,8 @@ export async function hledejKalendar(cal: calendar_v3.Calendar, vyrazy: string[]
             cas: zApi(e.start?.dateTime ?? e.start?.date),
             titulek: e.summary ?? "",
             kde: k.summary ?? k.id!,
-            text: [e.location, (e.description ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300)].filter(Boolean).join(" · "),
+            // celý popis události (s řádky) – v kartě se roluje
+            text: [e.location, (e.description ?? "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim().slice(0, 5000)].filter(Boolean).join("\n"),
             odkaz: e.htmlLink ?? null,
           });
         }
@@ -183,7 +212,7 @@ export async function hledejChat(prostory: string[], vyrazy: string[], token: st
         titulek: nazev,
         kde: nazev,
         kdo: m.sender?.displayName || undefined,
-        text: (m.text ?? "").slice(0, 1000),
+        text: (m.text ?? "").slice(0, 5000),
         odkaz: `https://mail.google.com/chat/u/0/#chat/space/${idProstoru}${idVlakna ? `/${idVlakna}` : ""}`,
         veVlakne: !shoda,
       });

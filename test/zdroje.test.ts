@@ -180,3 +180,16 @@ describe("instalovali jsme v lokalitě", () => {
   });
 });
 
+
+describe("tělo e-mailu", async () => {
+  const { teloZpravy } = await import("../src/zdroje/hledani.js");
+  const b64 = (s: string) => Buffer.from(s).toString("base64url");
+  it("text/plain přednostně, citace starší zprávy se uřízne; HTML bez značek", () => {
+    expect(teloZpravy({ mimeType: "multipart/alternative", parts: [
+      { mimeType: "text/plain", body: { data: b64("Dobrý den,\nprosím odložit.\n\nDne 1. 11. 2026 Novák napsal:\n> stará zpráva") } },
+      { mimeType: "text/html", body: { data: b64("<p>x</p>") } },
+    ] })).toBe("Dobrý den,\nprosím odložit.");
+    expect(teloZpravy({ mimeType: "text/html", body: { data: b64("<div>Řádek 1</div><div>Řádek&nbsp;2</div>") } })).toBe("Řádek 1\n Řádek 2");
+    expect(teloZpravy(undefined)).toBe("");
+  });
+});

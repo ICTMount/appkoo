@@ -146,7 +146,7 @@ a.volny.vyb{outline:2px solid var(--accent)}
 .vytizeni .d-volno{background:#2e9d4b}.vytizeni .d-obsazeno{background:#8a8a85}.vytizeni .d-blok{background:repeating-linear-gradient(45deg,#8a8a85 0 2px,transparent 2px 4px)}.vytizeni .d-vyhrazeno{background:#2e9d4b;opacity:.35}
 .vytizeni .d-navrh{outline:2px solid var(--accent);outline-offset:1px}.vytizeni small{font-size:11px;color:var(--muted)}.vytizeni small b{color:var(--text)}
 .vyhrazeny{font-size:12px;padding:5px 8px;margin:4px 0;border-radius:6px;border:1px dashed var(--line);color:var(--muted)}
-.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:210px;overflow-y:auto}.posun.zdroj{max-height:340px}.posun.maly{max-height:120px}
+.card.kompakt{padding:8px 12px;font-size:12px;min-width:0;overflow:hidden}.posun{overflow-x:auto;max-height:210px;overflow-y:auto}.posun.zdroj{max-height:340px}.posun.maly{max-height:120px}.posun{overscroll-behavior:contain}.posun .plny{white-space:pre-line;overflow-wrap:anywhere}.posun table{min-width:max-content}
 .notif dl{grid-template-columns:max-content 1fr}.notif .predpis{margin:0 0 6px;padding:0;list-style:none}.notif .predpis li{padding:1px 0;border-bottom:1px dotted var(--border, #e3e3e3)}.notif .predpis li:last-child{border:0}.notif h3{font-size:11px;margin:6px 0 2px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .grid>*{min-width:0}.grid.tretiny{grid-template-columns:1fr 1fr 1fr}.sloupec{display:flex;flex-direction:column;gap:12px;min-width:0}@media (max-width:900px){.grid.tretiny{grid-template-columns:1fr}}.card.kompakt h2{font-size:12px;margin-bottom:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
 .card.kompakt dl{gap:2px 10px}
@@ -507,7 +507,7 @@ function nalez(n: Nalez): string {
     n.kdo ? ` · ${esc(n.kdo)}` : ""
   }${n.kde && n.kde !== n.titulek ? ` · ${esc(n.kde)}` : ""}${n.veVlakne ? " · ve vlákně" : ""}${
     n.odkaz ? ` · <a href="${esc(n.odkaz)}" target="_blank" rel="noopener">otevřít</a>` : ""
-  }</div>${odkazyOId(esc(n.text.length > 160 ? `${n.text.slice(0, 159)}…` : n.text))}</div>`;
+  }</div><div class="plny">${odkazyOId(esc(n.text))}</div></div>`;
 }
 
 /** O-ID v textu (e-mail, kalendář, chat) jako odkaz na plánování zakázky */
