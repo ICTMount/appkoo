@@ -8,9 +8,17 @@ import type { Dotaz } from "../db/db.js";
 
 const SLOZKA = "application/vnd.google-apps.folder";
 
+/** Kalendářní den okamžiku v pražském čase (ne UTC – pondělí 0:30 patří do nového týdne) */
+function prazskyDen(d: Date): { rok: number; mesic: number; den: number } {
+  const c = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Prague", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(d);
+  const n = (typ: string) => Number(c.find((p) => p.type === typ)!.value);
+  return { rok: n("year"), mesic: n("month") - 1, den: n("day") };
+}
+
 /** ISO 8601 týden (pondělí–neděle; týden 1 obsahuje první čtvrtek roku) – stejně jako složky 2026_45 */
 export function isoTyden(d: Date): { rok: number; tyden: number } {
-  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const p = prazskyDen(d);
+  const t = new Date(Date.UTC(p.rok, p.mesic, p.den));
   const den = t.getUTCDay() || 7; // po = 1 … ne = 7
   t.setUTCDate(t.getUTCDate() + 4 - den); // čtvrtek téhož týdne určuje rok
   const rok = t.getUTCFullYear();

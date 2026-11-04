@@ -7,6 +7,8 @@ describe("složka zakázky na Disku", () => {
     expect(isoTyden(new Date(Date.UTC(2026, 0, 1)))).toEqual({ rok: 2026, tyden: 1 }); // čt 1. 1. 2026
     expect(isoTyden(new Date(Date.UTC(2027, 0, 1)))).toEqual({ rok: 2026, tyden: 53 }); // pá 1. 1. 2027 patří do 2026_53
     expect(nazevTydne(2026, 5)).toBe("2026_05");
+    // pondělí 9. 11. 2026 0:30 Praha = neděle 23:30 UTC → patří už do týdne 46
+    expect(isoTyden(new Date("2026-11-08T23:30:00Z"))).toEqual({ rok: 2026, tyden: 46 });
   });
 
   it("dohledá existující rok a týden, chybějící APPKOO a O-… založí; podruhé nic nového", async () => {
