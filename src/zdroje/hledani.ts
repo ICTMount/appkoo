@@ -124,14 +124,26 @@ export async function hledejEmaily(gmail: gmail_v1.Gmail, vyrazy: string[], max 
 
 // ---------- Kalendáře techniků ----------
 
+/** Nejvýš N úloh najednou – přes 100 souběžných dotazů na Calendar API Google brzdí a hledání nestihne limit */
+export async function poDavkach<T>(ulohy: (() => Promise<T>)[], soubezne = 8): Promise<T[]> {
+  const vysledky: T[] = new Array(ulohy.length);
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(soubezne, ulohy.length) }, async () => {
+      for (let j = i++; j < ulohy.length; j = i++) vysledky[j] = await ulohy[j]!();
+    }),
+  );
+  return vysledky;
+}
+
 export async function hledejKalendar(cal: calendar_v3.Calendar, vyrazy: string[], od: Date, do_: Date): Promise<Nalez[]> {
   if (!vyrazy.length) return [];
   const { data } = await cal.calendarList.list({ maxResults: 250 });
   const kalendare = (data.items ?? []).filter((k) => k.id && !k.id.endsWith("@group.v.calendar.google.com")); // bez svátků
   const nalezy = new Map<string, Nalez>();
-  await Promise.all(
+  await poDavkach(
     kalendare.flatMap((k) =>
-      vyrazy.map(async (v) => {
+      vyrazy.map((v) => async () => {
         const r = await cal.events.list({ calendarId: k.id!, q: v, singleEvents: true, timeMin: od.toISOString(), timeMax: do_.toISOString(), maxResults: 50 });
         for (const e of r.data.items ?? []) {
           if (!e.id || e.status === "cancelled" || nalezy.has(`${k.id}/${e.id}`)) continue;
@@ -232,7 +244,7 @@ export async function sLimitem<T>(ms: number, p: Promise<T>): Promise<T> {
   }
 }
 
-export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: Date, limitMs = 12_000, limitChatMs = 25_000): Promise<VysledekZdroje[]> {
+export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: Date, limitMs = 20_000, limitChatMs = 25_000): Promise<VysledekZdroje[]> {
   const od = new Date(now.getTime() - 180 * 86_400_000);
   const do_ = new Date(now.getTime() + 90 * 86_400_000);
   const zdroj = async (z: Zdroj, f: () => Promise<Nalez[]>): Promise<VysledekZdroje> => {
@@ -280,8 +292,8 @@ export async function hledejNaLokalite(cal: calendar_v3.Calendar, adresa: string
   const { data } = await cal.calendarList.list({ maxResults: 250 });
   const kalendare = (data.items ?? []).filter((k) => k.id && !k.id.endsWith("@group.v.calendar.google.com"));
   const nalezy = new Map<string, NalezLokality>();
-  await Promise.all(
-    kalendare.map(async (k) => {
+  await poDavkach(
+    kalendare.map((k) => async () => {
       const r = await cal.events.list({
         calendarId: k.id!,
         q: dotaz,

@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { delegace } from "../src/google/delegace.js";
-import { hledejChat, hledejEmaily, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, uliceCislo, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
+import { hledejChat, hledejEmaily, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, poDavkach, uliceCislo, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
 import { sekceZdroju } from "../src/web/html.js";
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -191,5 +191,23 @@ describe("tělo e-mailu", async () => {
     ] })).toBe("Dobrý den,\nprosím odložit.");
     expect(teloZpravy({ mimeType: "text/html", body: { data: b64("<div>Řádek 1</div><div>Řádek&nbsp;2</div>") } })).toBe("Řádek 1\n Řádek 2");
     expect(teloZpravy(undefined)).toBe("");
+  });
+});
+
+describe("poDavkach: omezený souběh dotazů na kalendáře", () => {
+  it("spustí nejvýš N úloh naráz, pořadí výsledků zachová", async () => {
+    let bezi = 0;
+    let max = 0;
+    const ulohy = Array.from({ length: 20 }, (_, i) => async () => {
+      bezi++;
+      max = Math.max(max, bezi);
+      await new Promise((r) => setTimeout(r, 2));
+      bezi--;
+      return i * 2;
+    });
+    const v = await poDavkach(ulohy, 4);
+    expect(v).toEqual(ulohy.map((_, i) => i * 2));
+    expect(max).toBe(4);
+    expect(await poDavkach([], 4)).toEqual([]);
   });
 });
