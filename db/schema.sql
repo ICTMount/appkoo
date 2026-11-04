@@ -175,3 +175,23 @@ CREATE TABLE IF NOT EXISTS notifikace_pdf (
 );
 CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC);
 CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC);
+
+-- Složka zakázky na Disku (zakládá se jen tlačítkem v detailu; src/google/slozky.ts si tabulku založí i sama)
+CREATE TABLE IF NOT EXISTS slozka_zakazky (
+  objednavka text PRIMARY KEY,               -- O-číslo bez přípon
+  slozka_id  text NOT NULL,                  -- ID složky na Disku
+  cesta      text NOT NULL,                  -- „2026 / 2026_45 / APPKOO / AppKoo O-…“
+  zalozil    text NOT NULL,
+  zalozeno   timestamptz NOT NULL DEFAULT now()
+);
+
+-- Přílohy zpráv (Chat, e-mail) uložené do složky zakázky (src/google/prilohy.ts)
+CREATE TABLE IF NOT EXISTS soubor_zakazky (
+  objednavka text NOT NULL,
+  klic       text NOT NULL,                  -- chat:<media> | chat:drive:<id> | email:<zpráva>:<příloha>
+  drive_id   text NOT NULL,
+  nazev      text NOT NULL,
+  ulozil     text NOT NULL,
+  ulozeno    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (objednavka, klic)
+);
