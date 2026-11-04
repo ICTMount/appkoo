@@ -105,7 +105,7 @@ export function udajeZFormulare(f: URLSearchParams): UdajeHovoru {
 /** Povinné potvrzení koordinátorky před zápisem (call script: shoda údajů, stav zásuvky) */
 export const POVINNA_POTVRZENI = [
   { pole: "overenoJmeno", text: "Jméno a adresa zákazníka souhlasí se zakázkou (100 %)." },
-  { pole: "overenaZasuvka", text: "Zásuvka je FREE, nebo jsou splněné podmínky SWAP (CASEID, do 7 dní) / FIS MOP (po datu portace)." },
+  { pole: "overenaZasuvka", text: "Nová instalace, zásuvka je FREE, nebo jsou splněné podmínky SWAP (CASEID, do 7 dní) / FIS MOP (po datu portace)." },
   { pole: "zakaznikSouhlasi", text: "Zákazník termín potvrdil." },
 ] as const;
 
