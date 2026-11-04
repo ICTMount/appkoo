@@ -224,7 +224,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         res.end("ok");
         return;
       }
-      const postCesta = /^\/zakazka\/[^/]+\/zapis$/.test(url.pathname) || /^\/konfigurace\/[A-Za-z]+\/(nahled|ulozit)$/.test(url.pathname);
+      const postCesta = /^\/zakazka\/[^/]+\/(zapis|slozka)$/.test(url.pathname) || /^\/konfigurace\/[A-Za-z]+\/(nahled|ulozit)$/.test(url.pathname);
       if (req.method !== "GET" && !(req.method === "POST" && postCesta)) return posli(res, 405, strankaChyby(405, "Nepovolená operace."));
 
       const email = await uzivatel(req, n);

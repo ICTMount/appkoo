@@ -282,6 +282,12 @@ describe("web: nabídka a zápis termínu", () => {
     expect((await w.post("/zakazka/P1/zapis", { ...vyber, ...potvrzeno })).status).toBe(409);
   });
 
+  it("tlačítko Založit složku: POST projde (ne 405), bez nastavení složek 503, cizí původ 403", async () => {
+    const w = await spust();
+    expect((await w.post("/zakazka/P1/slozka", {}, null)).status).toBe(403);
+    expect((await w.post("/zakazka/P1/slozka", {})).status).toBe(503);
+  });
+
   it("zápis vypnutý nebo jiný technik → nic se nezapíše", async () => {
     const w = await spust({ zapnuty: false, technici: "vsichni" });
     expect((await w.post("/zakazka/P1/zapis", { ...vyber, ...potvrzeno })).status).toBe(403);
