@@ -25,7 +25,8 @@ export function kodujVyber(v: VyberPrilohy): string {
   return B64(JSON.stringify({ n: v.priloha.nazev, t: v.priloha.typ, r: v.priloha.ref, d: v.den, k: v.kdo }));
 }
 
-const RE_MEDIA = /^spaces\/[\w-]+\/messages\/[\w.-]+\/attachments\/[\w-]+$/;
+// skutečný tvar attachmentDataRef.resourceName se od dokumentace liší – kontrola jen na bezpečné znaky a cestu spaces/…/attachments/…
+const RE_MEDIA = /^spaces\/[\w.=+%-]+\/messages\/[\w.=+%-]+\/attachments\/[\w.=+%/-]{1,400}$/;
 const RE_ID = /^[\w-]{1,200}$/;
 
 /** Zpět z hodnoty formuláře; neplatné (podvržené) hodnoty vrátí null */
@@ -37,7 +38,10 @@ export function dekodujVyber(s: string): VyberPrilohy | null {
     if (o.r.zdroj === "chat") {
       const media = typeof o.r.media === "string" ? o.r.media : undefined;
       const driveId = typeof o.r.driveId === "string" ? o.r.driveId : undefined;
-      if ((!media || !RE_MEDIA.test(media)) && (!driveId || !RE_ID.test(driveId))) return null;
+      if ((!media || !RE_MEDIA.test(media)) && (!driveId || !RE_ID.test(driveId))) {
+        console.log(JSON.stringify({ severity: "WARNING", message: "Příloha chat: reference neprošla kontrolou", media, driveId }));
+        return null;
+      }
       ref = { zdroj: "chat", ...(media && RE_MEDIA.test(media) ? { media } : {}), ...(driveId && RE_ID.test(driveId) ? { driveId } : {}) };
     } else if (o.r.zdroj === "email") {
       if (typeof o.r.zprava !== "string" || typeof o.r.priloha !== "string" || !RE_ID.test(o.r.zprava) || !/^[\w-]{1,500}$/.test(o.r.priloha)) return null;
@@ -48,7 +52,8 @@ export function dekodujVyber(s: string): VyberPrilohy | null {
       den: typeof o.d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.d) ? o.d : null,
       kdo: typeof o.k === "string" ? o.k.slice(0, 80) : null,
     };
-  } catch {
+  } catch (e) {
+    console.log(JSON.stringify({ severity: "WARNING", message: `Příloha: neplatná hodnota (${e instanceof Error ? e.message : String(e)})`, hodnota: s.slice(0, 300) }));
     return null;
   }
 }
