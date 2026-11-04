@@ -244,6 +244,7 @@ describe("web: nabídka a zápis termínu", () => {
   it("nabídka termínů a formulář", async () => {
     const w = await spust();
     expect((await w.get("/zakazka/P1/terminy")).headers.get("location")).toBe("/zakazka/P1#planovani");
+    expect((await w.get("/o/O-8560000001")).headers.get("location")).toBe("/?q=O-8560000001"); // krátký odkaz pro kalendář
     const n = await w.get("/zakazka/P1");
     expect(n.status).toBe(200);
     const html = await n.text();

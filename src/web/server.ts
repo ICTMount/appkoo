@@ -317,6 +317,9 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         return posli(res, 200, strankaVysledku(q, polozky, zdroje, stav, email, casti));
       }
       if (url.pathname === "/hledat") return presmeruj(`/?q=${encodeURIComponent(url.searchParams.get("q") ?? "")}`);
+      // Krátký stabilní odkaz na zakázku pro události v kalendáři a zprávy: /o/O-8551475759 → detail (nebo výsledky, když je víc aktivit)
+      const mo = url.pathname.match(/^\/o\/(O-\d{6,}|[^/]{4,40})$/);
+      if (mo) return presmeruj(`/?q=${encodeURIComponent(decodeURIComponent(mo[1]!))}`);
       if (url.pathname === "/planovani" || url.pathname === "/planovani/slot") return presmeruj(`/technik?${url.searchParams}`);
       const mt = url.pathname.match(/^\/zakazka\/([^/]+)\/terminy$/);
       if (mt) return presmeruj(`/zakazka/${mt[1]}#planovani`);

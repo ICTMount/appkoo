@@ -128,7 +128,23 @@ header{display:block;padding:0;position:sticky;top:0;z-index:5}
 header .lista{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:start;padding:10px 20px}
 header .vlevo{justify-self:start}header .logo{font-size:20px}
 header .stred{display:flex;flex-direction:column;align-items:center;gap:8px}header .stred .export{align-items:center;text-align:center;font-size:12px;color:var(--muted)}
-@media (max-width:760px){header .lista{grid-template-columns:1fr}header .vlevo,header .stred,header .vpravo{justify-self:stretch;align-items:flex-start}}
+@media (max-width:760px){header .lista{grid-template-columns:1fr auto;gap:6px 10px;padding:8px 12px}header .vlevo,header .stred,header .vpravo{justify-self:stretch;align-items:flex-start}
+header .stred{grid-column:1 / -1;order:3}header .vpravo{justify-self:end;align-items:flex-end}header .vpravo nav.tema{display:none}header .kdo{font-size:11px}
+.export{min-width:0}.export .soubor{display:none}.bar{display:none}
+nav.zalozky{padding:2px 12px 8px;gap:6px}nav.zalozky a{padding:7px 12px;font-size:14px}
+form.hledani{padding:8px 12px;gap:6px}form.hledani .pole-hledani{min-width:0}form.hledani input{min-width:0;width:100%;font-size:16px;padding:10px 36px 10px 10px}form.hledani>button{padding:10px 14px;white-space:nowrap}.jen-siroke{display:none}
+body{overflow-x:hidden}img,iframe{max-width:100%}
+main{padding:10px 12px}h1{font-size:18px}h1 small{display:block;font-size:12px;margin-top:2px}
+.grid{grid-template-columns:1fr;gap:10px}.card{padding:10px 12px}dl{grid-template-columns:minmax(88px,max-content) 1fr;gap:4px 8px}dt{font-size:12px}
+.posun.zdroj{max-height:280px}.card.kompakt{font-size:13px}
+a.btn,button.btn,button{padding:10px 14px}button.btn.maly{padding:6px 10px}
+section.planovani{padding:10px 10px 4px}section.planovani>h2{font-size:17px}.termin-box{flex-direction:column;align-items:stretch}a.btn.velke{text-align:center}
+iframe.mapa{height:180px}.pozn{max-width:none}
+.gc-karta{padding:12px 12px 12px;border-radius:10px}.gc-nadpis{font-size:18px}.gc-blok{gap:8px}.gc-popis{font-size:13px;line-height:1.7}.gc-radek{padding:3px 4px}
+form.vyber-tech{gap:10px}form.vyber-tech select{min-width:0;width:100%}
+.tbl{font-size:13px}th,td{padding:6px 6px}}
+/* telefony na výšku: hlavička není přilepená, ať nezabírá půl obrazovky */
+@media (max-width:760px) and (orientation:portrait){header{position:static}}
 nav.zalozky{display:flex;gap:8px;justify-content:flex-start;padding:4px 20px 10px}nav.zalozky a{font-size:15px;padding:8px 22px}nav.zalozky a{padding:7px 14px;border-radius:6px;color:var(--text);font-weight:600}
 nav.zalozky a.on{background:var(--accent);color:#fff}nav.zalozky a:hover{text-decoration:none;background:var(--line)}nav.zalozky a.on:hover{background:var(--accent)}
 header .vpravo{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:12px;color:var(--muted)}
@@ -303,7 +319,7 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
     o.dotaz
       ? `<a class="zrusit" href="/" title="Zrušit hledání" aria-label="Zrušit hledání">×</a>`
       : `<button type="reset" class="zrusit" title="Vymazat" aria-label="Vymazat hledání">×</button>`
-  }</span><button>Najít a plánovat</button></form></header>
+  }</span><button>Najít<span class="jen-siroke"> a plánovat</span></button></form></header>
 <main>${telo}</main></body></html>`;
 }
 
