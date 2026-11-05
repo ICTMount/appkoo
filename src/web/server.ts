@@ -804,10 +804,18 @@ function main() {
             // API objekty jednou na běh (klient delegace jen obnovuje token) – drží cache seznamu kalendářů
             let gmail: ReturnType<typeof gmailApi> | null = null;
             let kalendar: ReturnType<typeof calendarApi> | null = null;
+            // d.klient() se musí volat při KAŽDÉM použití – obnovuje token v jediném sdíleném OAuth klientovi;
+            // s „??=“ by se po hodině přestal obnovovat (401 invalid authentication credentials)
             return () => ({
               db,
-              gmail: async () => (gmail ??= gmailApi({ version: "v1", auth: (await d.klient()) as never })),
-              kalendar: async () => (kalendar ??= calendarApi({ version: "v3", auth: (await d.klient()) as never })),
+              gmail: async () => {
+                const klient = await d.klient();
+                return (gmail ??= gmailApi({ version: "v1", auth: klient as never }));
+              },
+              kalendar: async () => {
+                const klient = await d.klient();
+                return (kalendar ??= calendarApi({ version: "v3", auth: klient as never }));
+              },
               chatToken: async () => (await (await d.klient()).getAccessToken()).token ?? "",
               prostory,
             });
