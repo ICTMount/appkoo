@@ -45,7 +45,7 @@ import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
 import { slaKonec } from "../plan/kpi.js";
 import { webcalendar } from "../domain/webcalendar.js";
-import { geokodujVse, kontrolaBran, nabidniProZakazku, nactiKalendare, najdiTerminVKalendari, zapomenKalendar, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
+import { geokodujVse, kontrolaBran, nabidniProZakazku, nejdrivePodleRfs, nactiKalendare, najdiTerminVKalendari, zapomenKalendar, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
 import { addDays, atTime, isoDate } from "../domain/time.js";
 import { isWorkday } from "../domain/workdays.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
@@ -443,6 +443,9 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
 
         if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
         if (!povolen) return posli(res, 403, strankaChyby(403, brany.blokace[0] ?? "Zápis do kalendáře tohoto technika není povolený."));
+        // předobjednávka: termín před datem RFS se nezapíše (ani nestandardní úpravou času)
+        const nejdrive = nejdrivePodleRfs(detail.z);
+        if (nejdrive && isoDate(casOd) < nejdrive) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, [`Předobjednávka: instalace před datem RFS ${nejdrive.split("-").reverse().join(".")} není možná – vyberte termín od data RFS.`], formular, nahled, okoli));
         const chybi = [...chybejiciPole(formular).map((c) => `Chybí povinný údaj: ${c}`), ...chybejiciPotvrzeni(formular).map((c) => `Chybí potvrzení: ${c}`)];
         if (chybi.length) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, chybi, formular, nahled, okoli));
         if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendář není dostupný."));

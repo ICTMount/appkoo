@@ -13,7 +13,7 @@ import { paticka } from "../src/gcal/kalendar.js";
 import { prijmiSoubory } from "../src/jobs/importJob.js";
 import { odhadVzdalenosti } from "../src/plan/geo.js";
 import type { Geokoder } from "../src/plan/geokod.js";
-import { kontrolaBran, nabidniProZakazku, pracovniDny, skupinaZakazky, techniciZCiselniku, textProMwf, type ZavislostiPlanovace } from "../src/plan/planovac.js";
+import { kontrolaBran, nejdrivePodleRfs, nabidniProZakazku, pracovniDny, skupinaZakazky, techniciZCiselniku, textProMwf, type ZavislostiPlanovace } from "../src/plan/planovac.js";
 import { nactiDetail } from "../src/web/data.js";
 import { chybejiciPotvrzeni, udajeZFormulare } from "../src/web/planovani.js";
 import { vytvorHandler, zVlastniStranky } from "../src/web/server.js";
@@ -154,6 +154,10 @@ describe("brány plánování (zlatá pravidla)", () => {
     const b = kontrolaBran(z, faktaZakazky(z, TED), []);
     expect(b.blokace).toEqual([]);
     expect(b.upozorneni.join(" ")).toContain("Předobjednávka");
+    // instalace před datem RFS není možná: nejdřívější den = den RFS; bez RFS nebo u běžné zakázky bez omezení
+    expect(nejdrivePodleRfs({ ...z, rfs: local(2026, 10, 21, 0, 0) })).toBe("2026-10-21");
+    expect(nejdrivePodleRfs({ ...z, rfs: null })).toBeNull();
+    expect(nejdrivePodleRfs({ ...d.z, predobjednavka: false, rfs: local(2026, 10, 21, 0, 0) })).toBeNull();
   });
 
   it("skupina zakázky a pracovní dny (víkend se přeskočí)", () => {

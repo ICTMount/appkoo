@@ -237,7 +237,7 @@ const s7 = (z: { idS7: string; predobjednavka?: boolean; typAktivity: string }) 
 
 /** Předobjednávka (Typ aktivity Predobjednavka_*) – realizovat až po změně na standardní zakázku */
 export const predobjStitek = (z: { predobjednavka?: boolean }) =>
-  z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
+  z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – instalace před datem RFS není možná; termíny až od RFS, realizace po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
 /** Zakázka z webového kalendáře – přišla už s termínem, který si zákazník vybral sám */
 export const webcalStitek = (z: { zaznamy?: Zaznam[] }) =>
   webcalendar(z) ? ` <span class="webcal" title="Webcalendar – zákazník si termín vybral sám, zakázka přišla s dohodnutým termínem">WEBCALENDAR</span>` : "";
@@ -463,7 +463,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
     : `<span class="muted">bez historie</span>`;
 
   const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${webcalStitek(z)}${migraceStitek(z)}${usedStitek(z)} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
-${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
+${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – instalace před datem RFS není možná, termíny se nabízejí až od RFS; realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity, !!plan.jenNahled) : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
