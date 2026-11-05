@@ -227,3 +227,7 @@ CREATE TABLE IF NOT EXISTS sync_stav (
   pocet  integer NOT NULL DEFAULT 0,
   nazev  text
 );
+-- trigramový index pro LIKE '%…%' (když je rozšíření povolené; aplikace si ho zkusí založit sama)
+-- CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- CREATE INDEX IF NOT EXISTS kalendar_udalost_hledani_trgm ON kalendar_udalost USING gin (hledani gin_trgm_ops);
+-- CREATE INDEX IF NOT EXISTS chat_zprava_hledani_trgm ON chat_zprava USING gin (hledani gin_trgm_ops);
