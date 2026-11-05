@@ -508,9 +508,15 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const odData = /^\d{4}-\d{2}-\d{2}$/.test(odP) && !Number.isNaN(Date.parse(odP)) && odP > isoDate(now) ? odP : undefined;
         const spocitat = !brany.blokace.length && !detail.uzavreno && planovac && !jenNahled;
         const adresaZ = [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
+        // měření částí detailu – do logu (jsonPayload.casti), ať je vidět, na co se čeká
+        const casy: Record<string, number> = {};
+        const mer = <T>(nazev: string, p: Promise<T>): Promise<T> => {
+          const t = Date.now();
+          return p.finally(() => (casy[nazev] = Date.now() - t));
+        };
         const [zdroje, nabidka, lokalita, notifikaceDohledana] = await Promise.all([
-          n.zdroje ? hledejVsude(n.zdroje(), vyrazyZakazky(detail.z), now) : Promise.resolve(null),
-          spocitat
+          mer("zdroje", n.zdroje ? hledejVsude(n.zdroje(), vyrazyZakazky(detail.z), now) : Promise.resolve(null)),
+          mer("nabidka", spocitat
             ? (async (): Promise<Nabidka> => {
                 try {
                   const sla = slaKonec(detail.z, stav.posledniExport ?? now);
@@ -527,9 +533,9 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
                   return { moznosti: [], nedostupne: [], bezZakladny: [], bezPolohy: 0, technikuCelkem: 0, chyba: `Nabídku se nepodařilo spočítat: ${e instanceof Error ? e.message : String(e)}` };
                 }
               })()
-            : Promise.resolve(null),
+            : Promise.resolve(null)),
           // „Instalovali jsme v lokalitě“: události techniků na stejné adrese
-          n.zdroje && detail.z.adresa
+          mer("lokalita", n.zdroje && detail.z.adresa
             ? (async (): Promise<Lokalita> => {
                 try {
                   const nalezy = await sLimitem(12_000, (async () => hledejNaLokalite(await n.zdroje!().kalendar(), adresaZ, detail.z.idObjednavkyZaklad, now))());
@@ -538,14 +544,16 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
                   return { nalezy: [], chyba: e instanceof Error ? e.message : String(e) };
                 }
               })()
-            : Promise.resolve(null),
-          notifikaceSlib,
+            : Promise.resolve(null)),
+          mer("notifikace", notifikaceSlib),
         ]);
         detail.notifikace = notifikaceDohledana ?? detail.notifikace;
-        const casti = await mestskeCasti(await geokoderWebu(), [
+        const casti = await mer("casti", mestskeCasti(await geokoderWebu(), [
           [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
           ...(nabidka?.moznosti ?? []).flatMap((m) => [m.sousede?.pred.adresa, m.sousede?.po.adresa]),
-        ]);
+        ]));
+        for (const v of zdroje ?? []) casy[`zdroj_${v.zdroj}`] = v.ms ?? 0;
+        console.log(JSON.stringify({ severity: "INFO", message: `detail ${detail.z.idObjednavkyZaklad} části: ${Object.entries(casy).map(([k, v]) => `${k} ${v}`).join(", ")} ms`, casti: casy, objednavka: detail.z.idObjednavkyZaklad }));
         return posli(res, 200, strankaZakazky(detail, stav, email, now, zdroje, { brany, nabidka, zapis: { zapnuty: zapis.zapnuty, smiTechnik }, nedostupne: !planovac, casti, lokalita, ...(odData ? { odData } : {}),
           webcal: wc ? { ...wc, vKalendari: puvodni } : null,
           preplanovat,

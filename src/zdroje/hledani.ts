@@ -45,6 +45,8 @@ export interface VysledekZdroje {
   zdroj: Zdroj;
   nalezy: Nalez[];
   chyba?: string;
+  /** trvání hledání v ms (do logu výkonu) */
+  ms?: number;
 }
 
 export interface ZavislostiZdroju {
@@ -459,10 +461,11 @@ export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: 
   const od = new Date(now.getTime() - 180 * 86_400_000);
   const do_ = new Date(now.getTime() + 90 * 86_400_000);
   const zdroj = async (z: Zdroj, f: () => Promise<Nalez[]>): Promise<VysledekZdroje> => {
+    const t = Date.now();
     try {
-      return { zdroj: z, nalezy: await sLimitem(z === "chat" ? limitChatMs : limitMs, f()) };
+      return { zdroj: z, nalezy: await sLimitem(z === "chat" ? limitChatMs : limitMs, f()), ms: Date.now() - t };
     } catch (e) {
-      return { zdroj: z, nalezy: [], chyba: e instanceof Error ? e.message : String(e) };
+      return { zdroj: z, nalezy: [], chyba: e instanceof Error ? e.message : String(e), ms: Date.now() - t };
     }
   };
   return Promise.all([
