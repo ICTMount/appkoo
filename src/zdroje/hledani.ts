@@ -6,6 +6,8 @@
 import type { calendar_v3 } from "@googleapis/calendar";
 import type { gmail_v1 } from "@googleapis/gmail";
 import { tedPraha } from "../domain/time.js";
+import type { Dotaz } from "../db/db.js";
+import { hledejChatDb, hledejKalendarDb, stavSynchronizace } from "./sync.js";
 
 export type Zdroj = "email" | "kalendar" | "chat";
 
@@ -50,6 +52,8 @@ export interface VysledekZdroje {
 }
 
 export interface ZavislostiZdroju {
+  /** databáze se synchronizovanými kalendáři a Chatem (sync.ts) – když je čerstvá, hledá se v ní a Google se nevolá */
+  db?: Dotaz;
   gmail(): Promise<gmail_v1.Gmail>;
   kalendar(): Promise<calendar_v3.Calendar>;
   /** přístupový token pro Chat API (REST) */
@@ -203,7 +207,7 @@ export interface UdalostVPameti {
   /** malá písmena bez diakritiky: summary + description + location */
   hledani: string;
 }
-interface PametKalendaru {
+export interface PametKalendaru {
   nacteno: number;
   udalosti: Map<string, UdalostVPameti[]>;
 }
@@ -214,7 +218,7 @@ const OKNO_DOPREDU_DNI = 90;
 const pametKalendaru = new WeakMap<calendar_v3.Calendar, { p: Promise<PametKalendaru> | null; data: PametKalendaru | null; obnova: Promise<PametKalendaru> | null }>();
 export const vycistitPametUdalosti = (cal: calendar_v3.Calendar) => pametKalendaru.delete(cal);
 
-async function nactiPamet(cal: calendar_v3.Calendar, now: Date): Promise<PametKalendaru> {
+export async function nactiPamet(cal: calendar_v3.Calendar, now: Date): Promise<PametKalendaru> {
   const kalendare = await seznamKalendaru(cal);
   const timeMin = new Date(now.getTime() - OKNO_ZPET_DNI * 86_400_000).toISOString();
   const timeMax = new Date(now.getTime() + OKNO_DOPREDU_DNI * 86_400_000).toISOString();
@@ -311,7 +315,7 @@ interface ChatPriloha {
   driveDataRef?: { driveFileId?: string };
 }
 
-interface ChatZprava {
+export interface ChatZprava {
   name: string;
   text?: string;
   createTime?: string;
@@ -354,7 +358,7 @@ const CHAT_MAX_MS = 30 * 60_000;
 const cacheChatu = new Map<string, PametProstoru>();
 export const vycistitCacheChatu = () => cacheChatu.clear();
 
-async function stahniZpravy(prostor: string, auth: Record<string, string>, fetchFn: typeof fetch, od: string, nazev: string, maxStran: number): Promise<ChatZprava[]> {
+export async function stahniZpravy(prostor: string, auth: Record<string, string>, fetchFn: typeof fetch, od: string, nazev: string, maxStran: number): Promise<ChatZprava[]> {
   const api = "https://chat.googleapis.com/v1";
   const zpravy: ChatZprava[] = [];
   let pageToken = "";
@@ -468,16 +472,24 @@ export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: 
       return { zdroj: z, nalezy: [], chyba: e instanceof Error ? e.message : String(e), ms: Date.now() - t };
     }
   };
+  const [kalDb, chatDb] = await Promise.all([synchronizovano(zav.db, "kalendare"), synchronizovano(zav.db, "chat")]);
   return Promise.all([
     zdroj("email", async () => hledejEmaily(await zav.gmail(), vyrazy)),
-    zdroj("kalendar", async () => hledejKalendar(await zav.kalendar(), vyrazy, od, do_, now)),
-    zdroj("chat", async () => hledejChat(zav.prostory, vyrazy, await zav.chatToken(), zav.fetchFn)),
+    zdroj("kalendar", async () => (kalDb ? hledejKalendarDb(zav.db!, vyrazy, od, do_) : hledejKalendar(await zav.kalendar(), vyrazy, od, do_, now))),
+    zdroj("chat", async () => (chatDb ? hledejChatDb(zav.db!, zav.prostory, vyrazy) : hledejChat(zav.prostory, vyrazy, await zav.chatToken(), zav.fetchFn))),
   ]);
+}
+
+/** Databáze má synchronizaci mladší než 24 h → hledat v ní (po víkendu bez importů se do pondělí dojede z paměti) */
+export async function synchronizovano(db: Dotaz | undefined, klic: "kalendare" | "chat", maxStariMs = 24 * 3_600_000): Promise<boolean> {
+  if (!db) return false;
+  const kdy = await stavSynchronizace(db, klic);
+  return !!kdy && Date.now() - kdy.getTime() < maxStariMs;
 }
 
 // ---------- Instalovali jsme v lokalitě ----------
 
-const bezDiakritiky = (x: string) => x.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+export const bezDiakritiky = (x: string) => x.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 /** Ulice a číslo popisné z adresy MWF („Praha, Krčská 991/63“ → Krčská, 991) */
 export function uliceCislo(adresa: string): { ulice: string; cp: string } | null {

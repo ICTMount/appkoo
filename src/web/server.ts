@@ -54,7 +54,8 @@ import { delegace, SCOPY_DISK, SCOPY_KALENDAR } from "../google/delegace.js";
 import { nactiSlozku, odkazSlozky, ulozSlozku, zalozSlozkuZakazky } from "../google/slozky.js";
 import { dekodujVyber, klicPrilohy, nactiSoubory, nazevSouboru, stahniPrilohu, ulozPrilohuNaDisk, ulozSoubor } from "../google/prilohy.js";
 import { pipeline } from "node:stream/promises";
-import { hledejNaLokalite, hledejVsude, ocistitDotaz, prohrejPamet, sLimitem, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
+import { hledejNaLokaliteDb } from "../zdroje/sync.js";
+import { hledejNaLokalite, hledejVsude, ocistitDotaz, prohrejPamet, sLimitem, synchronizovano, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
 import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
@@ -538,7 +539,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           mer("lokalita", n.zdroje && detail.z.adresa
             ? (async (): Promise<Lokalita> => {
                 try {
-                  const nalezy = await sLimitem(12_000, (async () => hledejNaLokalite(await n.zdroje!().kalendar(), adresaZ, detail.z.idObjednavkyZaklad, now))());
+                  const zav = n.zdroje!();
+                  const nalezy = await sLimitem(12_000, (async () => ((await synchronizovano(zav.db, "kalendare")) ? hledejNaLokaliteDb(zav.db!, adresaZ, detail.z.idObjednavkyZaklad, now) : hledejNaLokalite(await zav.kalendar(), adresaZ, detail.z.idObjednavkyZaklad, now)))());
                   return { nalezy };
                 } catch (e) {
                   return { nalezy: [], chyba: e instanceof Error ? e.message : String(e) };
@@ -803,6 +805,7 @@ function main() {
             let gmail: ReturnType<typeof gmailApi> | null = null;
             let kalendar: ReturnType<typeof calendarApi> | null = null;
             return () => ({
+              db,
               gmail: async () => (gmail ??= gmailApi({ version: "v1", auth: (await d.klient()) as never })),
               kalendar: async () => (kalendar ??= calendarApi({ version: "v3", auth: (await d.klient()) as never })),
               chatToken: async () => (await (await d.klient()).getAccessToken()).token ?? "",
@@ -828,14 +831,17 @@ function main() {
     console.log(JSON.stringify({ severity: "INFO", message: `AppKoo web běží na portu ${port}` }));
   });
   // paměť kalendářů a Chatu: zahřát po startu a obnovovat každých 5 min, ať detail zakázky nikdy nečeká na Google
+  // (jen záloha: když databáze synchronizaci z importní úlohy nemá, zahřeje se paměť instance)
   const zdrojeProhrati = nastaveni.zdroje;
   if (zdrojeProhrati) {
-    const prohrat = () => {
+    const prohrat = async () => {
+      if ((await synchronizovano(db, "kalendare")) && (await synchronizovano(db, "chat"))) return;
       const t0 = Date.now();
-      void prohrejPamet(zdrojeProhrati(), tedPraha()).then(() => console.log(JSON.stringify({ severity: "INFO", message: `Paměť kalendářů a Chatu obnovena za ${Math.round((Date.now() - t0) / 1000)} s` })));
+      await prohrejPamet(zdrojeProhrati(), tedPraha());
+      console.log(JSON.stringify({ severity: "INFO", message: `Paměť kalendářů a Chatu obnovena za ${Math.round((Date.now() - t0) / 1000)} s (databáze bez synchronizace)` }));
     };
-    prohrat();
-    setInterval(prohrat, 5 * 60_000).unref();
+    void prohrat();
+    setInterval(() => void prohrat(), 5 * 60_000).unref();
   }
 }
 

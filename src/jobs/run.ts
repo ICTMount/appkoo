@@ -21,6 +21,9 @@ import { driveZdroj, gmailZdroj, type ZdrojExportu } from "../ingest/google.js";
 import { importujNotifikace } from "../ingest/notifikace.js";
 import { casExportu } from "../ingest/prijem.js";
 import { spustImport, type ZaznamBehu } from "./importJob.js";
+import { calendar as calendarApi } from "@googleapis/calendar";
+import { delegace } from "../google/delegace.js";
+import { synchronizujChat, synchronizujKalendare } from "../zdroje/sync.js";
 
 export type Zavaznost = "INFO" | "WARNING" | "ERROR";
 export type Logger = (severity: Zavaznost, message: string, data?: Record<string, unknown>) => void;
@@ -173,6 +176,26 @@ async function main(): Promise<number> {
       jsonLog(v.chyb || !v.veSlozce ? "WARNING" : "INFO", `Notifikační PDF: ve složce ${v.veSlozce}, načteno ${v.nacteno}, chyb ${v.chyb}${v.zprávy.length ? ` – ${v.zprávy[0]}` : ""}`, { notifikace: v });
     } catch (e) {
       jsonLog("ERROR", `Notifikační PDF nejdou načíst: ${popisChyby(e)}`, { notifikace_vypadek: true });
+    }
+  }
+  // kalendáře techniků a Chat do databáze – web pak nečeká na Google (stejná delegace jako web)
+  if (env.DELEGACE_UZIVATEL && env.SERVISNI_UCET) {
+    const d = delegace(env.SERVISNI_UCET, env.DELEGACE_UZIVATEL);
+    try {
+      const cal = calendarApi({ version: "v3", auth: (await d.klient()) as never });
+      const k = await synchronizujKalendare(db, cal);
+      jsonLog("INFO", `Kalendáře synchronizovány: ${k.kalendaru} kalendářů, ${k.udalosti} událostí za ${Math.round(k.ms / 1000)} s`, { sync_kalendare: k });
+    } catch (e) {
+      jsonLog("ERROR", `Synchronizace kalendářů selhala: ${popisChyby(e)}`, { sync_vypadek: "kalendare" });
+    }
+    const prostory = (env.CHAT_PROSTORY ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (prostory.length) {
+      try {
+        const c = await synchronizujChat(db, prostory, (await (await d.klient()).getAccessToken()).token ?? "");
+        jsonLog("INFO", `Chat synchronizován: ${c.prostoru} prostorů, ${c.novych} nových zpráv za ${Math.round(c.ms / 1000)} s`, { sync_chat: c });
+      } catch (e) {
+        jsonLog("ERROR", `Synchronizace Chatu selhala: ${popisChyby(e)}`, { sync_vypadek: "chat" });
+      }
     }
   }
   return kod;

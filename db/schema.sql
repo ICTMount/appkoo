@@ -195,3 +195,35 @@ CREATE TABLE IF NOT EXISTS soubor_zakazky (
   ulozeno    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (objednavka, klic)
 );
+
+-- Synchronizace kalendářů techniků a Google Chatu (importní úloha, src/zdroje/sync.ts) – web v nich hledá bez volání Google
+CREATE TABLE IF NOT EXISTS kalendar_udalost (
+  kalendar       text NOT NULL,                -- ID kalendáře technika
+  id             text NOT NULL,                -- ID události
+  kalendar_nazev text NOT NULL,
+  summary        text NOT NULL,
+  location       text NOT NULL,
+  description    text NOT NULL,                -- zkráceno na 2000 znaků
+  cas            timestamptz,                  -- začátek („Praha v UTC“)
+  odkaz          text,
+  hledani        text NOT NULL,                -- summary + description + location, malá písmena bez diakritiky
+  PRIMARY KEY (kalendar, id)
+);
+CREATE INDEX IF NOT EXISTS kalendar_udalost_cas ON kalendar_udalost (cas);
+CREATE TABLE IF NOT EXISTS chat_zprava (
+  name        text PRIMARY KEY,                -- spaces/…/messages/…
+  prostor     text NOT NULL,
+  vlakno      text,
+  create_time timestamptz NOT NULL,
+  odesilatel  text,
+  text        text NOT NULL,
+  prilohy     jsonb,                           -- Priloha[] (hledani.ts)
+  hledani     text NOT NULL
+);
+CREATE INDEX IF NOT EXISTS chat_zprava_prostor_cas ON chat_zprava (prostor, create_time DESC);
+CREATE TABLE IF NOT EXISTS sync_stav (
+  klic   text PRIMARY KEY,                     -- kalendare | chat | chat:<prostor>
+  kdy    timestamptz NOT NULL DEFAULT now(),
+  pocet  integer NOT NULL DEFAULT 0,
+  nazev  text
+);

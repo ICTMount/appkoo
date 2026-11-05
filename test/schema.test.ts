@@ -10,7 +10,7 @@ describe("schéma databáze", () => {
       "select tablename from pg_tables where schemaname = 'public' order by 1",
     );
     expect(rows.map((r) => r.tablename)).toEqual([
-      "ciselnik_polozka", "ciselnik_zmena", "gcal_udalost", "geokod", "import_run", "note_eval", "notifikace_pdf", "pokus", "slozka_zakazky", "soubor_zakazky", "uzivatel_log", "zakazka", "zakazka_historie",
+      "chat_zprava", "ciselnik_polozka", "ciselnik_zmena", "gcal_udalost", "geokod", "import_run", "kalendar_udalost", "note_eval", "notifikace_pdf", "pokus", "slozka_zakazky", "soubor_zakazky", "sync_stav", "uzivatel_log", "zakazka", "zakazka_historie",
     ]);
     await db.close();
   }, 60_000); // první start PGlite (WASM) trvá několik sekund
