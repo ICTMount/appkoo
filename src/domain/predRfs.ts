@@ -1,6 +1,6 @@
 // Instalace před datem RFS (postup TMCZ „Postup technika – Instalace služby před datem RFS“ v1.0).
 // MWF export příznak „Inštalácia pred RFS“ nenese (je jen v detailu MWF / PDA, kde je datum RFS červeně);
-// podle postupu ho ale poznáme z exportu: aktivita Inst_Pristupu_FTTH, vlastník sítě TMCZ, vyplněné datum RFS v budoucnu.
+// podle postupu ho ale poznáme z exportu: aktivita Inst_Pristupu_FTTH, vlastník sítě TMCZ, vyplněné datum RFS v budoucnu a ID S7.
 // Předobjednávky (Predobjednavka_*) jsou jiný případ – mají vlastní štítek a pravidla.
 
 import { isoDate } from "./time.js";
@@ -13,12 +13,13 @@ export interface InstalacePredRfs {
 }
 
 export function instalacePredRfs(
-  z: { typAktivity: string; infrastruktura: string; predobjednavka: boolean; rfs: Date | null },
+  z: { typAktivity: string; infrastruktura: string; predobjednavka: boolean; rfs: Date | null; idS7: string },
   now: Date,
 ): InstalacePredRfs | null {
   if (z.predobjednavka || !z.rfs) return null;
   if (z.infrastruktura !== "TMCZ") return null;
   if (!/Inst_Pristupu_FTTH/i.test(z.typAktivity)) return null;
+  if (!z.idS7.replace(/^=+/, "").trim()) return null; // taková aktivita musí mít ID S7 (bez něj nejde o instalaci před RFS)
   if (isoDate(z.rfs) <= isoDate(now)) return null; // RFS dnes nebo v minulosti = běžná zakázka
   return { rfs: z.rfs, rfsText: isoDate(z.rfs).split("-").reverse().join(".") };
 }

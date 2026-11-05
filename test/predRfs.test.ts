@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { instalacePredRfs, radekUdalostiPredRfs, upozorneniPredRfs } from "../src/domain/predRfs.js";
 
 const now = new Date("2026-11-05T09:00:00Z");
-const zakl = { typAktivity: "Inst_Pristupu_FTTH", infrastruktura: "TMCZ", predobjednavka: false, rfs: new Date("2026-11-11T00:00:00Z") };
+const zakl = { typAktivity: "Inst_Pristupu_FTTH", infrastruktura: "TMCZ", predobjednavka: false, rfs: new Date("2026-11-11T00:00:00Z"), idS7: "=10666331" };
 
 describe("instalace před RFS (postup TMCZ v1.0)", () => {
   it("TMCZ Inst_Pristupu_FTTH s RFS v budoucnu → před RFS; jinak ne", () => {
@@ -13,6 +13,8 @@ describe("instalace před RFS (postup TMCZ v1.0)", () => {
     expect(instalacePredRfs({ ...zakl, rfs: new Date("2026-09-09T00:00:00Z") }, now)).toBeNull(); // RFS v minulosti
     expect(instalacePredRfs({ ...zakl, rfs: null }, now)).toBeNull();
     expect(instalacePredRfs({ ...zakl, typAktivity: "Zafuk_Pristupu_FTTH" }, now)).toBeNull();
+    expect(instalacePredRfs({ ...zakl, idS7: "" }, now)).toBeNull(); // bez ID S7 to instalace před RFS není
+    expect(instalacePredRfs({ ...zakl, idS7: "=" }, now)).toBeNull();
   });
 
   it("texty: call script bez „nebude fungovat“, řádek události s kroky technika", () => {
