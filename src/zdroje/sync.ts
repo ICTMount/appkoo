@@ -5,7 +5,7 @@
 import type { calendar_v3 } from "@googleapis/calendar";
 import type { Db, Dotaz } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
-import { bezDiakritiky, nactiPamet, prilohyChatu, stahniZpravy, uliceCislo, type Nalez, type NalezLokality } from "./hledani.js";
+import { bezDiakritiky, nactiUdalostiKalendare, oknoUdalosti, poDavkach, prilohyChatu, seznamKalendaruTechniku, stahniZpravy, uliceCislo, type Nalez, type NalezLokality, type UdalostVPameti } from "./hledani.js";
 
 const TABULKY = `
 CREATE TABLE IF NOT EXISTS kalendar_udalost (
@@ -71,40 +71,82 @@ export function pripravSync(db: Dotaz): Promise<unknown> {
 
 // ---------- kalendáře ----------
 
-/** Načte všechny kalendáře (okno 2 roky zpět / 90 dní dopředu) a nahradí jejich řádky v databázi */
-export async function synchronizujKalendare(db: Db, cal: calendar_v3.Calendar, now: Date = tedPraha()): Promise<{ kalendaru: number; udalosti: number; ms: number }> {
+const PLNE_NACTENI_MS = 24 * 3_600_000; // jednou denně plné nahrání kalendáře (úklid), jinak jen změny
+
+async function zapisUdalosti(db: Db, kalendar: string, seznam: UdalostVPameti[], smazane: string[], nahradit: boolean): Promise<void> {
+  await db.tx(async (q) => {
+    if (nahradit) await q.query("DELETE FROM kalendar_udalost WHERE kalendar = $1", [kalendar]);
+    else if (smazane.length) await q.query("DELETE FROM kalendar_udalost WHERE kalendar = $1 AND id = ANY($2::text[])", [kalendar, smazane]);
+    // hromadný zápis přes unnest; při přírůstku se změněné řádky přepíšou (ON CONFLICT … UPDATE)
+    for (let i = 0; i < seznam.length; i += 500) {
+      const davka = seznam.slice(i, i + 500);
+      await q.query(
+        `INSERT INTO kalendar_udalost (kalendar, id, kalendar_nazev, summary, location, description, cas, odkaz, hledani)
+         SELECT $1, * FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::text[], $9::text[])
+         ON CONFLICT (kalendar, id) DO UPDATE SET kalendar_nazev = EXCLUDED.kalendar_nazev, summary = EXCLUDED.summary, location = EXCLUDED.location,
+           description = EXCLUDED.description, cas = EXCLUDED.cas, odkaz = EXCLUDED.odkaz, hledani = EXCLUDED.hledani
+         WHERE (kalendar_udalost.summary, kalendar_udalost.location, kalendar_udalost.description, kalendar_udalost.cas, kalendar_udalost.odkaz)
+               IS DISTINCT FROM (EXCLUDED.summary, EXCLUDED.location, EXCLUDED.description, EXCLUDED.cas, EXCLUDED.odkaz)`,
+        [
+          kalendar,
+          davka.map((u) => u.id),
+          davka.map((u) => u.kalendarNazev),
+          davka.map((u) => u.summary),
+          davka.map((u) => u.location),
+          davka.map((u) => u.description),
+          davka.map((u) => u.cas),
+          davka.map((u) => u.odkaz),
+          davka.map((u) => u.hledani),
+        ],
+      );
+    }
+  });
+}
+
+/**
+ * Zámek proti souběhu dvou běhů úlohy (Cloud Scheduler spustí další, i když předchozí ještě běží):
+ * řádek `bezi` v sync_stav; starší než 15 min se považuje za opuštěný.
+ */
+export async function zamekSync(db: Dotaz): Promise<boolean> {
+  await pripravSync(db);
+  const { rows } = await db.query(
+    `INSERT INTO sync_stav (klic, kdy) VALUES ('bezi', now())
+     ON CONFLICT (klic) DO UPDATE SET kdy = now() WHERE sync_stav.kdy < now() - interval '15 minutes'
+     RETURNING klic`,
+  );
+  return rows.length > 0;
+}
+export const odemkniSync = (db: Dotaz) => db.query("DELETE FROM sync_stav WHERE klic = 'bezi'");
+
+/**
+ * Kalendáře techniků do databáze. Jednou denně plné nahrání kalendáře, jinak jen události změněné od minulého
+ * běhu (updatedMin, včetně zrušených) – obvykle jednotky až desítky řádků, databázi to nezatíží.
+ */
+export async function synchronizujKalendare(db: Db, cal: calendar_v3.Calendar, now: Date = tedPraha()): Promise<{ kalendaru: number; udalosti: number; plne: number; ms: number }> {
   const t0 = Date.now();
   await pripravSync(db);
-  const pamet = await nactiPamet(cal, now);
+  const kalendare = await seznamKalendaruTechniku(cal);
+  const okno = oknoUdalosti(now);
+  const { rows: stavy } = await db.query<{ klic: string; kdy: Date }>("SELECT klic, kdy FROM sync_stav WHERE klic LIKE 'kal:%'");
+  const posledni = new Map(stavy.map((r) => [r.klic.slice(4), new Date(r.kdy)]));
   let celkem = 0;
-  for (const [kalendar, seznam] of pamet.udalosti) {
-    await db.tx(async (q) => {
-      await q.query("DELETE FROM kalendar_udalost WHERE kalendar = $1", [kalendar]);
-      // hromadný INSERT přes unnest – 25 kalendářů × stovky událostí po jednom by trvalo minuty
-      for (let i = 0; i < seznam.length; i += 500) {
-        const davka = seznam.slice(i, i + 500);
-        await q.query(
-          `INSERT INTO kalendar_udalost (kalendar, id, kalendar_nazev, summary, location, description, cas, odkaz, hledani)
-           SELECT $1, * FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::text[], $9::text[])
-           ON CONFLICT (kalendar, id) DO NOTHING`,
-          [
-            kalendar,
-            davka.map((u) => u.id),
-            davka.map((u) => u.kalendarNazev),
-            davka.map((u) => u.summary),
-            davka.map((u) => u.location),
-            davka.map((u) => u.description),
-            davka.map((u) => u.cas),
-            davka.map((u) => u.odkaz),
-            davka.map((u) => u.hledani),
-          ],
-        );
-      }
-    });
-    celkem += seznam.length;
-  }
+  let plne = 0;
+  await poDavkach(
+    kalendare.map((k) => async () => {
+      const zacatek = new Date();
+      const minule = posledni.get(k.id);
+      const nahradit = !minule || Date.now() - minule.getTime() > PLNE_NACTENI_MS;
+      // rezerva 10 min – změny provedené těsně před minulým během se nesmí ztratit
+      const { udalosti, smazane } = await nactiUdalostiKalendare(cal, k, okno, nahradit ? undefined : new Date(minule!.getTime() - 10 * 60_000).toISOString());
+      if (nahradit || udalosti.length || smazane.length) await zapisUdalosti(db, k.id, udalosti, smazane, nahradit);
+      await db.query("INSERT INTO sync_stav (klic, kdy, pocet) VALUES ($1, $2, $3) ON CONFLICT (klic) DO UPDATE SET kdy = EXCLUDED.kdy, pocet = EXCLUDED.pocet", [`kal:${k.id}`, zacatek, udalosti.length]);
+      celkem += udalosti.length;
+      if (nahradit) plne++;
+    }),
+    4,
+  );
   await db.query("INSERT INTO sync_stav (klic, kdy, pocet) VALUES ('kalendare', now(), $1) ON CONFLICT (klic) DO UPDATE SET kdy = now(), pocet = EXCLUDED.pocet", [celkem]);
-  return { kalendaru: pamet.udalosti.size, udalosti: celkem, ms: Date.now() - t0 };
+  return { kalendaru: kalendare.length, udalosti: celkem, plne, ms: Date.now() - t0 };
 }
 
 /** Kdy proběhla poslední synchronizace (null = nikdy) */

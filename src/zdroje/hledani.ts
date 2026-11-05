@@ -218,45 +218,68 @@ const OKNO_DOPREDU_DNI = 90;
 const pametKalendaru = new WeakMap<calendar_v3.Calendar, { p: Promise<PametKalendaru> | null; data: PametKalendaru | null; obnova: Promise<PametKalendaru> | null }>();
 export const vycistitPametUdalosti = (cal: calendar_v3.Calendar) => pametKalendaru.delete(cal);
 
+/** Okno událostí pro paměť i synchronizaci: 2 roky zpět, 90 dní dopředu */
+export function oknoUdalosti(now: Date): { timeMin: string; timeMax: string } {
+  return { timeMin: new Date(now.getTime() - OKNO_ZPET_DNI * 86_400_000).toISOString(), timeMax: new Date(now.getTime() + OKNO_DOPREDU_DNI * 86_400_000).toISOString() };
+}
+
+/**
+ * Události jednoho kalendáře. S `updatedMin` jen změněné od té doby (včetně zrušených → `smazane`) –
+ * přírůstková synchronizace místo přepisu desítek tisíc řádků.
+ */
+export async function nactiUdalostiKalendare(
+  cal: calendar_v3.Calendar,
+  k: { id: string; nazev: string },
+  okno: { timeMin: string; timeMax: string },
+  updatedMin?: string,
+): Promise<{ udalosti: UdalostVPameti[]; smazane: string[] }> {
+  const udalosti: UdalostVPameti[] = [];
+  const smazane: string[] = [];
+  let pageToken: string | undefined;
+  do {
+    const r = await cal.events.list({
+      calendarId: k.id,
+      singleEvents: true,
+      timeMin: okno.timeMin,
+      timeMax: okno.timeMax,
+      maxResults: 2500,
+      pageToken,
+      ...(updatedMin ? { updatedMin, showDeleted: true } : {}),
+      fields: "nextPageToken,items(id,status,summary,description,location,start,htmlLink)",
+    });
+    for (const e of r.data.items ?? []) {
+      if (!e.id) continue;
+      if (e.status === "cancelled") {
+        smazane.push(e.id);
+        continue;
+      }
+      const description = (e.description ?? "").slice(0, 2000);
+      udalosti.push({
+        kalendar: k.id,
+        kalendarNazev: k.nazev,
+        id: e.id,
+        summary: e.summary ?? "",
+        location: e.location ?? "",
+        description,
+        cas: zApi(e.start?.dateTime ?? e.start?.date),
+        odkaz: e.htmlLink ?? null,
+        hledani: bezDiakritiky(`${e.summary ?? ""} ${description} ${e.location ?? ""}`),
+      });
+    }
+    pageToken = r.data.nextPageToken ?? undefined;
+  } while (pageToken);
+  return { udalosti, smazane };
+}
+
+export async function seznamKalendaruTechniku(cal: calendar_v3.Calendar): Promise<{ id: string; nazev: string }[]> {
+  return (await seznamKalendaru(cal)).map((k) => ({ id: k.id!, nazev: k.summary ?? k.id! }));
+}
+
 export async function nactiPamet(cal: calendar_v3.Calendar, now: Date): Promise<PametKalendaru> {
-  const kalendare = await seznamKalendaru(cal);
-  const timeMin = new Date(now.getTime() - OKNO_ZPET_DNI * 86_400_000).toISOString();
-  const timeMax = new Date(now.getTime() + OKNO_DOPREDU_DNI * 86_400_000).toISOString();
+  const kalendare = await seznamKalendaruTechniku(cal);
+  const okno = oknoUdalosti(now);
   const udalosti = new Map<string, UdalostVPameti[]>();
-  await poDavkach(
-    kalendare.map((k) => async () => {
-      const seznam: UdalostVPameti[] = [];
-      let pageToken: string | undefined;
-      do {
-        const r = await cal.events.list({
-          calendarId: k.id!,
-          singleEvents: true,
-          timeMin,
-          timeMax,
-          maxResults: 2500,
-          pageToken,
-          fields: "nextPageToken,items(id,status,summary,description,location,start,htmlLink)",
-        });
-        for (const e of r.data.items ?? []) {
-          if (!e.id || e.status === "cancelled") continue;
-          const description = (e.description ?? "").slice(0, 2000);
-          seznam.push({
-            kalendar: k.id!,
-            kalendarNazev: k.summary ?? k.id!,
-            id: e.id,
-            summary: e.summary ?? "",
-            location: e.location ?? "",
-            description,
-            cas: zApi(e.start?.dateTime ?? e.start?.date),
-            odkaz: e.htmlLink ?? null,
-            hledani: bezDiakritiky(`${e.summary ?? ""} ${description} ${e.location ?? ""}`),
-          });
-        }
-        pageToken = r.data.nextPageToken ?? undefined;
-      } while (pageToken);
-      udalosti.set(k.id!, seznam);
-    }),
-  );
+  await poDavkach(kalendare.map((k) => async () => udalosti.set(k.id, (await nactiUdalostiKalendare(cal, k, okno)).udalosti)));
   return { nacteno: Date.now(), udalosti };
 }
 

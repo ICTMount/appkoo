@@ -23,7 +23,7 @@ import { casExportu } from "../ingest/prijem.js";
 import { spustImport, type ZaznamBehu } from "./importJob.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
 import { delegace } from "../google/delegace.js";
-import { synchronizujChat, synchronizujKalendare } from "../zdroje/sync.js";
+import { odemkniSync, synchronizujChat, synchronizujKalendare, zamekSync } from "../zdroje/sync.js";
 
 export type Zavaznost = "INFO" | "WARNING" | "ERROR";
 export type Logger = (severity: Zavaznost, message: string, data?: Record<string, unknown>) => void;
@@ -180,22 +180,30 @@ async function main(): Promise<number> {
   }
   // kalendáře techniků a Chat do databáze – web pak nečeká na Google (stejná delegace jako web)
   if (env.DELEGACE_UZIVATEL && env.SERVISNI_UCET) {
-    const d = delegace(env.SERVISNI_UCET, env.DELEGACE_UZIVATEL);
-    try {
-      const cal = calendarApi({ version: "v3", auth: (await d.klient()) as never });
-      const k = await synchronizujKalendare(db, cal);
-      jsonLog("INFO", `Kalendáře synchronizovány: ${k.kalendaru} kalendářů, ${k.udalosti} událostí za ${Math.round(k.ms / 1000)} s`, { sync_kalendare: k });
-    } catch (e) {
-      jsonLog("ERROR", `Synchronizace kalendářů selhala: ${popisChyby(e)}`, { sync_vypadek: "kalendare" });
+    if (!(await zamekSync(db))) {
+      jsonLog("WARNING", "Synchronizace kalendářů a Chatu přeskočena – předchozí běh ještě běží", { sync_preskoceno: true });
+      return kod;
     }
-    const prostory = (env.CHAT_PROSTORY ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-    if (prostory.length) {
+    try {
+      const d = delegace(env.SERVISNI_UCET, env.DELEGACE_UZIVATEL);
       try {
-        const c = await synchronizujChat(db, prostory, (await (await d.klient()).getAccessToken()).token ?? "");
-        jsonLog("INFO", `Chat synchronizován: ${c.prostoru} prostorů, ${c.novych} nových zpráv za ${Math.round(c.ms / 1000)} s`, { sync_chat: c });
+        const cal = calendarApi({ version: "v3", auth: (await d.klient()) as never });
+        const k = await synchronizujKalendare(db, cal);
+        jsonLog("INFO", `Kalendáře synchronizovány: ${k.kalendaru} kalendářů, ${k.udalosti} změněných událostí (${k.plne} plně) za ${Math.round(k.ms / 1000)} s`, { sync_kalendare: k });
       } catch (e) {
-        jsonLog("ERROR", `Synchronizace Chatu selhala: ${popisChyby(e)}`, { sync_vypadek: "chat" });
+        jsonLog("ERROR", `Synchronizace kalendářů selhala: ${popisChyby(e)}`, { sync_vypadek: "kalendare" });
       }
+      const prostory = (env.CHAT_PROSTORY ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+      if (prostory.length) {
+        try {
+          const c = await synchronizujChat(db, prostory, (await (await d.klient()).getAccessToken()).token ?? "");
+          jsonLog("INFO", `Chat synchronizován: ${c.prostoru} prostorů, ${c.novych} nových zpráv za ${Math.round(c.ms / 1000)} s`, { sync_chat: c });
+        } catch (e) {
+          jsonLog("ERROR", `Synchronizace Chatu selhala: ${popisChyby(e)}`, { sync_vypadek: "chat" });
+        }
+      }
+    } finally {
+      await odemkniSync(db).catch(() => undefined);
     }
   }
   return kod;

@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
 import type { Db } from "../src/db/db.js";
-import { hledejChatDb, hledejKalendarDb, hledejNaLokaliteDb, stavSynchronizace, synchronizujChat, synchronizujKalendare } from "../src/zdroje/sync.js";
+import { hledejChatDb, hledejKalendarDb, hledejNaLokaliteDb, odemkniSync, stavSynchronizace, synchronizujChat, synchronizujKalendare, zamekSync } from "../src/zdroje/sync.js";
 import { hledejVsude, synchronizovano, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
 
 const pgliteDb = (pg: PGlite): Db => ({
@@ -14,19 +14,28 @@ describe("synchronizace kalendářů a Chatu do databáze", () => {
   it("kalendáře: nahraje události, hledá zakázku i lokalitu z databáze; druhý běh nahradí řádky", async () => {
     const db = pgliteDb(new PGlite());
     let kolo = 0;
+    const volani: { updatedMin?: string; showDeleted?: boolean }[] = [];
     const cal = {
       calendarList: { list: async () => ({ data: { items: [{ id: "K1", summary: "Vajc Tomas" }, { id: "svatky@group.v.calendar.google.com", summary: "Svátky" }] } }) },
       events: {
-        list: async () => ({
-          data: {
-            items: [
-              { id: "a", status: "confirmed", summary: "Vajc - FTTH O-85511111111 Novák", location: "Krčská 991/63, Praha 4", start: { dateTime: "2026-05-04T10:00:00+02:00" }, htmlLink: "https://cal/a" },
-              { id: "b", status: "confirmed", summary: "Vajc - FTTH O-85522222222 Malá", description: "S7 1-D4O3JTD", location: "Krčská 991/12", start: { dateTime: "2026-08-04T10:00:00+02:00" } },
-              { id: "c", status: "confirmed", summary: "Vajc - VOLNY", location: "Krčská 991", start: { dateTime: "2026-08-06T10:00:00+02:00" } },
-              ...(kolo ? [{ id: "d", status: "confirmed", summary: "Vajc - FTTH O-85533333333 Nová", location: "Jinde 1", start: { dateTime: "2026-10-20T10:00:00+02:00" } }] : []),
-            ],
-          },
-        }),
+        list: async (p: { updatedMin?: string; showDeleted?: boolean }) => {
+          volani.push({ updatedMin: p.updatedMin, showDeleted: p.showDeleted });
+          return {
+            data: {
+              items: kolo === 0
+                ? [
+                    { id: "a", status: "confirmed", summary: "Vajc - FTTH O-85511111111 Novák", location: "Krčská 991/63, Praha 4", start: { dateTime: "2026-05-04T10:00:00+02:00" }, htmlLink: "https://cal/a" },
+                    { id: "b", status: "confirmed", summary: "Vajc - FTTH O-85522222222 Malá", description: "S7 1-D4O3JTD", location: "Krčská 991/12", start: { dateTime: "2026-08-04T10:00:00+02:00" } },
+                    { id: "c", status: "confirmed", summary: "Vajc - VOLNY", location: "Krčská 991", start: { dateTime: "2026-08-06T10:00:00+02:00" } },
+                  ]
+                : [
+                    // přírůstek: jedna nová, jedna zrušená
+                    { id: "d", status: "confirmed", summary: "Vajc - FTTH O-85533333333 Nová", location: "Jinde 1", start: { dateTime: "2026-10-20T10:00:00+02:00" } },
+                    { id: "c", status: "cancelled" },
+                  ],
+            },
+          };
+        },
       },
     } as never;
     const now = new Date("2026-10-16T12:00:00Z");
@@ -43,9 +52,23 @@ describe("synchronizace kalendářů a Chatu do databáze", () => {
     const l = await hledejNaLokaliteDb(db, "Praha, Krčská 991/63, 14000", "O-85599999999", now);
     expect(l!.map((x) => x.oId)).toEqual(["O-85522222222", "O-85511111111"]); // VOLNY ne, 991/12 i 991/63 ano (stejné č. p.)
 
+    expect(r.plne).toBe(1);
+    expect(volani[0]!.updatedMin).toBeUndefined(); // první běh: plné nahrání
+
     kolo = 1;
-    expect((await synchronizujKalendare(db, cal, now)).udalosti).toBe(4);
+    const r2 = await synchronizujKalendare(db, cal, now);
+    expect(r2).toMatchObject({ udalosti: 1, plne: 0 }); // druhý běh: jen změny od minula
+    expect(volani[1]!.showDeleted).toBe(true);
+    expect(volani[1]!.updatedMin).toBeDefined();
     expect((await hledejKalendarDb(db, ["O-85533333333"], new Date("2026-01-01"), new Date("2026-12-31"))).length).toBe(1);
+    expect((await hledejKalendarDb(db, ["O-85511111111"], new Date("2026-01-01"), new Date("2026-12-31"))).length).toBe(1); // staré zůstaly
+    expect((await hledejNaLokaliteDb(db, "Praha, Krčská 991, 14000", "O-0", now))!.map((x) => x.titulek)).not.toContain("Vajc - VOLNY"); // zrušená smazána
+
+    // zámek proti souběhu dvou běhů úlohy
+    expect(await zamekSync(db)).toBe(true);
+    expect(await zamekSync(db)).toBe(false);
+    await odemkniSync(db);
+    expect(await zamekSync(db)).toBe(true);
   }, 60_000); // první start PGlite (WASM) trvá několik sekund
 
   it("chat: první běh stáhne 60 dní, druhý jen novější; hledání vrátí shody i odpovědi ve vlákně s přílohami", async () => {
