@@ -59,7 +59,7 @@ import { hledejNaLokalite, hledejVsude, ocistitDotaz, prohrejPamet, sLimitem, sy
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
 import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
-import { chybejiciPole, chybejiciPotvrzeni, inicialy, iruLokalita, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
+import { chybejiciPole, chybejiciPotvrzeni, inicialy, iruLokalita, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, potvrzeniZakazky, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 import type { OkoliZapisu } from "./html.js";
 import { jeBlok, jeVolneOkno } from "../gcal/kontrola.js";
 import type { TechnikPlanu } from "../plan/planovac.js";
@@ -446,7 +446,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         // předobjednávka: termín před datem RFS se nezapíše (ani nestandardní úpravou času)
         const nejdrive = nejdrivePodleRfs(detail.z);
         if (nejdrive && isoDate(casOd) < nejdrive) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, [`Předobjednávka: instalace před datem RFS ${nejdrive.split("-").reverse().join(".")} není možná – vyberte termín od data RFS.`], formular, nahled, okoli));
-        const chybi = [...chybejiciPole(formular).map((c) => `Chybí povinný údaj: ${c}`), ...chybejiciPotvrzeni(formular).map((c) => `Chybí potvrzení: ${c}`)];
+        const chybi = [...chybejiciPole(formular).map((c) => `Chybí povinný údaj: ${c}`), ...chybejiciPotvrzeni(formular, potvrzeniZakazky(detail.z, now)).map((c) => `Chybí potvrzení: ${c}`)];
         if (chybi.length) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, chybi, formular, nahled, okoli));
         if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendář není dostupný."));
 

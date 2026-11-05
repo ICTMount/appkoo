@@ -1,3 +1,4 @@
+import { instalacePredRfs } from "../domain/predRfs.js";
 // Plánování termínu z webu: kontext z databáze, údaje z formuláře, zápis do kalendáře a evidence.
 
 import { nactiCiselnik } from "../db/ciselniky.js";
@@ -109,8 +110,14 @@ export const POVINNA_POTVRZENI = [
   { pole: "zakaznikSouhlasi", text: "Zákazník termín potvrdil." },
 ] as const;
 
-export function chybejiciPotvrzeni(f: URLSearchParams): string[] {
-  return POVINNA_POTVRZENI.filter((p) => f.get(p.pole) !== "ano").map((p) => p.text);
+/** Potvrzení navíc podle situace zakázky: instalace před RFS (TMCZ) – zákazník musí vědět, že služba poběží až od RFS */
+export function potvrzeniZakazky(z: Parameters<typeof instalacePredRfs>[0], now: Date): { pole: string; text: string }[] {
+  const p = instalacePredRfs(z, now);
+  return p ? [{ pole: "predRfs", text: `Instalace před RFS ${p.rfsText}: zákazník ví, že instalujeme v předstihu a služba bude aktivní od data RFS (přijde SMS).` }] : [];
+}
+
+export function chybejiciPotvrzeni(f: URLSearchParams, dalsi: { pole: string; text: string }[] = []): string[] {
+  return [...POVINNA_POTVRZENI, ...dalsi].filter((p) => f.get(p.pole) !== "ano").map((p) => p.text);
 }
 
 /** Povinná pole formuláře (bez nich technik nevyjede) – kontrolují se při zápisu do kalendáře */

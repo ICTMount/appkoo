@@ -21,6 +21,16 @@ const ud = (o: Partial<UdalostTechnika> = {}): UdalostTechnika => ({
 });
 
 describe("šablona události", () => {
+  it("instalace před RFS (TMCZ, RFS po termínu): řádek s postupem v popisu; CETIN ani RFS v minulosti ne", () => {
+    const predRfs = zak({ typAktivity: "Inst_Pristupu_FTTH", infrastruktura: "TMCZ", predobjednavka: false, rfs: local(2026, 10, 20, 0, 0) });
+    const u = sestavUdalost(predRfs, "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59));
+    expect(u.description).toContain("INSTALACE PŘED RFS 20.10.2026");
+    expect(u.description).toContain("Aktivace služby: 20.10.2026");
+    expect(u.summary.startsWith("RFS ")).toBe(false); // předpona RFS je jen pro předobjednávky
+    expect(sestavUdalost(zak({ rfs: local(2026, 10, 20, 0, 0) }), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59)).description).not.toContain("PŘED RFS");
+    expect(sestavUdalost(zak({ ...predRfs, rfs: local(2026, 10, 1, 0, 0) }), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59)).description).not.toContain("PŘED RFS");
+  });
+
   it("vyplní název, telefon, ID zakázky a skryté vlastnosti; čas v pražské zóně", () => {
     const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { patro: "3", byt: "12", souhlasSVrtanim: false, caseid: "CZ-1", kz: "BRIDGE Sagemcom" }, local(2026, 10, 17, 14, 51), "AP");
     // stejný tvar jako dnešní události v kalendářích techniků
