@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { delegace } from "../src/google/delegace.js";
-import { hledejChat, hledejEmaily, prilohyChatu, prilohyEmailu, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, poDavkach, uliceCislo, vycistitCacheKalendaru, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
+import { hledejChat, hledejEmaily, prilohyChatu, prilohyEmailu, hledejKalendar, hledejNaLokalite, hledejVsude, ocistitDotaz, poDavkach, uliceCislo, vycistitCacheKalendaru, vycistitPametUdalosti, vycistitCacheChatu, vyrazyZakazky, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
 import { sekceZdroju } from "../src/web/html.js";
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json" } });
@@ -103,16 +103,26 @@ describe("zdroje", () => {
     const cal = {
       calendarList: { list: async () => ({ data: { items: [{ id: "K1", summary: "Hristov Anton" }, { id: "en.czech#holiday@group.v.calendar.google.com", summary: "Svátky" }] } }) },
       events: {
-        list: async (p: { calendarId: string; q: string }) => {
-          hledano.push(`${p.calendarId}:${p.q}`);
-          return { data: { items: [{ id: "e1", status: "confirmed", summary: "Hristov - FTTH O-8550000001 Novák", location: "Praha", start: { dateTime: "2026-10-16T10:00:00+02:00" }, htmlLink: "https://cal/e1" }] } };
+        list: async (p: { calendarId: string; q?: string }) => {
+          hledano.push(`${p.calendarId}:${p.q ?? "-"}`);
+          return { data: { items: [
+            { id: "e1", status: "confirmed", summary: "Hristov - FTTH O-8550000001 Novák", location: "Praha", start: { dateTime: "2026-10-16T10:00:00+02:00" }, htmlLink: "https://cal/e1" },
+            { id: "e2", status: "confirmed", summary: "Hristov - FTTH O-8559999999 Jiný", description: "S7 1-D4O3JTD", location: "Brno", start: { dateTime: "2026-10-17T10:00:00+02:00" } },
+            { id: "e3", status: "confirmed", summary: "Hristov - FTTH O-8550000001 starý", location: "Praha", start: { dateTime: "2025-10-16T10:00:00+02:00" } },
+            { id: "e4", status: "cancelled", summary: "O-8550000001 zrušená", start: { dateTime: "2026-10-18T10:00:00+02:00" } },
+          ] } };
         },
       },
     } as never;
-    const n = await hledejKalendar(cal, ["O-8550000001", "1-D4O3JTD"], new Date("2026-04-01"), new Date("2026-12-31"));
-    expect(hledano).toEqual(["K1:O-8550000001", "K1:1-D4O3JTD"]);
-    expect(n).toHaveLength(1);
-    expect(n[0]).toMatchObject({ zdroj: "kalendar", kde: "Hristov Anton", odkaz: "https://cal/e1" });
+    const now = new Date("2026-10-15T12:00:00Z");
+    const n = await hledejKalendar(cal, ["O-8550000001", "1-D4O3JTD"], new Date("2026-04-01"), new Date("2026-12-31"), now);
+    // události se načtou jednou bez q (do paměti), hledá se lokálně – i v popisu, mimo okno a zrušené ne
+    expect(hledano).toEqual(["K1:-"]);
+    expect(n.map((x) => x.titulek)).toEqual(["Hristov - FTTH O-8559999999 Jiný", "Hristov - FTTH O-8550000001 Novák"]);
+    expect(n[1]).toMatchObject({ zdroj: "kalendar", kde: "Hristov Anton", odkaz: "https://cal/e1" });
+    // druhé hledání nad stejným API objektem jde z paměti
+    await hledejKalendar(cal, ["O-8559999999"], new Date("2026-04-01"), new Date("2026-12-31"), now);
+    expect(hledano).toHaveLength(1);
   });
 
   it("chat: zprávy s číslem zakázky i odpovědi ve stejném vlákně", async () => {
@@ -161,8 +171,8 @@ describe("instalovali jsme v lokalitě", () => {
     const cal = {
       calendarList: { list: async () => ({ data: { items: [{ id: "K1", summary: "Vajc Tomas" }] } }) },
       events: {
-        list: async (p: { q: string }) => {
-          dotazy.push(p.q);
+        list: async (p: { calendarId: string }) => {
+          dotazy.push(p.calendarId);
           return {
             data: {
               items: [
@@ -178,7 +188,7 @@ describe("instalovali jsme v lokalitě", () => {
       },
     } as never;
     const n = await hledejNaLokalite(cal, "Praha, Krčská 991/63, 14000", "O-85547833023", new Date("2026-10-16T12:00:00Z"));
-    expect(dotazy).toEqual(["Krčská 991"]);
+    expect(dotazy).toEqual(["K1"]); // jedno načtení do paměti, bez q
     expect(n!.map((x) => x.oId)).toEqual(["O-85522222222", "O-85511111111"]);
     expect(n![0]!.odkaz).toBe("https://cal/b");
   });
@@ -229,6 +239,7 @@ describe("seznam kalendářů v cache", () => {
     await hledejNaLokalite(cal, "Praha, Krčská 991/63", "O-1", new Date("2026-11-04T10:00:00Z"));
     expect(seznamu).toBe(1);
     vycistitCacheKalendaru(cal);
+    vycistitPametUdalosti(cal);
     await hledejKalendar(cal, ["O-1234567"], od, new Date("2026-12-31T00:00:00Z"));
     expect(seznamu).toBe(2);
   });

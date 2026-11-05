@@ -54,7 +54,7 @@ import { delegace, SCOPY_DISK, SCOPY_KALENDAR } from "../google/delegace.js";
 import { nactiSlozku, odkazSlozky, ulozSlozku, zalozSlozkuZakazky } from "../google/slozky.js";
 import { dekodujVyber, klicPrilohy, nactiSoubory, nazevSouboru, stahniPrilohu, ulozPrilohuNaDisk, ulozSoubor } from "../google/prilohy.js";
 import { pipeline } from "node:stream/promises";
-import { hledejNaLokalite, hledejVsude, ocistitDotaz, sLimitem, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
+import { hledejNaLokalite, hledejVsude, ocistitDotaz, prohrejPamet, sLimitem, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
 import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
 import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
@@ -229,6 +229,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
     }
   };
   return async (req: IncomingMessage, res: ServerResponse) => {
+    const t0 = Date.now();
     const url = new URL(req.url ?? "/", "http://localhost");
     const tema = temaZCookie(req.headers.cookie);
     if (tema) temaOdpovedi.set(res, tema);
@@ -248,6 +249,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         res.once("finish", () => {
           const a = akcePozadavku(req.method ?? "GET", url, res.statusCode);
           if (a) void zaznamenej(db, { email, ...a });
+          // trvání požadavku do logu – podklad pro ladění výkonu (Logs Explorer: jsonPayload.ms > 3000)
+          if (a && a.akce !== "uvod") console.log(JSON.stringify({ severity: "INFO", message: `${a.akce} ${a.objekt ?? a.detail ?? ""} ${Date.now() - t0} ms`, akce: a.akce, objekt: a.objekt ?? null, ms: Date.now() - t0, stav: res.statusCode }));
         });
       }
       if (!email) return posli(res, 401, strankaChyby(401, "Nepřihlášený uživatel – aplikace se otevírá přes přihlášení Google."));
@@ -482,7 +485,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const detail = await nactiDetail(db, decodeURIComponent(m[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
         // PDF chybí, nebo bylo načteno starší verzí bez tabulky Priebeh → dohledat / přečíst znovu hned
-        if ((!detail.notifikace || !detail.notifikace.priebeh) && n.notifikace) detail.notifikace = await n.notifikace(detail.z.idAktivity, { idObjednavkyZaklad: detail.z.idObjednavkyZaklad, idS7: detail.z.idS7 });
+        // dohledání PDF na Disku běží souběžně s ostatními zdroji (níže), ne před nimi
+        const notifikaceSlib = (!detail.notifikace || !detail.notifikace.priebeh) && n.notifikace ? n.notifikace(detail.z.idAktivity, { idObjednavkyZaklad: detail.z.idObjednavkyZaklad, idS7: detail.z.idS7 }).catch(() => detail.notifikace) : Promise.resolve(detail.notifikace);
         const kontext = await nactiKontext(db);
         const planovac = n.planovac;
         // webcalendar: zakázka přišla s termínem jen v MWF → ověřit, zda je v kalendáři technika
@@ -504,7 +508,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const odData = /^\d{4}-\d{2}-\d{2}$/.test(odP) && !Number.isNaN(Date.parse(odP)) && odP > isoDate(now) ? odP : undefined;
         const spocitat = !brany.blokace.length && !detail.uzavreno && planovac && !jenNahled;
         const adresaZ = [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
-        const [zdroje, nabidka, lokalita] = await Promise.all([
+        const [zdroje, nabidka, lokalita, notifikaceDohledana] = await Promise.all([
           n.zdroje ? hledejVsude(n.zdroje(), vyrazyZakazky(detail.z), now) : Promise.resolve(null),
           spocitat
             ? (async (): Promise<Nabidka> => {
@@ -535,7 +539,9 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
                 }
               })()
             : Promise.resolve(null),
+          notifikaceSlib,
         ]);
+        detail.notifikace = notifikaceDohledana ?? detail.notifikace;
         const casti = await mestskeCasti(await geokoderWebu(), [
           [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
           ...(nabidka?.moznosti ?? []).flatMap((m) => [m.sousede?.pred.adresa, m.sousede?.po.adresa]),
@@ -751,7 +757,7 @@ function main() {
   const env = process.env;
   if (!env.DATABASE_URL) throw new Error("Chybí proměnná DATABASE_URL.");
   const db = pgDb(env.DATABASE_URL);
-  const handler = vytvorHandler(db, {
+  const nastaveni: NastaveniWebu = {
     povoleni: (env.POVOLENI_UZIVATELE ?? "@ictmount.com").split(",").map((s) => s.trim()).filter(Boolean),
     spravci: (env.SPRAVCI ?? "davidh@ictmount.com").split(",").map((s) => s.trim()).filter(Boolean),
     overIap: env.IAP_AUDIENCE ? overovacIap(env.IAP_AUDIENCE) : undefined,
@@ -807,11 +813,22 @@ function main() {
       zapnuty: env.ZAPIS_KALENDARE === "ano",
       technici: env.ZAPIS_TECHNICI === "vsichni" ? "vsichni" : (env.ZAPIS_TECHNICI ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     },
-  });
+  };
+  const handler = vytvorHandler(db, nastaveni);
   const port = Number(env.PORT ?? 8080);
   createServer((req, res) => void handler(req, res)).listen(port, () => {
     console.log(JSON.stringify({ severity: "INFO", message: `AppKoo web běží na portu ${port}` }));
   });
+  // paměť kalendářů a Chatu: zahřát po startu a obnovovat každých 5 min, ať detail zakázky nikdy nečeká na Google
+  const zdrojeProhrati = nastaveni.zdroje;
+  if (zdrojeProhrati) {
+    const prohrat = () => {
+      const t0 = Date.now();
+      void prohrejPamet(zdrojeProhrati(), tedPraha()).then(() => console.log(JSON.stringify({ severity: "INFO", message: `Paměť kalendářů a Chatu obnovena za ${Math.round((Date.now() - t0) / 1000)} s` })));
+    };
+    prohrat();
+    setInterval(prohrat, 5 * 60_000).unref();
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

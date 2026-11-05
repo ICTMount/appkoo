@@ -183,30 +183,119 @@ async function seznamKalendaru(cal: calendar_v3.Calendar): Promise<calendar_v3.S
   return p;
 }
 
-export async function hledejKalendar(cal: calendar_v3.Calendar, vyrazy: string[], od: Date, do_: Date): Promise<Nalez[]> {
-  if (!vyrazy.length) return [];
+/**
+ * Paměť událostí techniků: všechny kalendáře, okno 2 roky zpět až 90 dní dopředu, načtené jednou a obnovované
+ * na pozadí (stale-while-revalidate). Detail zakázky tak nečeká na desítky dotazů do Calendar API –
+ * hledání zakázky i lokality běží nad pamětí instance. Nabídka termínů má vlastní, čerstvější cache (30 s).
+ */
+export interface UdalostVPameti {
+  kalendar: string;
+  kalendarNazev: string;
+  id: string;
+  summary: string;
+  location: string;
+  /** popis zkrácený na 2000 znaků – pro hledání adresy a čísla zakázky */
+  description: string;
+  cas: Date | null;
+  odkaz: string | null;
+  /** malá písmena bez diakritiky: summary + description + location */
+  hledani: string;
+}
+interface PametKalendaru {
+  nacteno: number;
+  udalosti: Map<string, UdalostVPameti[]>;
+}
+const PAMET_CERSTVA_MS = 5 * 60_000; // po této době se obnoví na pozadí, zatím se vrací stará
+const PAMET_MAX_MS = 45 * 60_000; // po této době se raději počká na obnovu (obnova na pozadí opakovaně selhávala)
+const OKNO_ZPET_DNI = 730;
+const OKNO_DOPREDU_DNI = 90;
+const pametKalendaru = new WeakMap<calendar_v3.Calendar, { p: Promise<PametKalendaru> | null; data: PametKalendaru | null; obnova: Promise<PametKalendaru> | null }>();
+export const vycistitPametUdalosti = (cal: calendar_v3.Calendar) => pametKalendaru.delete(cal);
+
+async function nactiPamet(cal: calendar_v3.Calendar, now: Date): Promise<PametKalendaru> {
   const kalendare = await seznamKalendaru(cal);
-  const nalezy = new Map<string, Nalez>();
+  const timeMin = new Date(now.getTime() - OKNO_ZPET_DNI * 86_400_000).toISOString();
+  const timeMax = new Date(now.getTime() + OKNO_DOPREDU_DNI * 86_400_000).toISOString();
+  const udalosti = new Map<string, UdalostVPameti[]>();
   await poDavkach(
-    kalendare.flatMap((k) =>
-      vyrazy.map((v) => async () => {
-        const r = await cal.events.list({ calendarId: k.id!, q: v, singleEvents: true, timeMin: od.toISOString(), timeMax: do_.toISOString(), maxResults: 50 });
+    kalendare.map((k) => async () => {
+      const seznam: UdalostVPameti[] = [];
+      let pageToken: string | undefined;
+      do {
+        const r = await cal.events.list({
+          calendarId: k.id!,
+          singleEvents: true,
+          timeMin,
+          timeMax,
+          maxResults: 2500,
+          pageToken,
+          fields: "nextPageToken,items(id,status,summary,description,location,start,htmlLink)",
+        });
         for (const e of r.data.items ?? []) {
-          if (!e.id || e.status === "cancelled" || nalezy.has(`${k.id}/${e.id}`)) continue;
-          nalezy.set(`${k.id}/${e.id}`, {
-            zdroj: "kalendar",
+          if (!e.id || e.status === "cancelled") continue;
+          const description = (e.description ?? "").slice(0, 2000);
+          seznam.push({
+            kalendar: k.id!,
+            kalendarNazev: k.summary ?? k.id!,
+            id: e.id,
+            summary: e.summary ?? "",
+            location: e.location ?? "",
+            description,
             cas: zApi(e.start?.dateTime ?? e.start?.date),
-            titulek: e.summary ?? "",
-            kde: k.summary ?? k.id!,
-            // jen název, čas a adresa – popis události se v detailu nezobrazuje
-            text: e.location ?? "",
             odkaz: e.htmlLink ?? null,
+            hledani: bezDiakritiky(`${e.summary ?? ""} ${description} ${e.location ?? ""}`),
           });
         }
-      }),
-    ),
+        pageToken = r.data.nextPageToken ?? undefined;
+      } while (pageToken);
+      udalosti.set(k.id!, seznam);
+    }),
   );
-  return [...nalezy.values()].sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0));
+  return { nacteno: Date.now(), udalosti };
+}
+
+/** Události z paměti; první volání načte, další vrací hned a po 5 min obnovují na pozadí */
+export async function udalostiZPameti(cal: calendar_v3.Calendar, now: Date): Promise<UdalostVPameti[]> {
+  let z = pametKalendaru.get(cal);
+  if (!z) pametKalendaru.set(cal, (z = { p: null, data: null, obnova: null }));
+  const stari = z.data ? Date.now() - z.data.nacteno : Infinity;
+  if (!z.data || stari > PAMET_MAX_MS) {
+    // první načtení (nebo paměť příliš stará): počkat; souběžné požadavky sdílí jeden slib
+    if (!z.p) {
+      z.p = nactiPamet(cal, now).finally(() => (z!.p = null));
+    }
+    z.data = await z.p;
+  } else if (stari > PAMET_CERSTVA_MS && !z.obnova) {
+    z.obnova = nactiPamet(cal, now)
+      .then((d) => (z!.data = d))
+      .catch((e) => {
+        console.log(JSON.stringify({ severity: "WARNING", message: `Obnova paměti kalendářů selhala: ${e instanceof Error ? e.message : String(e)}` }));
+        return z!.data!;
+      })
+      .finally(() => (z!.obnova = null));
+  }
+  return [...z.data.udalosti.values()].flat();
+}
+
+export async function hledejKalendar(cal: calendar_v3.Calendar, vyrazy: string[], od: Date, do_: Date, now: Date = new Date()): Promise<Nalez[]> {
+  if (!vyrazy.length) return [];
+  const hledane = vyrazy.map(bezDiakritiky);
+  const vse = await udalostiZPameti(cal, now);
+  const nalezy: Nalez[] = [];
+  for (const u of vse) {
+    if (!u.cas || u.cas < od || u.cas > do_) continue;
+    if (!hledane.some((v) => u.hledani.includes(v))) continue;
+    nalezy.push({
+      zdroj: "kalendar",
+      cas: u.cas,
+      titulek: u.summary,
+      kde: u.kalendarNazev,
+      // jen název, čas a adresa – popis události se v detailu nezobrazuje
+      text: u.location,
+      odkaz: u.odkaz,
+    });
+  }
+  return nalezy.sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0));
 }
 
 // ---------- Google Chat ----------
@@ -245,20 +334,26 @@ export function prilohyChatu(a: ChatPriloha[] | undefined): Priloha[] {
   });
 }
 
-/** Zprávy prostoru za posledních N dní – krátká cache, aby opakované hledání nečetlo vše znovu */
-const cacheChatu = new Map<string, { kdy: number; zpravy: ChatZprava[]; nazev: string }>();
+/**
+ * Zprávy prostoru za posledních N dní v paměti instance. První načtení stáhne vše (až 10 stran po 1000),
+ * další už jen zprávy novější než poslední známá (filter createTime >). Po 60 s se obnovuje na pozadí –
+ * detail zakázky nikdy nečeká na stahování, jen první otevření po startu instance.
+ */
+interface PametProstoru {
+  kdy: number;
+  zpravy: ChatZprava[];
+  nazev: string;
+  /** createTime poslední známé zprávy – odtud se dočítá */
+  posledni: string | null;
+  obnova: Promise<void> | null;
+}
+const CHAT_CERSTVY_MS = 60_000;
+const CHAT_MAX_MS = 30 * 60_000;
+const cacheChatu = new Map<string, PametProstoru>();
 export const vycistitCacheChatu = () => cacheChatu.clear();
 
-async function zpravyProstoru(prostor: string, token: string, fetchFn: typeof fetch, dniZpet: number, maxStran = 10) {
-  const c = cacheChatu.get(prostor);
-  if (c && Date.now() - c.kdy < 5 * 60_000) return c;
-  const auth = { authorization: `Bearer ${token}` };
+async function stahniZpravy(prostor: string, auth: Record<string, string>, fetchFn: typeof fetch, od: string, nazev: string, maxStran: number): Promise<ChatZprava[]> {
   const api = "https://chat.googleapis.com/v1";
-  const info = await fetchFn(`${api}/${prostor}`, { headers: auth });
-  if (!info.ok) throw new Error(`Chat ${prostor}: HTTP ${info.status} ${(await info.text()).slice(0, 200)}`);
-  const nazev = ((await info.json()) as { displayName?: string }).displayName ?? prostor;
-
-  const od = new Date(Date.now() - dniZpet * 86_400_000).toISOString();
   const zpravy: ChatZprava[] = [];
   let pageToken = "";
   for (let i = 0; i < maxStran; i++) {
@@ -271,9 +366,37 @@ async function zpravyProstoru(prostor: string, token: string, fetchFn: typeof fe
     if (!d.nextPageToken) break;
     pageToken = d.nextPageToken;
   }
-  const v = { kdy: Date.now(), zpravy, nazev };
-  cacheChatu.set(prostor, v);
-  return v;
+  return zpravy;
+}
+
+async function zpravyProstoru(prostor: string, token: string, fetchFn: typeof fetch, dniZpet: number, maxStran = 10): Promise<{ zpravy: ChatZprava[]; nazev: string }> {
+  const auth = { authorization: `Bearer ${token}` };
+  const api = "https://chat.googleapis.com/v1";
+  const hranice = new Date(Date.now() - dniZpet * 86_400_000).toISOString();
+  const c = cacheChatu.get(prostor);
+  const doplnit = async (p: PametProstoru) => {
+    const nove = await stahniZpravy(prostor, auth, fetchFn, p.posledni ?? hranice, p.nazev, maxStran);
+    const zname = new Set(p.zpravy.map((m) => m.name));
+    p.zpravy = [...p.zpravy.filter((m) => (m.createTime ?? "") >= hranice), ...nove.filter((m) => !zname.has(m.name))];
+    p.posledni = p.zpravy.reduce<string | null>((max, m) => (m.createTime && (!max || m.createTime > max) ? m.createTime : max), p.posledni);
+    p.kdy = Date.now();
+  };
+  if (c && Date.now() - c.kdy < CHAT_MAX_MS) {
+    if (Date.now() - c.kdy > CHAT_CERSTVY_MS && !c.obnova) {
+      c.obnova = doplnit(c)
+        .catch((e) => console.log(JSON.stringify({ severity: "WARNING", message: `Obnova Chatu ${c.nazev} selhala: ${e instanceof Error ? e.message : String(e)}` })))
+        .finally(() => (c.obnova = null));
+    }
+    return c;
+  }
+  const info = await fetchFn(`${api}/${prostor}`, { headers: auth });
+  if (!info.ok) throw new Error(`Chat ${prostor}: HTTP ${info.status} ${(await info.text()).slice(0, 200)}`);
+  const nazev = ((await info.json()) as { displayName?: string }).displayName ?? prostor;
+  const p: PametProstoru = c ?? { kdy: 0, zpravy: [], nazev, posledni: null, obnova: null };
+  p.nazev = nazev;
+  await doplnit(p);
+  cacheChatu.set(prostor, p);
+  return p;
 }
 
 export async function hledejChat(prostory: string[], vyrazy: string[], token: string, fetchFn: typeof fetch = fetch, dniZpet = 60): Promise<Nalez[]> {
@@ -306,6 +429,21 @@ export async function hledejChat(prostory: string[], vyrazy: string[], token: st
   return vysledek.sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0));
 }
 
+/**
+ * Zahřátí paměti (po startu instance a pak každých 5 min z časovače): události kalendářů a zprávy Chatu
+ * se načtou dřív, než je někdo potřebuje – první ranní otevření zakázky nečeká na Google.
+ */
+export async function prohrejPamet(zav: ZavislostiZdroju, now: Date): Promise<void> {
+  const chyba = (co: string) => (e: unknown) => console.log(JSON.stringify({ severity: "WARNING", message: `Zahřátí paměti (${co}) selhalo: ${e instanceof Error ? e.message : String(e)}` }));
+  await Promise.all([
+    (async () => udalostiZPameti(await zav.kalendar(), now))().catch(chyba("kalendáře")),
+    (async () => {
+      const token = await zav.chatToken();
+      await Promise.all(zav.prostory.map((p) => zpravyProstoru(p, token, zav.fetchFn ?? fetch, 60)));
+    })().catch(chyba("chat")),
+  ]);
+}
+
 // ---------- Vše najednou ----------
 
 export async function sLimitem<T>(ms: number, p: Promise<T>): Promise<T> {
@@ -329,7 +467,7 @@ export async function hledejVsude(zav: ZavislostiZdroju, vyrazy: string[], now: 
   };
   return Promise.all([
     zdroj("email", async () => hledejEmaily(await zav.gmail(), vyrazy)),
-    zdroj("kalendar", async () => hledejKalendar(await zav.kalendar(), vyrazy, od, do_)),
+    zdroj("kalendar", async () => hledejKalendar(await zav.kalendar(), vyrazy, od, do_, now)),
     zdroj("chat", async () => hledejChat(zav.prostory, vyrazy, await zav.chatToken(), zav.fetchFn)),
   ]);
 }
@@ -359,39 +497,25 @@ export interface NalezLokality extends Nalez {
 export async function hledejNaLokalite(cal: calendar_v3.Calendar, adresa: string, vyloucitOId: string, now: Date, max = 20): Promise<NalezLokality[] | null> {
   const uc = uliceCislo(adresa);
   if (!uc) return null;
-  const dotaz = `${uc.ulice} ${uc.cp}`;
   const ulice = bezDiakritiky(uc.ulice);
   const cislo = new RegExp(`(^|[^\\d])${uc.cp}(/|[^\\d]|$)`);
-  const kalendare = await seznamKalendaru(cal);
-  const nalezy = new Map<string, NalezLokality>();
-  await poDavkach(
-    kalendare.map((k) => async () => {
-      const r = await cal.events.list({
-        calendarId: k.id!,
-        q: dotaz,
-        singleEvents: true,
-        timeMin: new Date(now.getTime() - 730 * 86_400_000).toISOString(),
-        timeMax: new Date(now.getTime() + 60 * 86_400_000).toISOString(),
-        maxResults: 50,
-      });
-      for (const e of r.data.items ?? []) {
-        const summary = e.summary ?? "";
-        if (!e.id || e.status === "cancelled" || /\bvoln[yáé]\b/i.test(bezDiakritiky(summary)) || (vyloucitOId && summary.includes(vyloucitOId))) continue;
-        const kde = bezDiakritiky(`${e.location ?? ""} ${(e.description ?? "").slice(0, 2000)}`);
-        if (!kde.includes(ulice) || !cislo.test(kde)) continue; // full-text hledání kalendáře je volné – ověřit ulici i číslo
-        const cas = zApi(e.start?.dateTime ?? e.start?.date);
-        nalezy.set(`${k.id}/${e.id}`, {
-          zdroj: "kalendar",
-          cas,
-          titulek: summary,
-          kde: k.summary ?? k.id!,
-          text: e.location ?? "",
-          odkaz: e.htmlLink ?? null,
-          oId: summary.match(/O-\d{8,}/)?.[0],
-          budouci: !!cas && cas > now,
-        });
-      }
-    }),
-  );
-  return [...nalezy.values()].sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0)).slice(0, max);
+  const horni = new Date(now.getTime() + 60 * 86_400_000);
+  const nalezy: NalezLokality[] = [];
+  for (const u of await udalostiZPameti(cal, now)) {
+    if (!u.cas || u.cas > horni) continue;
+    if (/\bvoln[yae]\b/i.test(bezDiakritiky(u.summary)) || (vyloucitOId && u.summary.includes(vyloucitOId))) continue;
+    const kde = bezDiakritiky(`${u.location} ${u.description}`);
+    if (!kde.includes(ulice) || !cislo.test(kde)) continue;
+    nalezy.push({
+      zdroj: "kalendar",
+      cas: u.cas,
+      titulek: u.summary,
+      kde: u.kalendarNazev,
+      text: u.location,
+      odkaz: u.odkaz,
+      oId: u.summary.match(/O-\d{8,}/)?.[0],
+      budouci: u.cas > now,
+    });
+  }
+  return nalezy.sort((a, b) => (b.cas?.getTime() ?? 0) - (a.cas?.getTime() ?? 0)).slice(0, max);
 }
