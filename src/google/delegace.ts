@@ -53,6 +53,7 @@ export function delegace(
   }
 
   async function obnov(): Promise<string> {
+    const t0 = Date.now();
     const iat = Math.floor(ted() / 1000);
     const payload = { iss: servisniUcet, sub: uzivatel, scope: scopy.join(" "), aud: "https://oauth2.googleapis.com/token", iat, exp: iat + 3600 };
 
@@ -76,6 +77,7 @@ export function delegace(
     }
     const t = (await vymena.json()) as { access_token: string; expires_in: number };
     cache = { token: t.access_token, vyprsi: ted() + t.expires_in * 1000 };
+    console.log(JSON.stringify({ severity: "INFO", message: `Token delegace obnoven (${scopy.map((x) => x.split("/").at(-1)).join(", ")}) za ${Date.now() - t0} ms, platí ${t.expires_in} s` }));
     return t.access_token;
   }
 

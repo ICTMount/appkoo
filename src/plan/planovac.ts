@@ -249,7 +249,9 @@ export async function nabidniProZakazku(
   const od = atTime(dny[0]!, 0);
   const do_ = atTime(addDays(dny.at(-1)!, 1), 0);
 
+  const tKal = Date.now();
   const { udalosti, nedostupne, citelni } = await nactiKalendare(zav.api, vhodni, od, do_);
+  const msKalendare = Date.now() - tKal;
 
   // Volné sloty, které už začaly nebo začnou do hodiny, se nenabízejí
   const nejdrive = minutesOfDay(now) + 60;
@@ -262,7 +264,9 @@ export async function nabidniProZakazku(
   const bezZakladny = new Set<string>();
   let bezPolohy = 0;
   const techniciPlanu = citelni.map((t) => ({ jmeno: t.jmeno, vyjezd: t.vyjezd, vyjezd2: t.vyjezd2 }));
+  const tDny = Date.now();
   const sestavene = await Promise.all(dny.map((d) => sestavDny(techniciPlanu, udalosti, d, zav.geokoder, opts.trvaniMin ?? 90, adresaZMwf)));
+  const msDny = Date.now() - tDny;
   for (const [i, d] of dny.entries()) {
     const s = sestavene[i]!;
     s.bezZakladny.forEach((x) => bezZakladny.add(x));
@@ -273,6 +277,7 @@ export async function nabidniProZakazku(
     }
   }
 
+  const tSloty = Date.now();
   const zakladni = nabidniTerminy(
     { id: z.idAktivity, bod, trvani: opts.trvaniMin ?? 90, priorita, slaKonec },
     vsechnyDny,
@@ -283,6 +288,7 @@ export async function nabidniProZakazku(
     opts.dohodnuty ? (den, okno) => (naDohodnuty(den, okno) ? -100_000 : 0) : undefined,
   );
 
+  console.log(JSON.stringify({ severity: "INFO", message: `nabídka ${z.idObjednavkyZaklad}: kalendáře ${msKalendare} ms (${udalosti.length} událostí, ${citelni.length} techniků), dny+geokód ${msDny} ms, sloty ${Date.now() - tSloty} ms` }));
   function naDohodnuty(den: string, okno: { od: number; do: number }): boolean {
     const d = opts.dohodnuty;
     if (!d || isoDate(d.od) !== den) return false;
