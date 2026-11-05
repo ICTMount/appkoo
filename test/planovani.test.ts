@@ -154,8 +154,8 @@ describe("brány plánování (zlatá pravidla)", () => {
     const b = kontrolaBran(z, faktaZakazky(z, TED), []);
     expect(b.blokace).toEqual([]);
     expect(b.upozorneni.join(" ")).toContain("Předobjednávka");
-    // instalace před datem RFS není možná: nejdřívější den = den RFS; bez RFS nebo u běžné zakázky bez omezení
-    expect(nejdrivePodleRfs({ ...z, rfs: local(2026, 10, 21, 0, 0) })).toBe("2026-10-21");
+    // instalace před datem RFS není možná: nejdřívější den = den po RFS; bez RFS nebo u běžné zakázky bez omezení
+    expect(nejdrivePodleRfs({ ...z, rfs: local(2026, 10, 21, 0, 0) })).toBe("2026-10-22");
     expect(nejdrivePodleRfs({ ...z, rfs: null })).toBeNull();
     expect(nejdrivePodleRfs({ ...d.z, predobjednavka: false, rfs: local(2026, 10, 21, 0, 0) })).toBeNull();
   });

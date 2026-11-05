@@ -84,7 +84,7 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
   if (z.termin && opts.presun) upozorneni.push(`Přesun: zakázka má termín ${isoDate(z.termin.od).split("-").reverse().join(".")} – po zápisu se původní událost vrátí na VOLNY; změňte termín i v MWF.`);
   if (z.predobjednavka) {
     const rfs = z.rfs ? ` (RFS ${isoDate(z.rfs).split("-").reverse().join(".")})` : "";
-    upozorneni.push(`Předobjednávka${rfs} – instalace před datem RFS není možná; termíny se nabízejí až od RFS, realizace až po změně na standardní zakázku v MWF.`);
+    upozorneni.push(`Předobjednávka${rfs} – instalace před datem RFS není možná; termíny se nabízejí až ode dne po RFS, realizace až po změně na standardní zakázku v MWF.`);
   }
   const predRfs = instalacePredRfs(z, new Date(`${f.dnes}T12:00:00Z`));
   if (predRfs) upozorneni.push(upozorneniPredRfs(predRfs));
@@ -164,9 +164,9 @@ export interface ZavislostiPlanovace {
   vzdalenosti: Vzdalenosti;
 }
 
-/** Předobjednávka s datem RFS: nejdřívější den instalace = den RFS (dřív instalovat nelze); jinak null */
+/** Předobjednávka s datem RFS: nejdřívější den instalace = den po RFS (v den RFS ani dřív instalovat nelze); jinak null */
 export function nejdrivePodleRfs(z: { predobjednavka: boolean; rfs: Date | null }): string | null {
-  return z.predobjednavka && z.rfs ? isoDate(z.rfs) : null;
+  return z.predobjednavka && z.rfs ? addDays(isoDate(z.rfs), 1) : null;
 }
 
 /** Pracovní dny od dneška (včetně) – `pocet` dní */
@@ -253,7 +253,7 @@ export async function nabidniProZakazku(
 
   const dnes = isoDate(now);
   // „jiné termíny“: hledat až od zvoleného dne (zákazník nemůže dřív)
-  // předobjednávka: instalace před datem RFS není možná – nabízet až od RFS
+  // předobjednávka: instalace před datem RFS není možná – nabízet až ode dne po RFS
   const nejdriveOd = [opts.odData, nejdrivePodleRfs(z)].filter((d): d is string => !!d).sort().at(-1);
   const dny = pracovniDny(nejdriveOd && nejdriveOd > dnes ? nejdriveOd : dnes, opts.dni ?? 10);
   const od = atTime(dny[0]!, 0);

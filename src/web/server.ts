@@ -445,7 +445,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (!povolen) return posli(res, 403, strankaChyby(403, brany.blokace[0] ?? "Zápis do kalendáře tohoto technika není povolený."));
         // předobjednávka: termín před datem RFS se nezapíše (ani nestandardní úpravou času)
         const nejdrive = nejdrivePodleRfs(detail.z);
-        if (nejdrive && isoDate(casOd) < nejdrive) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, [`Předobjednávka: instalace před datem RFS ${nejdrive.split("-").reverse().join(".")} není možná – vyberte termín od data RFS.`], formular, nahled, okoli));
+        if (nejdrive && isoDate(casOd) < nejdrive) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, [`Předobjednávka: instalace do dne RFS (nejdříve ${nejdrive.split("-").reverse().join(".")}) není možná – vyberte termín až ode dne po RFS.`], formular, nahled, okoli));
         const chybi = [...chybejiciPole(formular).map((c) => `Chybí povinný údaj: ${c}`), ...chybejiciPotvrzeni(formular, potvrzeniZakazky(detail.z, now)).map((c) => `Chybí potvrzení: ${c}`)];
         if (chybi.length) return posli(res, 422, strankaZapisu(detail, vyb, brany, povolen, stav, email, chybi, formular, nahled, okoli));
         if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendář není dostupný."));
