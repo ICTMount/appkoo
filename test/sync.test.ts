@@ -46,7 +46,7 @@ describe("synchronizace kalendářů a Chatu do databáze", () => {
     kolo = 1;
     expect((await synchronizujKalendare(db, cal, now)).udalosti).toBe(4);
     expect((await hledejKalendarDb(db, ["O-85533333333"], new Date("2026-01-01"), new Date("2026-12-31"))).length).toBe(1);
-  });
+  }, 60_000); // první start PGlite (WASM) trvá několik sekund
 
   it("chat: první běh stáhne 60 dní, druhý jen novější; hledání vrátí shody i odpovědi ve vlákně s přílohami", async () => {
     const db = pgliteDb(new PGlite());
@@ -89,5 +89,5 @@ describe("synchronizace kalendářů a Chatu do databáze", () => {
     await synchronizujKalendare(db, { calendarList: { list: async () => ({ data: { items: [] } }) }, events: { list: async () => ({ data: { items: [] } }) } } as never, new Date("2026-10-16T12:00:00Z"));
     const v = await hledejVsude(zav, ["O-8550000001"], new Date("2026-10-16T12:00:00Z"));
     expect(v.map((x) => [x.zdroj, x.nalezy.length, x.chyba ?? null])).toEqual([["email", 0, null], ["kalendar", 0, null], ["chat", 3, null]]);
-  });
+  }, 60_000);
 });
