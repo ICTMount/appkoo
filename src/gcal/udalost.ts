@@ -3,6 +3,7 @@
 // Do skrytých vlastností události se uloží ID zakázky, takže párování s MWF nezávisí na textu.
 
 import type { Zakazka } from "../import/mwfExport.js";
+import { instalacePredRfs, radekUdalostiPredRfs } from "../domain/predRfs.js";
 import { fmtDate, fmtTime } from "../domain/time.js";
 
 /** Údaje zjištěné při hovoru (kontrolní seznam call scriptu) */
@@ -96,6 +97,7 @@ export function sestavUdalost(
     `PŘEDPOJEN: ${ano(h.predpojen)}`,
     ...(z.infrastruktura === "TMCZ" ? [`PODB (adresa): ${h.podb ?? ""}`] : []),
     ...(h.caseid ? [`CASEID: ${h.caseid}`] : []),
+    ...((p) => (p ? [radekUdalostiPredRfs(p)] : []))(instalacePredRfs(z, od)),
     ...(h.dokumenty ? [`DOKUMENTY: ${h.dokumenty}`] : []),
     "",
     "INSTALAČNÍ PŘEDPIS:",

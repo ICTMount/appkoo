@@ -14,6 +14,7 @@ import type { Zakazka } from "../import/mwfExport.js";
 import type { Fakta, Priorita } from "../domain/priorita.js";
 import { addDays, atTime, isoDate, minutesOfDay } from "../domain/time.js";
 import { isWorkday } from "../domain/workdays.js";
+import { instalacePredRfs, upozorneniPredRfs } from "../domain/predRfs.js";
 import { sestavDny } from "./dny.js";
 import type { Vzdalenosti } from "./geo.js";
 import type { Geokoder } from "./geokod.js";
@@ -85,6 +86,8 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
     const rfs = z.rfs ? ` (RFS ${isoDate(z.rfs).split("-").reverse().join(".")})` : "";
     upozorneni.push(`Předobjednávka${rfs} – termín lze naplánovat, realizace až po změně na standardní zakázku v MWF.`);
   }
+  const predRfs = instalacePredRfs(z, new Date(`${f.dnes}T12:00:00Z`));
+  if (predRfs) upozorneni.push(upozorneniPredRfs(predRfs));
   if (z.pocetMv >= 2) upozorneni.push(`Už ${z.pocetMv} marné výjezdy – zvážit storno / eskalaci.`);
 
   const adresa = norm(`${z.adresa} ${z.psc}`);
