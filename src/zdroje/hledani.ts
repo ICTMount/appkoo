@@ -263,7 +263,8 @@ export async function nactiUdalostiKalendare(
         description,
         cas: zApi(e.start?.dateTime ?? e.start?.date),
         odkaz: e.htmlLink ?? null,
-        hledani: bezDiakritiky(`${e.summary ?? ""} ${description} ${e.location ?? ""}`),
+        // hledaný text bez instalačního předpisu (popis jen 600 znaků) – tabulka je 3× menší a hledání bez indexu rychlé
+        hledani: bezDiakritiky(`${e.summary ?? ""} ${e.location ?? ""} ${description.slice(0, 600)}`),
       });
     }
     pageToken = r.data.nextPageToken ?? undefined;

@@ -39,12 +39,11 @@ CREATE TABLE IF NOT EXISTS sync_stav (
   nazev  text
 )`;
 
-// Textové hledání (LIKE '%…%') nad desítkami tisíc událostí: trigramový index zkrátí stovky ms na jednotky.
-// Rozšíření pg_trgm nemusí být povolené (PGlite v testech, omezená práva) – pak se hledá sekvenčně, funkčně stejně.
-const INDEXY_TRGM = `
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE INDEX IF NOT EXISTS kalendar_udalost_hledani_trgm ON kalendar_udalost USING gin (hledani gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS chat_zprava_hledani_trgm ON chat_zprava USING gin (hledani gin_trgm_ops)`;
+// Trigramový index (pg_trgm) jsme zkusili a zavrhli: na db-f1-micro zdržoval zápis desítek tisíc řádků
+// na desítky minut, zatímco hledání bez indexu trvá stovky ms. Dříve založené indexy se odstraní.
+const ODSTRANIT_INDEXY = `
+DROP INDEX IF EXISTS kalendar_udalost_hledani_trgm;
+DROP INDEX IF EXISTS chat_zprava_hledani_trgm`;
 
 const pripraveno = new WeakMap<Dotaz, Promise<unknown>>();
 export function pripravSync(db: Dotaz): Promise<unknown> {
@@ -52,14 +51,7 @@ export function pripravSync(db: Dotaz): Promise<unknown> {
   if (!p) {
     p = (async () => {
       for (const sql of TABULKY.split(";").map((x) => x.trim()).filter(Boolean)) await db.query(sql);
-      for (const sql of INDEXY_TRGM.split(";").map((x) => x.trim()).filter(Boolean)) {
-        try {
-          await db.query(sql);
-        } catch (e) {
-          console.log(JSON.stringify({ severity: "INFO", message: `Trigramový index není k dispozici (${e instanceof Error ? e.message.split("\n")[0] : String(e)}) – hledání bez indexu` }));
-          break;
-        }
-      }
+      for (const sql of ODSTRANIT_INDEXY.split(";").map((x) => x.trim()).filter(Boolean)) await db.query(sql).catch(() => undefined);
     })().catch((e) => {
       pripraveno.delete(db);
       throw e;
