@@ -631,7 +631,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const kontext = await nactiKontext(db);
         const zId = p.get("z");
         const detail = zId ? await nactiDetail(db, zId, now) : null;
-        const technici = kontext.technici.map((t) => ({ jmeno: t.jmeno, nazevVKalendari: t.nazevVKalendari, kalendar: t.kalendar }));
+        const technici = kontext.technici.map((t) => ({ jmeno: t.jmeno, nazevVKalendari: t.nazevVKalendari, kalendar: t.kalendar, vyjezd: [t.vyjezd, t.vyjezd2].filter(Boolean).join(" / ") }));
         // výchozí výběr: u zakázky technici s odpovídající dovedností (FTTH / PIV / SAT), jinak všichni
         const vychozi = detail ? kontext.technici.filter((t) => t.skupiny.includes(skupinaZakazky(detail.z.typAktivity))).map((t) => t.jmeno) : [];
         const volby: VolbyMrizky = {

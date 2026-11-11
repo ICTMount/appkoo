@@ -33,6 +33,17 @@ export interface TechnikMrizky {
   jmeno: string;
   nazevVKalendari: string;
   kalendar: string;
+  /** odkud technik vyjíždí (adresa z číselníku Technici) */
+  vyjezd?: string;
+}
+
+/** Adresa události rozdělená na ulici a městskou část / obec („Bellušova 1827/53“ + „Praha 13 Stodůlky“) – část se v mřížce zvýrazňuje */
+export function castAdresy(location: string): { ulice: string; cast: string } {
+  const casti = location.split(",").map((s) => s.trim()).filter(Boolean);
+  if (casti.length > 1 && /^(česko|czechia|česká republika|cz)$/i.test(casti.at(-1)!)) casti.pop();
+  if (casti.length < 2) return { ulice: casti[0] ?? "", cast: "" };
+  const cast = casti.pop()!.replace(/^\d{3}\s?\d{2}\s+/, "");
+  return { ulice: casti.join(", "), cast };
 }
 
 export interface VolbyMrizky {
@@ -76,7 +87,12 @@ export interface BlokMrizky {
   /** text v bloku (v hustém režimu zkrácený) */
   nazev: string;
   cas: string;
-  misto: string;
+  /** ulice a číslo (v hustém režimu prázdné) */
+  ulice: string;
+  /** městská část / obec – zvýrazněná */
+  cast: string;
+  /** celá adresa do detailu */
+  adresa: string;
   /** detail po najetí myší */
   plnyNazev: string;
   detail: string[];
@@ -90,7 +106,7 @@ export interface BlokMrizky {
 
 export interface SloupecMrizky {
   nadpis: string;
-  pod: { stitek: string; bloky: BlokMrizky[] }[];
+  pod: { stitek: string; napoveda: string; bloky: BlokMrizky[] }[];
 }
 
 export interface Mrizka {
@@ -147,12 +163,15 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
       const vlevo = poradi++ >= podsloupcu / 2;
       const prefix = new RegExp(`^${p.t.nazevVKalendari.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*-\\s*`, "i");
       return {
-        stitek: v.pohled === "den" ? "" : p.t.nazevVKalendari,
+        // den: pod jménem technika místo výjezdu; týden: jméno, výjezd v nápovědě
+        stitek: v.pohled === "den" ? (p.t.vyjezd ? `výjezd: ${p.t.vyjezd}` : "") : p.t.nazevVKalendari,
+        napoveda: p.t.vyjezd ? `${p.t.jmeno} – výjezd: ${p.t.vyjezd}` : p.t.jmeno,
         bloky: p.seznam.map((u): BlokMrizky => {
           const od = Math.max(start, hodina(u.od));
           const doH = isoDate(u.do) > isoDate(u.od) ? konec : Math.min(konec, Math.max(od + 0.25, hodina(u.do)));
           const volny = jeVolneOkno({ summary: u.summary, barva: u.barvaId ?? undefined });
           const bg = barvaUdalosti(u);
+          const adr = castAdresy(u.location);
           const kratky = u.summary.replace(prefix, "").replace(/\s+(SLA|RFS)\b.*$/i, "");
           return {
             top: ((od - start) / delka) * 100,
@@ -162,9 +181,11 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
             fg: barvaTextu(bg),
             nazev: v.jenVolny ? p.t.nazevVKalendari : husta ? kratky : u.summary,
             cas: `${hm(u.od)} – ${hm(u.do)}`,
-            misto: husta ? (u.location.split(",").pop() ?? "").trim() : u.location.trim(),
+            ulice: husta && adr.cast ? "" : adr.ulice,
+            cast: adr.cast,
+            adresa: u.location.trim(),
             plnyNazev: u.summary,
-            detail: [...(u.location.trim() ? [u.location.trim()] : []), ...radkyDetailu(u.description)],
+            detail: radkyDetailu(u.description),
             odkaz: u.odkaz,
             oid: u.summary.match(/O-\d{8,}/)?.[0] ?? null,
             vlevo,
@@ -198,12 +219,29 @@ button,input{font:inherit}
 .k-prep a+a{border-left:1px solid #747775}
 .k-prep a.on{background:#d3e3fd;color:#0b2e6b}
 .k-telo{display:flex;flex-wrap:wrap;flex:1;min-height:0}
-.k-panel{flex:1 1 11em;max-width:14em;padding:.5em .9em .9em;display:flex;flex-direction:column;gap:.1em;overflow-y:auto;max-height:100%}
+.k-panel{flex:0 0 16em;max-width:100%;padding:.5em .9em .9em;display:flex;flex-direction:column;gap:.1em;overflow-y:auto;max-height:100%}
 .k-panel label{display:flex;align-items:center;gap:.6em;min-height:26px;cursor:pointer}
 .k-panel input[type=checkbox]{width:1.2em;height:1.2em;flex:none}
 .k-panel b{font-weight:500;margin:.5em 0 .3em}
 .k-panel .k-tl{justify-content:center;margin-top:.6em;cursor:pointer}
 .k-pozn{color:#444746;font-size:.9em;margin-top:.6em}
+.k-panel label small{display:block;color:#444746;font-size:.8em;line-height:1.1}
+.k-panel label>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mm{margin:.2em 0 .6em;font-size:.82em}
+.mm-h{display:flex;align-items:center;justify-content:space-between;white-space:nowrap;font-weight:500;font-size:1.1em;padding:0 .2em .3em}
+.mm-h span+span{display:flex}.mm-h a{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;border-radius:50%;color:#444746;font-size:1.3em}
+.mm-h a:hover{background:#f1f3f4;text-decoration:none}
+.mm table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:center}
+.mm th{font-weight:400;color:#444746;padding:.15em 0}
+.mm td{padding:0}
+.mm td.t{color:#444746;background:#f1f3f4;font-size:.9em}
+.mm td a{display:inline-flex;align-items:center;justify-content:center;width:1.9em;height:1.9em;border-radius:50%;color:#1f1f1f}
+.mm td a:hover{background:#f1f3f4;text-decoration:none}
+.mm td a.jiny{color:#80868b}
+.mm td a.dnes{background:#1967d2;color:#fff}
+.mm td a.vyb{background:#d3e3fd;color:#0b2e6b}
+.mm tr.vyb td{background:#eef3fd}.mm tr.vyb td.t{background:#d3e3fd}
+.ev-b b,.tip b{font-weight:700}
 .k-mriz{flex:999 1 560px;min-width:0;min-height:0;overflow-x:auto;display:flex}
 .k-vnitrek{flex:1;display:flex;flex-direction:column;padding-right:.5em}
 .k-hl,.k-grid{display:flex}
@@ -252,6 +290,38 @@ function odkaz(v: VolbyMrizky, zmena: Partial<Pick<VolbyMrizky, "pohled" | "den"
   return `/kalendar?${q}`;
 }
 
+/** Měsíční kalendář v levém horním rohu (jako v Google Kalendáři): čísla týdnů, dnešek, vybraný den / týden */
+export function miniMesic(v: VolbyMrizky, dnes: IsoDate): string {
+  const d = fromIso(v.den);
+  const prvni = isoDate(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)));
+  const mesic = d.getUTCMonth();
+  const posun = (n: number) => {
+    const t = new Date(Date.UTC(d.getUTCFullYear(), mesic + n, 1));
+    const posledni = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+    return isoDate(new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), Math.min(d.getUTCDate(), posledni))));
+  };
+  const isoTyden = (x: IsoDate) => {
+    const t = fromIso(x);
+    t.setUTCDate(t.getUTCDate() + 3 - ((t.getUTCDay() + 6) % 7));
+    const t1 = new Date(Date.UTC(t.getUTCFullYear(), 0, 4));
+    return 1 + Math.round(((t.getTime() - t1.getTime()) / 86_400_000 - 3 + ((t1.getUTCDay() + 6) % 7)) / 7);
+  };
+  const vybranyTyden = pondeli(v.den);
+  const radky: string[] = [];
+  for (let po = pondeli(prvni), i = 0; i < 6; i++, po = addDays(po, 7)) {
+    if (i > 3 && fromIso(po).getUTCMonth() !== mesic) break;
+    const bunky = Array.from({ length: 7 }, (_, k) => {
+      const x = addDays(po, k);
+      const tr = [x === dnes ? "dnes" : v.pohled === "den" && x === v.den ? "vyb" : "", fromIso(x).getUTCMonth() !== mesic ? "jiny" : ""].filter(Boolean).join(" ");
+      return `<td><a${tr ? ` class="${tr}"` : ""} href="${esc(odkaz(v, { den: x }))}">${fromIso(x).getUTCDate()}</a></td>`;
+    }).join("");
+    radky.push(`<tr${v.pohled === "tyden" && po === vybranyTyden ? ` class="vyb"` : ""}><td class="t">${isoTyden(po)}</td>${bunky}</tr>`);
+  }
+  const NAZVY = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+  return `<div class="mm"><div class="mm-h"><span>${NAZVY[mesic]} ${d.getUTCFullYear()}</span><span><a href="${esc(odkaz(v, { den: posun(-1) }))}" aria-label="Předchozí měsíc">‹</a><a href="${esc(odkaz(v, { den: posun(1) }))}" aria-label="Další měsíc">›</a></span></div>
+<table><tr><th></th><th>P</th><th>Ú</th><th>S</th><th>Č</th><th>P</th><th>S</th><th>N</th></tr>${radky.join("")}</table></div>`;
+}
+
 export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const { volby: v, mrizka: m } = s;
   const krok = v.pohled === "den" ? 1 : 7;
@@ -263,17 +333,18 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const vaha = (sl: SloupecMrizky) => Math.max(1, sl.pod.length);
   const blok = (b: BlokMrizky) => {
     const cil = b.oid ? `/o/${encodeURIComponent(b.oid)}` : b.odkaz;
-    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}</span>${b.misto && !b.volny ? `<span>${esc(b.misto)}</span>` : ""}`;
+    const misto = [b.ulice ? esc(b.ulice) : "", b.cast ? `<b>${esc(b.cast)}</b>` : ""].filter(Boolean).join(", ");
+    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}`;
     const styl = `background:${b.bg};color:${b.fg}`;
     const telo = cil
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
       : `<div class="ev-b" tabindex="0" style="${styl}">${obsah}</div>`;
-    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}</div>`;
+    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}</div>`;
     return `<div class="ev" style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
-<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0"><div>${esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div>${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
+<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0"><div>${esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
 <div class="k-grid"><div class="k-osa">${m.hodiny.map((h) => `<div>${h}:00</div>`).join("")}</div>${m.sloupce
         .map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0;background-size:100% ${(100 / m.hodiny.length).toFixed(4)}%">${sl.pod.map((p) => `<div class="k-pod" style="font-size:${pismo}em">${p.bloky.map(blok).join("")}</div>`).join("")}</div>`)
         .join("")}</div></div>`
@@ -288,9 +359,10 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
 <span class="k-prep"><a class="${v.pohled === "den" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "den" }))}">Den</a><a class="${v.pohled === "tyden" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "tyden" }))}">Týden</a></span></div></div>
 <div class="k-telo">
 <form class="k-panel" method="get" action="/kalendar"><input type="hidden" name="pohled" value="${v.pohled}"><input type="hidden" name="den" value="${v.den}">${z ? `<input type="hidden" name="z" value="${esc(z.idAktivity)}">` : ""}
+${miniMesic(v, dnes)}
 <label style="font-weight:500"><input type="checkbox" name="volne" value="1"${v.jenVolny ? " checked" : ""} style="accent-color:#0b8043">Jen VOLNY</label>
 <b>Kalendáře techniků</b>
-${s.technici.map((t) => `<label><input type="checkbox" name="t" value="${esc(t.jmeno)}"${vybrano(t) ? " checked" : ""} style="accent-color:${s.barvy.get(t.kalendar) ?? VYCHOZI_BARVA}">${esc(t.jmeno)}</label>`).join("\n")}
+${s.technici.map((t) => `<label><input type="checkbox" name="t" value="${esc(t.jmeno)}"${vybrano(t) ? " checked" : ""} style="accent-color:${s.barvy.get(t.kalendar) ?? VYCHOZI_BARVA}"><span title="${esc(t.vyjezd ? `výjezd: ${t.vyjezd}` : t.jmeno)}">${esc(t.jmeno)}${t.vyjezd ? `<small>${esc(t.vyjezd)}</small>` : ""}</span></label>`).join("\n")}
 <button class="k-tl" type="submit">Zobrazit výběr</button>
 <div class="k-pozn">Zrcadlo Google Kalendáře: časy a barvy podle zdroje. ${s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}</div>
 <div class="k-pozn">${esc(s.uzivatel)}</div>

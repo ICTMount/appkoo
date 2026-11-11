@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { barvaTextu, barvaUdalosti, pondeli, radkyDetailu, rozsahMrizky, sestavMrizku, strankaMrizky, type TechnikMrizky, type VolbyMrizky } from "../src/web/mrizka.js";
+import { barvaTextu, barvaUdalosti, castAdresy, miniMesic, pondeli, radkyDetailu, rozsahMrizky, sestavMrizku, strankaMrizky, type TechnikMrizky, type VolbyMrizky } from "../src/web/mrizka.js";
 import type { UdalostMrizky } from "../src/zdroje/sync.js";
 
 const T: TechnikMrizky[] = [
-  { jmeno: "Tomáš Vajc", nazevVKalendari: "Vajc", kalendar: "K1" },
+  { jmeno: "Tomáš Vajc", nazevVKalendari: "Vajc", kalendar: "K1", vyjezd: "Praha 4, Krč" },
   { jmeno: "Anton Hristov", nazevVKalendari: "Hristov", kalendar: "K2" },
 ];
 const u = (kalendar: string, den: string, od: string, do_: string, summary: string, o: Partial<UdalostMrizky> = {}): UdalostMrizky => ({
@@ -25,10 +25,10 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(m.hodiny[0]).toBe(8);
     expect(m.hodiny.length).toBe(13); // 8–21
     const [zak, v1, v2] = m.sloupce[0]!.pod[0]!.bloky;
-    expect(zak).toMatchObject({ volny: false, bg: "#3f51b5", fg: "#fff", oid: "O-8559960553", cas: "8:00 – 10:00", misto: "Bellušova 1827 / 53, Praha 13 Stodůlky" });
+    expect(zak).toMatchObject({ volny: false, bg: "#3f51b5", fg: "#fff", oid: "O-8559960553", cas: "8:00 – 10:00", ulice: "Bellušova 1827 / 53", cast: "Praha 13 Stodůlky" });
     expect(zak!.top).toBeCloseTo(0);
     expect(zak!.vyska).toBeCloseTo((2 / 13) * 100);
-    expect(zak!.detail).toEqual(["Bellušova 1827 / 53, Praha 13 Stodůlky", "TEL: 605227589", "ČASOVÉ MOŽNOSTI: pevný termín"]); // bez instalačního předpisu
+    expect(zak!.detail).toEqual(["TEL: 605227589", "ČASOVÉ MOŽNOSTI: pevný termín"]); // bez instalačního předpisu
     expect(v1).toMatchObject({ volny: true, bg: "#0b8043", nazev: "Vajc - VOLNY" });
     expect(v2!.vyska).toBeCloseTo((1.5 / 13) * 100); // 12:00–13:30 – délka podle kalendáře
     // NEPLANOVAT má barvu kalendáře technika; na světlé barvě tmavý text
@@ -43,7 +43,7 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(m.husta).toBe(true);
     expect(m.hodiny.at(-1)).toBe(21); // 8–22 kvůli události do 21:30
     expect(m.sloupce[0]!.pod[0]!.bloky[0]!.nazev).toBe("FTTH O-8559960553 Eckhardt"); // bez jména technika a SLA
-    expect(m.sloupce[0]!.pod[0]!.bloky[0]!.misto).toBe("Praha 13 Stodůlky");
+    expect(m.sloupce[0]!.pod[0]!.bloky[0]).toMatchObject({ ulice: "", cast: "Praha 13 Stodůlky" });
     expect(m.sloupce[0]!.pod[0]!.bloky[0]!.plnyNazev).toContain("SLA 20.11.2026"); // detail má vše
     expect(pondeli("2026-11-22")).toBe("2026-11-16");
     expect(rozsahMrizky({ pohled: "tyden", den: "2026-11-18" }).dny.length).toBe(7);
@@ -80,5 +80,25 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(h).toContain('href="/zakazka/19902219"');
     expect(h).toContain("Stav k 18:19");
     expect(h).toContain('name="z" value="19902219"');
+  });
+
+  it("městská část adresy se oddělí a zvýrazní; výjezd technika v záhlaví; měsíční kalendář vlevo nahoře", () => {
+    expect(castAdresy(" Bellušova 1827 / 53, Praha 13 Stodůlky")).toEqual({ ulice: "Bellušova 1827 / 53", cast: "Praha 13 Stodůlky" });
+    expect(castAdresy("Plovdivská 3265/4, 143 00 Praha 12 - Modřany")).toEqual({ ulice: "Plovdivská 3265/4", cast: "Praha 12 - Modřany" });
+    expect(castAdresy("Brožíkova 445, 530 09 Pardubice II, Česko")).toEqual({ ulice: "Brožíkova 445", cast: "Pardubice II" });
+    expect(castAdresy("Krčská 991")).toEqual({ ulice: "Krčská 991", cast: "" });
+    const v = volby();
+    const m = sestavMrizku(UD, T, v);
+    expect(m.sloupce[0]!.pod[0]!.stitek).toBe("výjezd: Praha 4, Krč");
+    const h = strankaMrizky({ volby: v, technici: T, barvy: new Map(), mrizka: m, synchronizace: null, uzivatel: "a@b.cz" }, "2026-11-11");
+    expect(h).toContain("Bellušova 1827 / 53, <b>Praha 13 Stodůlky</b>");
+    expect(h).toContain("<small>Praha 4, Krč</small>");
+    const mm = miniMesic(v, "2026-11-11");
+    expect(mm).toContain("Listopad 2026");
+    expect(mm).toContain('<td class="t">47</td>'); // týden 16.–22.11.
+    expect(mm).toContain('class="dnes" href="/kalendar?pohled=den&amp;den=2026-11-11"');
+    expect(mm).toContain('class="vyb" href="/kalendar?pohled=den&amp;den=2026-11-16"');
+    expect(mm).toContain("den=2026-12-16"); // šipka na další měsíc
+    expect(miniMesic(volby({ pohled: "tyden" }), "2026-11-11")).toContain('<tr class="vyb"><td class="t">47</td>');
   });
 });
