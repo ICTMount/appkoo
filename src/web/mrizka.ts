@@ -7,6 +7,7 @@ import { addDays, fromIso, isoDate, type IsoDate } from "../domain/time.js";
 import { jeVolneOkno } from "../gcal/kontrola.js";
 import { zHtml } from "../gcal/kalendar.js";
 import type { UdalostMrizky } from "../zdroje/sync.js";
+import type { Bod } from "../plan/geo.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -35,6 +36,8 @@ export interface TechnikMrizky {
   kalendar: string;
   /** odkud technik vyjíždí (adresa z číselníku Technici) */
   vyjezd?: string;
+  /** první adresa výjezdu – od ní se počítají přejezdy */
+  vyjezdAdresa?: string;
 }
 
 /** Adresa události rozdělená na ulici a městskou část / obec („Bellušova 1827/53“ + „Praha 13 Stodůlky“) – část se v mřížce zvýrazňuje */
@@ -85,6 +88,8 @@ export interface OznaceniMrizky {
   /** klíč „kalendář|eventId“ */
   navrhy?: Map<string, { poradi: number; duvod: string }>;
   tato?: { kalendar: string; eventId: string } | null;
+  /** přejezdy: polohy adres (klíč = adresa události / výjezdu, oříznutá), výpočet km a poloha plánované zakázky */
+  prejezdy?: { polohy: Map<string, Bod | null>; km: (a: Bod, b: Bod) => number; cil?: Bod | null };
 }
 
 const hm = (t: Date) => `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
@@ -142,6 +147,10 @@ export interface BlokMrizky {
   navrh?: { poradi: number; duvod: string };
   /** současná událost plánované zakázky */
   tato?: boolean;
+  /** přejezd na tuto adresu z předchozí zastávky dne (nebo z výjezdu technika), km */
+  prejezd?: { km: number; zVyjezdu: boolean };
+  /** VOLNY + plánovaná zakázka: přejezd z předchozí zastávky na adresu zakázky a z ní na další zastávku (nebo zpět na výjezd), km */
+  vlozeni?: { pred: number; po: number; predVyjezd: boolean; poVyjezd: boolean };
 }
 
 export interface SloupecMrizky {
@@ -161,6 +170,33 @@ export interface Mrizka {
 export function radkyDetailu(popis: string): string[] {
   const text = zHtml(popis).split(/INSTALAČNÍ PŘEDPIS/i)[0]!;
   return text.split(/\r?\n/).map((r) => r.trim()).filter((r) => r && !/^\[SHEET2CAL\]/.test(r)).slice(0, 10);
+}
+
+/**
+ * Přejezdy v jednom dni technika: u každé zakázky km z předchozí zastávky (první z výjezdu), u VOLNY slotu
+ * km „předchozí zastávka → plánovaná zakázka → další zastávka“. Zastávka = událost s adresou, kterou známe na mapě.
+ */
+function prejezdyDne(bloky: BlokMrizky[], t: TechnikMrizky, pr: OznaceniMrizky["prejezdy"]): BlokMrizky[] {
+  if (!pr) return bloky;
+  const bod = (a: string | undefined) => (a ? pr.polohy.get(a.trim()) ?? null : null);
+  const vyjezd = bod(t.vyjezdAdresa);
+  const serazene = [...bloky].sort((a, b) => a.odIso.localeCompare(b.odIso));
+  const zastavky = serazene.map((b) => (!b.volny ? bod(b.adresa) : null));
+  let minula = vyjezd;
+  let minulaVyjezd = true;
+  serazene.forEach((b, i) => {
+    const z = zastavky[i];
+    if (z) {
+      if (minula) b.prejezd = { km: pr.km(minula, z), zVyjezdu: minulaVyjezd };
+      minula = z;
+      minulaVyjezd = false;
+    } else if (b.volny && pr.cil) {
+      const dalsiI = zastavky.findIndex((x, j) => j > i && !!x);
+      const dalsi = dalsiI >= 0 ? zastavky[dalsiI]! : vyjezd;
+      if (minula && dalsi) b.vlozeni = { pred: pr.km(minula, pr.cil), po: pr.km(pr.cil, dalsi), predVyjezd: minulaVyjezd, poVyjezd: dalsiI < 0 };
+    }
+  });
+  return bloky;
 }
 
 /** Sestaví mřížku z událostí (čistá funkce – testuje se bez databáze) */
@@ -206,7 +242,7 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
         // den: pod jménem technika místo výjezdu; týden: jméno, výjezd v nápovědě
         stitek: v.pohled === "den" ? (p.t.vyjezd ? `výjezd: ${p.t.vyjezd}` : "") : p.t.nazevVKalendari,
         napoveda: p.t.vyjezd ? `${p.t.jmeno} – výjezd: ${p.t.vyjezd}` : p.t.jmeno,
-        bloky: p.seznam.map((u): BlokMrizky => {
+        bloky: prejezdyDne(p.seznam.map((u): BlokMrizky => {
           const od = Math.max(start, hodina(u.od));
           const doH = isoDate(u.do) > isoDate(u.od) ? konec : Math.min(konec, Math.max(od + 0.25, hodina(u.do)));
           const volny = jeVolneOkno({ summary: u.summary, barva: u.barvaId ?? undefined });
@@ -239,7 +275,7 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
             ...(oznaceni.navrhy?.has(`${u.kalendar}|${u.id}`) ? { navrh: oznaceni.navrhy.get(`${u.kalendar}|${u.id}`)! } : {}),
             ...(oznaceni.tato && oznaceni.tato.kalendar === u.kalendar && oznaceni.tato.eventId === u.id ? { tato: true } : {}),
           };
-        }),
+        }), p.t, oznaceni.prejezdy),
       };
     }),
   }));
@@ -294,6 +330,7 @@ button,input{font:inherit}
 .mm td a.vyb{background:var(--vyb-bg);color:var(--vyb-fg)}
 .mm tr.vyb td{background:var(--vyb2)}.mm tr.vyb td.t{background:var(--vyb-bg)}
 .ev-b b,.tip b{font-weight:700}
+.ev-km{display:inline-block;background:rgba(0,0,0,.28);color:#fff;border-radius:1em;padding:0 .5em;font-weight:500;white-space:nowrap}
 .k-mriz{flex:999 1 560px;min-width:0;min-height:0;overflow-x:auto;display:flex}
 .k-vnitrek{flex:1;display:flex;flex-direction:column;padding-right:.5em}
 .k-hl,.k-grid{display:flex}
@@ -334,6 +371,7 @@ button,input{font:inherit}
 .ev.navrh .ev-b{outline:4px solid var(--text);outline-offset:-4px;box-shadow:inset 0 0 0 7px #fdd835}
 .ev.navrh .ev-b{padding:.55em .7em}
 .ev.navrh .ev-znak{background:#fdd835;color:#000;font-size:1.15em;padding:.05em .6em;border:2px solid #1f1f1f}
+.s-navrhem .ev{background:var(--panel);border-radius:4px}
 .s-navrhem .ev:not(.navrh):not(.tato) .ev-b{opacity:.3}
 .s-navrhem .ev:not(.navrh):not(.tato):hover .ev-b{opacity:1}
 .k-dop{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:.4em .6em}
@@ -430,12 +468,21 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       : b.oid ? `/o/${encodeURIComponent(b.oid)}` : b.odkaz;
     const znak = b.navrh ? `<span class="ev-znak">${m.husta ? `${b.navrh.poradi}.` : `nejoptimálnější ${b.navrh.poradi}`}</span>` : b.tato ? `<span class="ev-znak">tato zakázka</span>` : "";
     const misto = [b.ulice ? esc(b.ulice) : "", b.cast ? `<b>${esc(b.cast)}</b>` : ""].filter(Boolean).join(", ");
-    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}${znak}`;
+    const km = (x: number) => `${x.toFixed(1).replace(".", ",")} km`;
+    // přejezdy: zakázka = km z předchozí zastávky; VOLNY = km sem z předchozí a odsud na další (s plánovanou zakázkou)
+    const prejezd = b.prejezd
+      ? `<span class="ev-km">${m.husta ? "" : b.prejezd.zVyjezdu ? "z výjezdu " : "přejezd "}${km(b.prejezd.km)}</span>`
+      : b.vlozeni ? `<span class="ev-km">${m.husta ? "" : "sem "}${km(b.vlozeni.pred)} · ${m.husta ? "" : "dál "}${km(b.vlozeni.po)}</span>` : "";
+    const prejezdDetail = b.prejezd
+      ? `<div class="r">Přejezd ${b.prejezd.zVyjezdu ? "z výjezdu technika" : "z předchozí zakázky"}: <b>${km(b.prejezd.km)}</b></div>`
+      : b.vlozeni ? `<div class="r">S touto zakázkou: ${b.vlozeni.predVyjezd ? "z výjezdu" : "z předchozí zakázky"} <b>${km(b.vlozeni.pred)}</b>, ${b.vlozeni.poVyjezd ? "zpět na výjezd" : "na další zakázku"} <b>${km(b.vlozeni.po)}</b></div>` : "";
+    // km je hned u času, aby nezmizelo u krátkých bloků
+    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}${prejezd ? ` ${prejezd}` : ""}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}${znak}`;
     const styl = `background:${b.bg};color:${b.fg}`;
     const telo = cil
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
       : `<div class="ev-b" tabindex="0" style="${styl}">${obsah}</div>`;
-    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}${lzePlanovat ? `<div class="r"><b>Klik = naplánovat ${esc(z!.oid)} do tohoto slotu.</b></div>` : ""}${b.navrh ? `<div class="r">Nejoptimálnější ${b.navrh.poradi}: ${esc(b.navrh.duvod)}</div>` : ""}</div>`;
+    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${prejezdDetail}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}${lzePlanovat ? `<div class="r"><b>Klik = naplánovat ${esc(z!.oid)} do tohoto slotu.</b></div>` : ""}${b.navrh ? `<div class="r">Nejoptimálnější ${b.navrh.poradi}: ${esc(b.navrh.duvod)}</div>` : ""}</div>`;
     return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}" style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
   };
   const mrizka = m.sloupce.length

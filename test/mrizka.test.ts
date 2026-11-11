@@ -124,4 +124,28 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(blok).toContain("Termín teď nelze naplánovat: Zásuvka USED");
     expect(blok).not.toContain("Vybrat nejoptimálnější VOLNY");
   });
+
+  it("přejezdy: zakázka má km z předchozí zastávky (první z výjezdu), VOLNY km sem a dál s plánovanou zakázkou", () => {
+    const ud = [
+      u("K1", "2026-11-16", "08:00", "10:00", "Vajc - FTTH O-8559960553 A", { location: "A 1, Praha" }),
+      u("K1", "2026-11-16", "10:00", "12:00", "Vajc - VOLNY", { barvaId: "10" }),
+      u("K1", "2026-11-16", "12:00", "14:00", "Vajc - FTTH O-8559960554 B", { location: "B 2, Praha" }),
+      u("K1", "2026-11-16", "14:00", "16:00", "Vajc - VOLNY", { barvaId: "10" }),
+    ];
+    const polohy = new Map([["Praha 4, Krč", { lat: 0, lon: 0 }], ["A 1, Praha", { lat: 0, lon: 1 }], ["B 2, Praha", { lat: 0, lon: 4 }]]);
+    const km = (a: { lon: number }, b: { lon: number }) => Math.abs(a.lon - b.lon);
+    const technik = [{ ...T[0]!, vyjezdAdresa: "Praha 4, Krč" }];
+    const v = volby({ zakazka: { idAktivity: "P1", oid: "O-1", adresa: "C 3, Praha" } });
+    const b = sestavMrizku(ud, technik, v, { prejezdy: { polohy, km, cil: { lat: 0, lon: 2 } } }).sloupce[0]!.pod[0]!.bloky;
+    expect(b[0]!.prejezd).toEqual({ km: 1, zVyjezdu: true });
+    expect(b[1]!.vlozeni).toEqual({ pred: 1, po: 2, predVyjezd: false, poVyjezd: false }); // A → zakázka → B
+    expect(b[2]!.prejezd).toEqual({ km: 3, zVyjezdu: false });
+    expect(b[3]!.vlozeni).toEqual({ pred: 2, po: 2, predVyjezd: false, poVyjezd: true }); // B → zakázka → výjezd
+    const h = strankaMrizky({ volby: v, technici: technik, barvy: new Map(), mrizka: sestavMrizku(ud, technik, v, { prejezdy: { polohy, km, cil: { lat: 0, lon: 2 } } }), synchronizace: null, uzivatel: "a@b.cz" }, "2026-11-11");
+    expect(h).toContain("z výjezdu 1,0 km");
+    expect(h).toContain("přejezd 3,0 km");
+    expect(h).toContain("sem 1,0 km · dál 2,0 km");
+    // bez poloh se nic nepočítá
+    expect(sestavMrizku(ud, technik, v).sloupce[0]!.pod[0]!.bloky[0]!.prejezd).toBeUndefined();
+  });
 });

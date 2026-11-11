@@ -634,7 +634,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const kontext = await nactiKontext(db);
         const zId = p.get("z");
         const detail = zId ? await nactiDetail(db, zId, now) : null;
-        const technici = kontext.technici.map((t) => ({ jmeno: t.jmeno, nazevVKalendari: t.nazevVKalendari, kalendar: t.kalendar, vyjezd: [t.vyjezd, t.vyjezd2].filter(Boolean).join(" / ") }));
+        const technici = kontext.technici.map((t) => ({ jmeno: t.jmeno, nazevVKalendari: t.nazevVKalendari, kalendar: t.kalendar, vyjezd: [t.vyjezd, t.vyjezd2].filter(Boolean).join(" / "), vyjezdAdresa: t.vyjezd }));
         // výchozí výběr: u zakázky technici s odpovídající dovedností (FTTH / PIV / SAT), jinak všichni
         const vychozi = detail ? kontext.technici.filter((t) => t.skupiny.includes(skupinaZakazky(detail.z.typAktivity))).map((t) => t.jmeno) : [];
         const vybrani = p.has("t") ? p.getAll("t").filter((j) => technici.some((t) => t.jmeno === j)) : vychozi;
@@ -729,6 +729,23 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           } catch (e) {
             navrhChyba = `Doporučení se nepodařilo spočítat: ${e instanceof Error ? e.message : String(e)}`;
             navrhy = [];
+          }
+        }
+        // přejezdy mezi naplánovanými adresami (a s plánovanou zakázkou ve VOLNY slotech): polohy z geokodéru (cache v DB)
+        if (planovac && zive) {
+          try {
+            const adresaZ = zakazkaMrizky?.adresa ?? "";
+            const adresy = [...new Set([
+              ...udalosti.filter((u) => u.location.trim() && !jeVolneOkno({ summary: u.summary, barva: u.barvaId ?? undefined })).map((u) => u.location.trim()),
+              ...zobrazeni.map((t) => t.vyjezd.trim()).filter(Boolean),
+              ...(adresaZ ? [adresaZ] : []),
+            ])];
+            if (adresy.length <= 600) {
+              const polohy = await geokodujVse(planovac.geokoder, adresy);
+              oznaceni.prejezdy = { polohy, km: (a, b) => planovac.vzdalenosti.km(a, b), cil: adresaZ ? polohy.get(adresaZ) ?? null : null };
+            }
+          } catch {
+            // bez přejezdů – mřížka se zobrazí i tak
           }
         }
         // žádný doporučený slot v zobrazeném období → rovnou přepnout na den nejlepšího doporučení
