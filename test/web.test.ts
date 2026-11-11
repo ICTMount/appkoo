@@ -156,8 +156,8 @@ describe("webový server", () => {
     // kombinovaná objednávka FTTH + IPTV + MESH: žlutý štítek v hlavičce, pruh s pokyny a řádek P8
     expect(hd).toContain('class="kombi"');
     expect(hd).toContain("FTTH + IPTV (1× set-top box) + MESH (1)");
-    expect(hd).toContain("Kombinovaná objednávka");
-    expect(hd).toContain("pouze z MWF app");
+    expect(hd).toContain("pouze z MWF app"); // pokyny jsou v titulku štítku, žádný pruh navíc
+    expect(hd).not.toContain("kombi-pruh");
     expect(hd).toContain("P8: Základní produkt");
     const a1 = await get("/zakazka/A1", "davidh@ictmount.com");
     expect(a1.headers.get("content-security-policy")).toContain("frame-src https://www.google.com");
