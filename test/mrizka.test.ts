@@ -45,6 +45,7 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(m.sloupce[0]!.pod[0]!.bloky[0]!.nazev).toBe("FTTH O-8559960553 Eckhardt"); // bez jména technika a SLA
     expect(m.sloupce[0]!.pod[0]!.bloky[0]).toMatchObject({ ulice: "", cast: "Praha 13 Stodůlky" });
     expect(m.sloupce[0]!.pod[0]!.bloky[0]!.plnyNazev).toContain("SLA 20.11.2026"); // detail má vše
+    expect(m.sloupce[0]!.pod[0]!.bloky[1]!.nazev).toBe("Vajc - VOLNY"); // VOLNY se nezkracuje ani v hustém režimu
     expect(pondeli("2026-11-22")).toBe("2026-11-16");
     expect(rozsahMrizky({ pohled: "tyden", den: "2026-11-18" }).dny.length).toBe(7);
   });
@@ -52,7 +53,7 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
   it("jen VOLNY: zůstanou jen volné sloty, technici bez volna zmizí; výběr techniků", () => {
     const d = sestavMrizku(UD, T, volby({ jenVolny: true }));
     expect(d.sloupce.map((s) => s.nadpis)).toEqual(["Vajc"]);
-    expect(d.sloupce[0]!.pod[0]!.bloky.map((b) => [b.nazev, b.cas])).toEqual([["Vajc", "10:00 – 12:00"], ["Vajc", "12:00 – 13:30"]]);
+    expect(d.sloupce[0]!.pod[0]!.bloky.map((b) => [b.nazev, b.cas])).toEqual([["Vajc - VOLNY", "10:00 – 12:00"], ["Vajc - VOLNY", "12:00 – 13:30"]]); // v hlavičce vždy „technik - VOLNY“
     const t = sestavMrizku(UD, T, volby({ pohled: "tyden", jenVolny: true }));
     expect(t.sloupce.map((s) => s.pod.length)).toEqual([1, 0, 0, 0, 0, 0, 0]);
     expect(sestavMrizku(UD, T, volby({ vybrani: ["Anton Hristov"] })).sloupce.map((s) => s.nadpis)).toEqual(["Hristov"]);

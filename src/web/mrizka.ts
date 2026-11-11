@@ -179,7 +179,8 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
             volny,
             bg,
             fg: barvaTextu(bg),
-            nazev: v.jenVolny ? p.t.nazevVKalendari : husta ? kratky : u.summary,
+            // VOLNY má v hlavičce vždy celý název ze zdroje („Kostal - VOLNY“), zkracují se jen zakázky v hustém režimu
+            nazev: volny || !husta ? u.summary : kratky,
             cas: `${hm(u.od)} – ${hm(u.do)}`,
             ulice: husta && adr.cast ? "" : adr.ulice,
             cast: adr.cast,
