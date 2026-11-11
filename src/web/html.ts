@@ -84,7 +84,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}.P0{background:var(--p0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}.pred-rfs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#283593;color:#fff;vertical-align:middle;margin-top:4px}.pred-rfs-pruh{border-left:4px solid #283593;background:rgba(40,53,147,.08);color:var(--text)}.kombi{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#fdd835;color:#000;border:1px solid #c6a700;vertical-align:middle;margin-top:4px}form.inline{display:inline}h1 button.mala{font-size:12px;font-weight:600;padding:2px 8px;vertical-align:middle}.ok-text{color:#2e7d32;font-weight:600}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
+.card h2{font-size:14px;margin:0 0 8px}.zdr{display:inline-block;font-size:10.5px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;margin-left:8px;white-space:nowrap;vertical-align:middle;text-transform:none;letter-spacing:0;line-height:1.5}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}.pred-rfs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#283593;color:#fff;vertical-align:middle;margin-top:4px}.pred-rfs-pruh{border-left:4px solid #283593;background:rgba(40,53,147,.08);color:var(--text)}.kombi{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#fdd835;color:#000;border:1px solid #c6a700;vertical-align:middle;margin-top:4px}form.inline{display:inline}h1 button.mala{font-size:12px;font-weight:600;padding:2px 8px;vertical-align:middle}.ok-text{color:#2e7d32;font-weight:600}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy input{vertical-align:middle;margin:0 2px 0 0}.prilohy .na-disku{color:#2e7d32;text-decoration:none;font-weight:600}.ulozit-prilohy{margin-top:8px}nav.strankovani{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 4px;font-size:14px}nav.strankovani a,nav.strankovani b,nav.strankovani span{display:inline-block;min-width:30px;padding:6px 8px;text-align:center;border:1px solid var(--line);border-radius:6px}nav.strankovani b{background:var(--accent);color:#fff;border-color:var(--accent)}nav.strankovani a{text-decoration:none}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
@@ -337,6 +337,19 @@ export function barVytizeni(v: VytizeniDne, zvyraznit?: string): string {
 
 export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CETIN|VDF)$/.test(i) ? i : "jin")}" title="P17: Vlastník sítě">${esc(i || "?")}</span>`;
 
+/** Štítek „zdroj: …“ u nadpisu – odkud informace v kartě pochází (MWF, notifikační PDF, Google Kalendář, …) */
+export const zdr = (zdroj: string) => `<span class="zdr" title="Zdroj informace">zdroj: ${esc(zdroj)}</span>`;
+export const ZDROJ = {
+  mwf: "MWF export",
+  poznamka: "MWF poznámka",
+  pdf: "notifikační PDF (MWF)",
+  gcal: "Google Kalendář techniků",
+  gmail: "Gmail tmcz01",
+  chat: "Google Chat",
+  disk: "Google Disk",
+  appkoo: "výpočet AppKoo",
+} as const;
+
 export function stranka(titulek: string, uzivatel: string, stav: StavImportu, telo: string, o: { zalozka?: Zalozka; dotaz?: string } = {}): string {
   const zal = o.zalozka ?? "zakazka";
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -381,7 +394,7 @@ export function strankaVysledku(
   const od = sp.celkem ? (sp.strana - 1) * sp.naStranku + 1 : 0;
   const doN = Math.min(sp.celkem, sp.strana * sp.naStranku);
   const pocet = sp.stran > 1 ? `${od}–${doN} z ${sp.celkem} zakázek` : `${sp.celkem} zakázek`;
-  const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${pocet}</small></h1>
+  const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${pocet}</small>${zdr(ZDROJ.mwf)}</h1>
 <div class="tbl"><table><thead><tr><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th>${prioTh()}</tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF (otevřených i uzavřených) nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
 ${strankovaniNav(dotaz, sp.strana, sp.stran)}
@@ -448,7 +461,7 @@ ${priebeh()}
 ${predpisyNotifikace(n)}
 <h3>Zoznam KZ</h3>
 <dl>${radek("Zařízení", zarizeniNotifikace(n.zariadenia))}${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${n.zariadenia?.length ? "" : radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>`;
-  return `<div class="card kompakt notif"><h2 class="s-ikonou"><span class="i-drive">${IKONA.drive}</span>Výpis z notifikačního PDF${n ? ` <small class="muted">${esc(n.nazev)} · ${esc(fmtDate(n.vznik))} · ${odkaz}</small>` : ""}</h2><div class="posun">${telo}</div></div>`;
+  return `<div class="card kompakt notif"><h2 class="s-ikonou"><span class="i-drive">${IKONA.drive}</span>Notifikační PDF${zdr(ZDROJ.pdf)}${n ? ` <small class="muted">${esc(n.nazev)} · ${esc(fmtDate(n.vznik))} · ${odkaz}</small>` : ""}</h2><div class="posun">${telo}</div></div>`;
 }
 
 /** Instalovali jsme v lokalitě: null nalezy = adresa bez ulice a čísla popisného */
@@ -520,7 +533,7 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
 
   const adresa = [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
   const mapa = adresa
-    ? `<div class="card"><h2>Adresa a mapa</h2><div>${esc(adresa)}${mc(adresa, plan.casti)}</div>
+    ? `<div class="card"><h2>Adresa a mapa${zdr("MWF export · Google Mapy")}</h2><div>${esc(adresa)}${mc(adresa, plan.casti)}</div>
 <iframe class="mapa" title="Mapa" loading="lazy" referrerpolicy="no-referrer" src="https://www.google.com/maps?q=${esc(encodeURIComponent(adresa))}&amp;z=15&amp;output=embed"></iframe>
 <div><a href="https://www.google.com/maps/search/?api=1&amp;query=${esc(encodeURIComponent(adresa))}" target="_blank" rel="noopener">Google Mapy</a> · <a href="https://mapy.cz/zakladni?q=${esc(encodeURIComponent(adresa))}" target="_blank" rel="noopener">Mapy.cz</a></div></div>`
     : "";
@@ -550,15 +563,15 @@ ${(() => { const p = instalacePredRfs(z, now); return p ? pruhPredRfs(p, false) 
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 ${plan.zprava ? `<div class="ok">${esc(plan.zprava)}</div>` : ""}
 <div class="grid">
-<div class="card"><h2>Zákazník</h2><dl>
+<div class="card"><h2>Zákazník${zdr(ZDROJ.mwf)}</h2><dl>
 ${radek("Zákazník", esc(z.zakaznik))}
 ${radek("Kontakt", z.telefony.map((t) => `<a href="tel:${esc(t.replace(/\s/g, ""))}">${esc(t)}</a>`).join(", "))}
 ${radek("Adresa / PSČ", esc(adresa) + mc(adresa, plan.casti))}
 ${radek("Subregion", esc(z.subregion))}
 ${radek("Produkt", esc(z.produkt))}
 </dl></div>
-<div class="card"><h2>Zakázka</h2><dl>
-${radek("Stav", esc(z.stavMwf))}
+<div class="card"><h2>Zakázka${zdr(ZDROJ.mwf)}</h2><dl>
+${radek("Stav MWF", esc(z.stavMwf))}
 ${radek("Pracovní zdroj", esc(z.technik))}
 ${radek("Čas postoupení dod.", esc(dt(z.prideleno)))}
 ${radek("Výsledek dojednávání", esc(z.vysledek ?? ""))}
@@ -566,7 +579,7 @@ ${radek("Do splnění", slaText)}
 ${radek("Dohodnutý termín", esc(z.termin ? `${dt(z.termin.od)} – ${fmtTime(z.termin.do)}` : ""))}
 ${radek("Důvod parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniNestandardni && `nestandardní: ${z.parkovaniNestandardni}`].filter(Boolean).join(" · ")))}
 ${radek("P17: Vlastník sítě", infraStitek(z.infrastruktura))}
-${plan.iru ? radek("IRU lokalita", `<span class="iru"><b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
+${plan.iru ? radek("IRU lokalita", `<span class="iru"><small class="muted">číselník AppKoo ·</small> <b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
 ${radek("Typ aktivity", `${esc(z.typAktivity)}${predobjStitek(z)}`)}
 ${radek("P3: Typ balíčku", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
 ${radek("P8: Základní produkt", esc(z.zakladniProdukt) || `<span class="muted">neuvedeno</span>`)}
@@ -574,7 +587,7 @@ ${z.kategorieTt ? radek("P9: Kategorie TT", `<small>${esc(z.kategorieTt)}</small
 ${prioritySvisible ? radek("Priorita", `${prio(d.priorita)} ${esc(d.duvod)}`) : ""}
 ${radek("Preferované datum", esc(den(z.preferovanyDatum)))}
 ${radek("Datum RFS", esc(den(z.rfs)))}
-${plan.slozka?.zapnuto ? radekOddeleny("Dokumenty", plan.slozka.zaznam
+${plan.slozka?.zapnuto ? radekOddeleny("Složka zakázky (Disk)", plan.slozka.zaznam
     ? `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">otevřít složku na Disku</a> <small class="muted">${esc(plan.slozka.zaznam.cesta)}${plan.prilohy?.ulozene.size ? ` · ${plan.prilohy.ulozene.size} ${plan.prilohy.ulozene.size === 1 ? "soubor" : plan.prilohy.ulozene.size < 5 ? "soubory" : "souborů"} z AppKoo` : ""}</small>`
     : plan.slozka.smiZalozit
       ? `<form method="post" action="/zakazka/${encodeURIComponent(z.idAktivity)}/slozka" class="inline"><button class="btn maly">Založit složku</button> <small class="muted">${esc(`${slozkaTyden(z.termin?.od ?? new Date())} / APPKOO / ${nazevSlozkyZakazky(z.idObjednavkyZaklad)}`)}</small></form>`
@@ -583,28 +596,28 @@ ${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
 </dl></div>
 ${mapa}
 </div>
-${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity se stejným ID obj. v ext. systému</h2>${d.souvisejici
+${d.souvisejici.length ? `<div class="card" style="margin-top:12px"><h2>Další aktivity zakázky <small class="muted">stejné ID obj. v ext. systému</small>${zdr(ZDROJ.mwf)}</h2>${d.souvisejici
     .map((s) => `<div>ID aktivity <a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> · ${esc(s.typ_aktivity)} · ${esc(s.stav_mwf)}${s.uzavreno ? " · uzavřeno" : ""}</div>`)
     .join("")}</div>` : ""}
-<div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
+<div class="card scroll" style="margin-top:12px"><h2>Poznámka MWF <small class="muted">nejnovější nahoře</small>${zdr(ZDROJ.poznamka)}</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
 ${sekceZdroju(zdroje, plan.prilohy)}
 <div class="grid tretiny" style="margin-top:12px">
 ${sekceNotifikace(d.notifikace)}
-<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
+<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě${zdr(ZDROJ.gcal)}</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 <div class="sloupec">
-<div class="card kompakt"><h2>Kontaktování</h2><div class="posun maly"><dl>
-${radek("Stav", esc(stavKontaktu(d, now)))}
+<div class="card kompakt"><h2>Kontaktování${zdr("MWF poznámka · vyhodnocení AppKoo")}</h2><div class="posun maly"><dl>
+${radek("Stav kontaktování", esc(stavKontaktu(d, now)))}
 ${radek("Další kontakt", esc(denIso(d.dalsiKontakt)))}
 ${radek("Navolané dny", esc(`${d.plan.navolaneDny} (cíl ${d.plan.pokusuDenne} pokus/y denně)`))}
 ${radek("SMS", esc(`odesláno ${d.plan.sms.odeslano}${d.plan.sms.doporucena ? " · doporučena další" : ""}${d.plan.sms.nejdrive ? ` · nejdřív ${dt(d.plan.sms.nejdrive)}` : ""}`))}
 ${radek("Pokusy", esc(pokusy.map((p) => `${dt(p.at)} ${p.dovolano ? "dovoláno" : "nedovoláno"}${p.sms ? " + SMS" : ""}`).join("; ")))}
 ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </dl></div></div>
-<div class="card kompakt"><h2>Historie změn mezi exporty</h2><div class="posun maly">${historieHtml}</div></div>
+<div class="card kompakt"><h2>Historie změn <small class="muted">mezi exporty</small>${zdr("MWF exporty")}</h2><div class="posun maly">${historieHtml}</div></div>
 </div>
 </div>
 ${plan.jenNahled ? "" : `<div class="konec-detailu"></div>
-<section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
+<section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small>${zdr(ZDROJ.gcal)}</h2>
 ${sekcePlanovani(d, plan)}</section>`}`;
 
   // Technik v terénu: zákazník, adresa, telefon, patro/byt, předpis – to vše má v události v kalendáři.
@@ -615,20 +628,20 @@ ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${(() => { const p = instalacePredRfs(z, now); return p ? pruhPredRfs(p, true) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
-<div class="card"><dl>
+<div class="card"><h2>Zakázka${zdr(ZDROJ.mwf)}</h2><dl>
 ${radek("Stav MWF", esc(z.stavMwf))}
 ${radek("Dohodnutý termín", esc(z.termin ? `${dt(z.termin.od)} – ${fmtTime(z.termin.do)}` : ""))}
 ${radek("Důvod parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniNestandardni && `nestandardní: ${z.parkovaniNestandardni}`].filter(Boolean).join(" · ")))}
-${plan.iru ? radek("IRU lokalita", `<span class="iru"><b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
+${plan.iru ? radek("IRU lokalita", `<span class="iru"><small class="muted">číselník AppKoo ·</small> <b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
 ${radek("Marné výjezdy", z.pocetMv ? esc(String(z.pocetMv)) : "")}
-${plan.slozka?.zaznam ? radek("Dokumenty", `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">složka zakázky na Disku</a>`) : ""}
+${plan.slozka?.zaznam ? radek("Složka zakázky (Disk)", `<a href="${esc(plan.slozka.zaznam.odkaz)}" target="_blank" rel="noopener">otevřít složku na Disku</a>`) : ""}
 ${d.souvisejici.length ? radek("Další aktivity", d.souvisejici.map((s) => `<a href="/zakazka/${encodeURIComponent(s.id_aktivity)}">${esc(s.id_aktivity)}</a> ${esc(s.typ_aktivity)}${s.uzavreno ? " (uzavřeno)" : ""}`).join("<br>")) : ""}
 </dl></div>
-<div class="card scroll" style="margin-top:12px"><h2>Poznámka (nejnovější nahoře)</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
+<div class="card scroll" style="margin-top:12px"><h2>Poznámka MWF <small class="muted">nejnovější nahoře</small>${zdr(ZDROJ.poznamka)}</h2>${zaznamy || `<span class="muted">bez záznamů</span>`}${z.uvodPoznamky ? `<div class="zaznam"><div class="hl"><b>Úvod poznámky</b></div>${esc(z.uvodPoznamky)}</div>` : ""}</div>
 ${sekceZdroju(zdroje ? [...zdroje].sort((a, b) => PORADI_TECHNIK[a.zdroj] - PORADI_TECHNIK[b.zdroj]) : zdroje, plan.prilohy)}
 <div class="grid" style="margin-top:12px">
 ${sekceNotifikace(d.notifikace)}
-<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
+<div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě${zdr(ZDROJ.gcal)}</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 </div>`;
 
   return stranka(z.idObjednavky || z.idAktivity, uzivatel, stav, plan.jenNahled ? teloTechnik : telo, { dotaz: z.idObjednavky || z.idAktivity });
@@ -647,7 +660,8 @@ const IKONA: Record<Zdroj | "drive", string> = {
   chat: svg('<path d="M4 5h16v11H9l-5 4z"/>'),
 };
 
-const NAZEV_ZDROJE: Record<Zdroj, string> = { email: "E-mail (koordinace)", kalendar: "Kalendáře techniků", chat: "Google Chat" };
+const NAZEV_ZDROJE: Record<Zdroj, string> = { email: "E-mail", kalendar: "Události v kalendářích techniků", chat: "Chat" };
+const ZDROJ_NALEZU: Record<Zdroj, string> = { email: ZDROJ.gmail, kalendar: ZDROJ.gcal, chat: ZDROJ.chat };
 
 function nalez(n: Nalez, u?: UkladaniPriloh): string {
   return `<div class="zaznam${n.veVlakne ? " muted" : ""}"><div class="hl"><b>${odkazyOId(esc(n.titulek))}</b>${n.cas ? ` · ${esc(dt(n.cas))}` : ""}${
@@ -694,7 +708,7 @@ const odkazyOId = (html: string) => html.replace(/O-\d{8,}/g, (o) => `<a href="/
 
 /** Nálezy z e-mailu, kalendářů a chatu – každý zdroj vlastní karta, chyba zdroje nezablokuje ostatní */
 export function sekceZdroju(zdroje: VysledekZdroje[] | null, u?: UkladaniPriloh): string {
-  if (!zdroje) return `<div class="card" style="margin-top:12px"><h2>Ostatní zdroje</h2><span class="muted">Hledání v e-mailu, kalendářích a chatu zatím není zapnuté (chybí delegace účtu tmcz01).</span></div>`;
+  if (!zdroje) return `<div class="card" style="margin-top:12px"><h2>E-mail, kalendáře, Chat</h2><span class="muted">Hledání v e-mailu, kalendářích a chatu zatím není zapnuté (chybí delegace účtu tmcz01).</span></div>`;
   const kUlozeni = !!u?.smiUkladat && zdroje.some((v) => v.nalezy.slice(0, 30).some((n) => n.prilohy?.some((p) => !u.ulozene.has(klicPrilohy(p.ref)))));
   return `<div class="grid" style="margin-top:12px">${zdroje
     .map((v) => {
@@ -704,7 +718,7 @@ export function sekceZdroju(zdroje: VysledekZdroje[] | null, u?: UkladaniPriloh)
           ? v.nalezy.slice(0, 30).map((n) => nalez(n, u)).join("") + (v.nalezy.length > 30 ? `<p class="muted">… a dalších ${v.nalezy.length - 30}</p>` : "")
           : `<span class="muted">nic nenalezeno</span>`;
       // dlouhý seznam (hlavně e-mail) se neroztahuje přes celou stránku – roluje uvnitř karty
-      return `<div class="card kompakt"><h2 class="s-ikonou"><span class="i-${v.zdroj}">${IKONA[v.zdroj]}</span>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}</h2><div class="posun zdroj">${obsah}</div></div>`;
+      return `<div class="card kompakt"><h2 class="s-ikonou"><span class="i-${v.zdroj}">${IKONA[v.zdroj]}</span>${esc(NAZEV_ZDROJE[v.zdroj])}${v.nalezy.length ? ` <small class="muted">${v.nalezy.length}</small>` : ""}${zdr(ZDROJ_NALEZU[v.zdroj])}</h2><div class="posun zdroj">${obsah}</div></div>`;
     })
     .join("")}</div>${
     kUlozeni
@@ -728,7 +742,7 @@ const slot = (od: Date, do_: Date) => `${denTydne(od)} ${fmtDate(od)} ${fmtTime(
 function hlavickaZakazky(d: Detail): string {
   const z = d.z;
   return `<p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← ${esc(z.idObjednavky || z.idAktivity)}</a></p>
-<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z, d.notifikace)}${predobjStitek(z)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
+<h1>Termín zapsán – ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z, d.notifikace)}${predobjStitek(z)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
 }
 
 
@@ -934,8 +948,8 @@ function sekceOkoli(o: OkoliZapisu, vyb: { t: string; e: string; od: Date; do: D
     return `<iframe class="mapa trasa-mapa" title="Trasa technika" loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}"></iframe>`;
   })();
   const legenda = zastavky.map((z, i) => `<div class="${z.tato ? "zast tato" : "zast"}">${cislo(i + 1, z.tato)} <b>${pismeno(i + 1)}</b> · ${fmtTime(z.od)} · ${esc(z.adresa)}</div>`).join("");
-  return `<div class="gc-den"><h2>${esc(vyb.t)} · ${esc(den)}</h2>${udalosti}</div>
-<div class="gc-den"><h2>Trasa technika <small class="muted">${esc(den)}, orientačně podle času zakázek · číslo = pořadí, písmeno = bod na mapě</small></h2>${mapa}<div class="legenda">${legenda}</div></div>`;
+  return `<div class="gc-den"><h2>Den technika <small class="muted">${esc(vyb.t)} · ${esc(den)}</small>${zdr(ZDROJ.gcal)}</h2>${udalosti}</div>
+<div class="gc-den"><h2>Trasa technika <small class="muted">${esc(den)}, orientačně podle času zakázek · číslo = pořadí, písmeno = bod na mapě</small>${zdr("Google Kalendář techniků · Google Mapy")}</h2>${mapa}<div class="legenda">${legenda}</div></div>`;
   void okoli;
 }
 
@@ -961,7 +975,7 @@ export function strankaZapsano(
   const telo = `${hlavickaZakazky(d)}
 <div class="ok"><b>Termín zapsán do kalendáře:</b> ${esc(technik)} · ${esc(slot(od, do_))}${odkaz ? ` · <a href="${esc(odkaz)}" target="_blank" rel="noopener">otevřít v kalendáři</a>` : ""}</div>
 ${presun ? `<div class="${presun.ok ? "ok" : "err"}">${esc(presun.zprava)}</div>` : ""}
-<div class="card"><h2>Teď zapište do MWF (Dojednávania)</h2><p class="muted">MWF zůstává hlavní evidencí – zkopírujte řádek a uložte termín v MWF. Po dalším importu aplikace zkontroluje shodu MWF ↔ kalendář.</p>
+<div class="card"><h2>Zápis do MWF <small class="muted">Dojednávania – zkopírovat ručně</small></h2><p class="muted">MWF zůstává hlavní evidencí – zkopírujte řádek a uložte termín v MWF. Po dalším importu aplikace zkontroluje shodu MWF ↔ kalendář.</p>
 <pre class="mwf">${esc(mwf)}</pre></div>
 <p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← Zpět na zakázku</a> · <a href="/technik">Doplnit technika</a></p>`;
   return stranka("Termín zapsán", uzivatel, stav, telo);
@@ -1036,7 +1050,7 @@ ${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← ${kr
   let horni = "";
   if (s.technik) {
     const t = s.technik;
-    horni = `<h1>${esc(t.jmeno)} <small>${esc(t.skupiny.join(", "))} · výjezd ${esc(t.vyjezd)}${t.vyjezd2 ? ` / ${esc(t.vyjezd2)}` : ""}</small></h1>
+    horni = `<h1>${esc(t.jmeno)} <small>${esc(t.skupiny.join(", "))} · výjezd ${esc(t.vyjezd)}${t.vyjezd2 ? ` / ${esc(t.vyjezd2)}` : ""}</small>${zdr(ZDROJ.gcal)}</h1>
 ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
 <div class="tyden">${s.dny
       .map((d) => {
@@ -1069,7 +1083,7 @@ ${s.chyba ? `<div class="err">${esc(s.chyba)}</div>` : ""}
       return `<tr><td><a href="/technik?t=${encodeURIComponent(d.technik.jmeno)}&den=${esc(s.den)}"><b>${esc(d.technik.jmeno)}</b></a><br><small class="muted">${esc(d.technik.skupiny.join(", "))}</small>${barVytizeni(vytizeniDne([...d.zakazky, ...d.volne, ...d.vyhrazene], d.technik.jmeno, s.den))}</td>
 <td class="nowrap">${d.zakazky.length}</td><td class="nowrap">${d.volne.length}</td><td>${osa || `<span class="muted">prázdný den</span>`}</td></tr>`;
     });
-    horni = `<h1>Doplnit technika <small>přehled ${esc(DNY_DLOUHE(s.den))} ${esc(fmtDate(s.den))} – od nejméně vytížených</small></h1>
+    horni = `<h1>Doplnit technika <small>přehled ${esc(DNY_DLOUHE(s.den))} ${esc(fmtDate(s.den))} – od nejméně vytížených</small>${zdr(ZDROJ.gcal)}</h1>
 ${s.prehled.nedostupne.length ? `<div class="warn">Kalendář nejde přečíst: ${esc(s.prehled.nedostupne.join(", "))}.</div>` : ""}
 <div class="tbl"><table><thead><tr><th>Technik</th><th>Zakázek</th><th>Volných</th><th>Den – zakázky a volné sloty podle času</th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="4" class="muted">Žádný technik s čitelným kalendářem (zkontrolujte číselník Technici).</td></tr>`}</tbody></table></div>`;
@@ -1120,7 +1134,7 @@ ${prioTd(n.kandidat.priorita)}
     v.bezPolohy ? `${v.bezPolohy} kandidátů nemá adresu dohledatelnou na mapě.` : "",
     v.bezPolohyVeDni ? `${v.bezPolohyVeDni} zakázek ve dni technika nemá dohledatelnou adresu – v trase chybí.` : "",
   ].filter(Boolean);
-  return `<h2 class="sekce">Zakázky do slotu ${esc(slot(vyb.od, vyb.do))} · ${esc(vyb.technik.jmeno)}</h2>
+  return `<h2 class="sekce">Zakázky do slotu ${esc(slot(vyb.od, vyb.do))} · ${esc(vyb.technik.jmeno)}${zdr("MWF export · km odhad AppKoo")}</h2>
 ${v.den.length ? barVytizeni(vytizeniDne(v.den, vyb.technik.jmeno, isoDate(vyb.od)), vyb.eventId) : ""}
 ${v.chyba ? `<div class="err">${esc(v.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}

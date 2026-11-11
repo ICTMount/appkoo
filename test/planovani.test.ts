@@ -307,7 +307,8 @@ describe("web: nabídka a zápis termínu", () => {
     const kal = await w.get("/kalendar?z=P1&pohled=tyden");
     expect(kal.status).toBe(200);
     const kalHtml = await kal.text();
-    expect(kalHtml).toContain("Kalendáře techniků");
+    expect(kalHtml).toContain("Kalendář techniků");
+    expect(kalHtml).toContain("zdroj: MWF export");
     expect(kalHtml).toContain('name="z" value="P1"');
     // kombinovaná objednávka → kalendář: POST projde (ne 405), cizí původ 403, běžná FTTH zakázka 400
     expect((await w.post("/zakazka/P1/kombinace-kalendar", {}, null)).status).toBe(403);
@@ -410,9 +411,10 @@ describe("uživatelé a Konfigurace", () => {
     expect(t).not.toContain("Kam naplánovat");
     expect(t).not.toContain("Doplnit technika");
     // technik vidí jen to, co není v události kalendáře: bez karty Zákazník, Kontaktování a mapy; poznámka a zdroje ano
-    expect(t).not.toContain("<h2>Zákazník</h2>");
+    expect(t).not.toContain("<h2>Zákazník");
     expect(t).not.toContain("Kontaktování");
-    expect(t).toContain("Poznámka (nejnovější nahoře)");
+    expect(t).toContain("Poznámka MWF");
+    expect(t).toContain("zdroj: MWF poznámka");
     expect((await w.get("/technik", "hristov@ictmount.com")).status).toBe(403);
     expect((await w.get("/zakazka/P1/zapis?k=K1&e=v1&t=Hristov&od=2026-10-16T10:00:00.000Z&do=2026-10-16T12:00:00.000Z", "hristov@ictmount.com")).status).toBe(403);
     expect(await (await w.get("/zakazka/P1", "jana@ictmount.com")).text()).toContain("Kam naplánovat");

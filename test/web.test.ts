@@ -166,7 +166,7 @@ describe("webový server", () => {
     expect(h1).toContain("P3: Typ balíčku");
     expect(h1).not.toContain('class="kombi"'); // běžná FTTH bez štítku
     expect(h1).toContain("https://www.google.com/maps?q=Prav%C3%A1%201%2C%20Praha");
-    expect(h1.indexOf("Poznámka (nejnovější")).toBeLessThan(h1.indexOf("Kontaktování"));
+    expect(h1.indexOf("Poznámka MWF")).toBeLessThan(h1.indexOf("Kontaktování"));
     const hledani = await get("/?q=O-8550000003", "davidh@ictmount.com");
     expect(hledani.status).toBe(302);
     expect(hledani.headers.get("location")).toBe("/zakazka/A3");

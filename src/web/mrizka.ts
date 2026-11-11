@@ -315,7 +315,7 @@ button,input{font:inherit}
 .k-panel>*{flex-shrink:0}
 .k-panel>b{font-weight:600;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px}
 .k-panel .k-tl{justify-content:center;margin-top:8px;cursor:pointer;font-size:13px}
-.k-pozn{color:var(--muted);font-size:12px;margin-top:8px}
+.k-pozn{color:var(--muted);font-size:12px;margin-top:8px}.zdr{display:inline-block;font-size:10.5px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;white-space:nowrap;line-height:1.5}
 .k-panel label small{display:block;color:var(--muted);font-size:11px;line-height:1.15}
 .k-panel label>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mm{margin:2px 0 8px;font-size:12px}
@@ -513,7 +513,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const slaText = (t: Date) => `${DNY_KR[t.getUTCDay()]!.toLowerCase()} ${t.getUTCDate()}.${t.getUTCMonth() + 1}. ${hm(t)}`;
   const adrZ = z ? castAdresy(z.adresa) : null;
   const pruh = z
-    ? `<div class="k-zakazka"><h2>Kam naplánovat <small><a href="/zakazka/${encodeURIComponent(z.idAktivity)}" title="Zpět na detail zakázky">${esc(z.oid)}</a>${z.zakaznik ? ` · ${esc(z.zakaznik)}` : ""}</small><a class="k-tl" href="/zakazka/${encodeURIComponent(z.idAktivity)}">← Detail zakázky</a></h2>
+    ? `<div class="k-zakazka"><h2>Kam naplánovat <small><a href="/zakazka/${encodeURIComponent(z.idAktivity)}" title="Zpět na detail zakázky">${esc(z.oid)}</a>${z.zakaznik ? ` · ${esc(z.zakaznik)}` : ""}</small><span class="zdr" title="Zdroj informace">zdroj: MWF export</span><a class="k-tl" href="/zakazka/${encodeURIComponent(z.idAktivity)}">← Detail zakázky</a></h2>
 ${z.infra ? `<span class="infra i-${esc(z.infra)}">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => (typeof x === "string" ? { text: x, druh: "kombi" } : x)).map((x) => `<span class="st st-${x.druh}">${esc(x.text)}</span>`).join("")}
 ${z.telefon ? `<span><a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a></span>` : ""}
 <span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
@@ -545,11 +545,11 @@ ${pruh}
 <form class="k-panel" method="get" action="/kalendar"><input type="hidden" name="pohled" value="${v.pohled}"><input type="hidden" name="den" value="${v.den}">${z ? `<input type="hidden" name="z" value="${esc(z.idAktivity)}">` : ""}${v.navrh && z ? `<input type="hidden" name="navrh" value="1">` : ""}
 ${miniMesic(v, dnes)}
 <label style="font-weight:500"><input type="checkbox" name="volne" value="1"${v.jenVolny ? " checked" : ""} style="accent-color:#0b8043">Jen VOLNY</label>
-<b>Kalendáře techniků</b>
+<b>Technici</b>
 ${s.technici.map((t) => `<label><input type="checkbox" name="t" value="${esc(t.jmeno)}"${vybrano(t) ? " checked" : ""} style="accent-color:${s.barvy.get(t.kalendar) ?? VYCHOZI_BARVA}"><span title="${esc(t.vyjezd ? `výjezd: ${t.vyjezd}` : t.jmeno)}">${esc(t.jmeno)}${t.vyjezd ? `<small>${esc(t.vyjezd)}</small>` : ""}</span></label>`).join("\n")}
 <button class="k-tl" type="submit">Zobrazit výběr</button>
 ${navrhy}
-<div class="k-pozn">Data z Google Kalendářů techniků (účet tmcz01). ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
+<div class="k-pozn">Zdroj: Google Kalendář techniků (účet tmcz01); km přejezdů = odhad AppKoo. ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
 <div class="k-pozn">${esc(s.uzivatel)}</div>
 </form>
 <div class="k-mriz${v.navrh && m.sloupce.some((sl) => sl.pod.some((p) => p.bloky.some((b) => b.navrh))) ? " s-navrhem" : ""}">${mrizka}</div>
