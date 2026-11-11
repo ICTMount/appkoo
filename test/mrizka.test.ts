@@ -37,7 +37,9 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
 
   it("týden: 7 dní, v každém vybraní technici vedle sebe; rozsah dne se roztáhne podle událostí; hustý režim zkracuje názvy", () => {
     const m = sestavMrizku(UD, T, volby({ pohled: "tyden", den: "2026-11-18" }));
-    expect(m.sloupce.map((s) => s.nadpis)).toEqual(["Po 16.11.", "Út 17.11.", "St 18.11.", "Čt 19.11.", "Pá 20.11.", "So 21.11.", "Ne 22.11."]);
+    // celý název dne včetně roku; zkrácený jen pro úzký sloupec
+    expect(m.sloupce.map((s) => s.nadpis)).toEqual(["pondělí 16. 11. 2026", "úterý 17. 11. 2026", "středa 18. 11. 2026", "čtvrtek 19. 11. 2026", "pátek 20. 11. 2026", "sobota 21. 11. 2026", "neděle 22. 11. 2026"]);
+    expect(m.sloupce.map((s) => s.kratky)).toEqual(["Po 16.11.", "Út 17.11.", "St 18.11.", "Čt 19.11.", "Pá 20.11.", "So 21.11.", "Ne 22.11."]);
     expect(m.sloupce[0]!.pod.map((p) => p.stitek)).toEqual(["Vajc", "Hristov"]);
     expect(m.podsloupcu).toBe(14);
     expect(m.husta).toBe(true);

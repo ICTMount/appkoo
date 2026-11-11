@@ -162,6 +162,8 @@ export interface BlokMrizky {
 
 export interface SloupecMrizky {
   nadpis: string;
+  /** zkrácený nadpis pro úzký sloupec (týden: „Út 10.11.“ místo „úterý 10. 11. 2026“) */
+  kratky?: string;
   pod: { stitek: string; napoveda: string; bloky: BlokMrizky[] }[];
 }
 
@@ -229,10 +231,11 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
   }
   const delka = konec - start;
   type Pod = { t: TechnikMrizky; den: IsoDate; seznam: UdalostMrizky[] };
-  const skupiny: { nadpis: string; pod: Pod[] }[] =
+  const denCely = (d: IsoDate) => { const t = fromIso(d); return `${DNY[t.getUTCDay()]} ${t.getUTCDate()}. ${t.getUTCMonth() + 1}. ${t.getUTCFullYear()}`; };
+  const skupiny: { nadpis: string; kratky?: string; pod: Pod[] }[] =
     v.pohled === "den"
       ? vyb.map((t) => ({ nadpis: t.nazevVKalendari, pod: [{ t, den: dny[0]!, seznam: podle.get(`${t.kalendar}|${dny[0]}`) ?? [] }] }))
-      : dny.map((d) => ({ nadpis: denKratce(d), pod: vyb.map((t) => ({ t, den: d, seznam: podle.get(`${t.kalendar}|${d}`) ?? [] })) }));
+      : dny.map((d) => ({ nadpis: denCely(d), kratky: denKratce(d), pod: vyb.map((t) => ({ t, den: d, seznam: podle.get(`${t.kalendar}|${d}`) ?? [] })) }));
   // jen VOLNY: technici (den: sloupce, týden: podsloupce) bez volného slotu se nezobrazí
   const filtr = v.jenVolny
     ? (v.pohled === "den" ? skupiny.filter((s) => s.pod[0]!.seznam.length) : skupiny.map((s) => ({ ...s, pod: s.pod.filter((p) => p.seznam.length) })))
@@ -242,6 +245,7 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
   let poradi = 0;
   const sloupce = filtr.map((s) => ({
     nadpis: s.nadpis,
+    ...(s.kratky ? { kratky: s.kratky } : {}),
     pod: s.pod.map((p) => {
       const vlevo = poradi++ >= podsloupcu / 2;
       const prefix = new RegExp(`^${p.t.nazevVKalendari.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*-\\s*`, "i");
@@ -356,6 +360,10 @@ button,input{font:inherit}
 .k-sl{min-width:0;border-left:1px solid var(--line)}
 .k-hl .k-sl{text-align:center;padding:.25em .2em 0}
 .k-hl .k-sl>div:first-child{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-hl .k-sl{container-type:inline-size}
+.k-hl .k-den{font-size:1.15em;font-weight:600;letter-spacing:.06em;padding-bottom:.15em}
+.k-den .d-kr{display:none}
+@container (max-width:190px){.k-den{letter-spacing:0}.k-den .d-dl{display:none}.k-den .d-kr{display:inline}}
 .k-pods{display:flex}
 .k-pods div{flex:1 1 0;min-width:0;font-size:.8em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:.2em}
 /* mřížka po 15 minutách jako v Google Kalendáři: hodina výrazně, čtvrthodiny jemně */
@@ -518,7 +526,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
-<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0"><div>${esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
+<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0"><div${sl.kratky ? ` class="k-den"` : ""}>${sl.kratky ? `<span class="d-dl">${esc(sl.nadpis)}</span><span class="d-kr">${esc(sl.kratky)}</span>` : esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
 <div class="k-grid"><div class="k-osa">${m.hodiny.map((h) => `<div>${h}:00</div>`).join("")}</div>${m.sloupce
         .map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0;background-size:100% ${(100 / m.hodiny.length).toFixed(4)}%,100% ${(25 / m.hodiny.length).toFixed(4)}%">${sl.pod.map((p) => `<div class="k-pod" style="font-size:${pismo}em">${p.bloky.map(blok).join("")}</div>`).join("")}</div>`)
         .join("")}</div></div>`
