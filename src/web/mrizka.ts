@@ -82,6 +82,8 @@ export interface ZakazkaMrizky {
   upozorneni?: string[];
   /** současný termín zakázky (přeplánování) */
   termin?: string;
+  /** dohodnutý termín je jen v MWF, v kalendáři technika chybí (webcalendar) */
+  terminChybi?: boolean;
 }
 
 /** Označení bloků: doporučené sloty našeptávače a současná událost plánované zakázky */
@@ -89,6 +91,8 @@ export interface OznaceniMrizky {
   /** klíč „kalendář|eventId“ */
   navrhy?: Map<string, { poradi: number; duvod: string }>;
   tato?: { kalendar: string; eventId: string } | null;
+  /** dohodnutý termín zakázky, který v kalendáři chybí (webcalendar) – VOLNY sloty, které se s ním kryjí, se označí */
+  dohodnuty?: { od: Date; do: Date } | null;
   /** přejezdy: polohy adres (klíč = adresa události / výjezdu, oříznutá), výpočet km a poloha plánované zakázky */
   prejezdy?: { polohy: Map<string, Bod | null>; km: (a: Bod, b: Bod) => number; minuty?: (a: Bod, b: Bod) => number; cil?: Bod | null };
 }
@@ -148,6 +152,8 @@ export interface BlokMrizky {
   navrh?: { poradi: number; duvod: string };
   /** současná událost plánované zakázky */
   tato?: boolean;
+  /** VOLNY slot, který se kryje s dohodnutým termínem zákazníka (webcalendar) */
+  dohod?: boolean;
   /** přejezd na tuto adresu z předchozí zastávky dne (nebo z výjezdu technika), km */
   prejezd?: { km: number; zVyjezdu: boolean; min?: number };
   /** VOLNY + plánovaná zakázka: přejezd z předchozí zastávky na adresu zakázky a z ní na další zastávku (nebo zpět na výjezd), km */
@@ -275,6 +281,7 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
             doIso: u.do.toISOString(),
             ...(oznaceni.navrhy?.has(`${u.kalendar}|${u.id}`) ? { navrh: oznaceni.navrhy.get(`${u.kalendar}|${u.id}`)! } : {}),
             ...(oznaceni.tato && oznaceni.tato.kalendar === u.kalendar && oznaceni.tato.eventId === u.id ? { tato: true } : {}),
+            ...(volny && oznaceni.dohodnuty && u.od < oznaceni.dohodnuty.do && u.do > oznaceni.dohodnuty.od ? { dohod: true } : {}),
           };
         }), p.t, oznaceni.prejezdy),
       };
@@ -316,7 +323,7 @@ button,input{font:inherit}
 .k-panel>*{flex-shrink:0}
 .k-panel>b{font-weight:600;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px}
 .k-panel .k-tl{justify-content:center;margin-top:8px;cursor:pointer;font-size:13px}
-.k-pozn{color:var(--muted);font-size:12px;margin-top:8px}.zdr{display:inline-block;font-size:10.5px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;white-space:nowrap;line-height:1.5}
+.k-chybi{color:#e5484d;font-weight:600}.k-pozn{color:var(--muted);font-size:12px;margin-top:8px}.zdr{display:inline-block;font-size:10.5px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;white-space:nowrap;line-height:1.5}
 .k-panel label small{display:block;color:var(--muted);font-size:11px;line-height:1.15}
 .k-panel label>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mm{margin:2px 0 8px;font-size:12px}
@@ -398,6 +405,9 @@ button,input{font:inherit}
 .k-dop a b{font-weight:700}
 .k-dop a.jinde{background:#fff}
 .ev.tato .ev-b{outline:3px dashed var(--text);outline-offset:-3px}
+.ev.dohod:not(.navrh) .ev-b{outline:3px solid #fff;outline-offset:-3px;box-shadow:inset 0 0 0 6px #1a73e8}
+.ev.dohod:not(.navrh) .ev-znak{background:#1a73e8;color:#fff}
+.s-navrhem .ev.dohod .ev-b{opacity:1}
 .ev-znak{background:#fff;color:#0b5a2f;font-weight:700;border-radius:1em;padding:0 .5em}
 .k-navrhy{margin:.4em 0 0;padding:0;list-style:none;font-size:.9em}
 .k-navrhy li{margin:.25em 0}
@@ -487,7 +497,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
     const cil = lzePlanovat
       ? `/zakazka/${encodeURIComponent(z!.idAktivity)}/zapis?${new URLSearchParams({ k: b.kalendar, e: b.id, t: b.technik, od: b.odIso, do: b.doIso, ...s.planovani!.navic })}`
       : b.oid ? `/o/${encodeURIComponent(b.oid)}` : b.odkaz;
-    const znak = b.navrh ? `<span class="ev-znak">${m.husta ? `${b.navrh.poradi}.` : `nejoptimálnější ${b.navrh.poradi}`}</span>` : b.tato ? `<span class="ev-znak">tato zakázka</span>` : "";
+    const znak = b.navrh ? `<span class="ev-znak">${m.husta ? `${b.navrh.poradi}.` : `nejoptimálnější ${b.navrh.poradi}`}</span>` : b.tato ? `<span class="ev-znak">tato zakázka</span>` : b.dohod ? `<span class="ev-znak">${m.husta ? "termín" : "termín zákazníka"}</span>` : "";
     const misto = [b.ulice ? esc(b.ulice) : "", b.cast ? `<b>${esc(b.cast)}</b>` : ""].filter(Boolean).join(", ");
     const km = (x: number) => `${x.toFixed(1).replace(".", ",")} km`;
     // přejezdy: zakázka = km z předchozí zastávky; VOLNY = km sem z předchozí a odsud na další (s plánovanou zakázkou)
@@ -504,7 +514,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
       : `<div class="ev-b" tabindex="0" style="${styl}">${obsah}</div>`;
     const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${prejezdDetail}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}${lzePlanovat ? `<div class="r"><b>Klik = naplánovat ${esc(z!.oid)} do tohoto slotu.</b></div>` : ""}${b.navrh ? `<div class="r">Nejoptimálnější ${b.navrh.poradi}: ${esc(b.navrh.duvod)}</div>` : ""}</div>`;
-    return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}"${b.navrh ? ` id="navrh-${b.navrh.poradi}"` : ""} style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
+    return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}${b.dohod ? " dohod" : ""}"${b.navrh ? ` id="navrh-${b.navrh.poradi}"` : ""} style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
@@ -520,7 +530,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
 ${z.infra ? `<span class="infra i-${esc(z.infra)}">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => (typeof x === "string" ? { text: x, druh: "kombi" } : x)).map((x) => `<span class="st st-${x.druh}">${esc(x.text)}</span>`).join("")}
 ${z.telefon ? `<span><a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a></span>` : ""}
 <span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
-${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>` : ""}
+${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? (z.terminChybi ? `<span class="k-chybi">dohodnutý termín <b>${esc(z.termin)}</b> v kalendáři technika chybí – klikněte na VOLNY označený „termín zákazníka“; jiný slot jen po dohodě se zákazníkem</span>` : `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>`) : ""}
 ${v.navrh && (s.navrhy ?? []).length ? `<div class="k-dop"><b>Nejoptimálnější VOLNY:</b>${s.navrhy!.map((n) => `<a class="${dny.includes(n.den) ? "" : "jinde"}" href="${esc(odkaz(v, { pohled: "den", den: n.den }))}#navrh-${n.poradi}" title="${esc(n.duvod)} – klik zobrazí den a slot"><b>${n.poradi}</b> ${esc(denKratce(n.den))} ${esc(n.cas)} · ${esc(n.technik)}</a>`).join("")}<span class="k-sedy">klik zobrazí den technika a doporučený slot</span></div>` : ""}
 ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat: ${z.blokace!.map(esc).join(" · ")}</div>` : ""}${(z.upozorneni ?? []).length ? `<div class="k-upoz">${z.upozorneni!.map(esc).join(" · ")}</div>` : ""}</div>`
     : "";

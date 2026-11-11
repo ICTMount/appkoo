@@ -15,6 +15,7 @@ import type { Fakta, Priorita } from "../domain/priorita.js";
 import { addDays, atTime, isoDate, minutesOfDay } from "../domain/time.js";
 import { isWorkday } from "../domain/workdays.js";
 import { instalacePredRfs, upozorneniPredRfs } from "../domain/predRfs.js";
+import { webcalendar } from "../domain/webcalendar.js";
 import { sestavDny } from "./dny.js";
 import type { Vzdalenosti } from "./geo.js";
 import type { Geokoder } from "./geokod.js";
@@ -373,6 +374,8 @@ export interface NavrhySlotu {
   kandidatu: number;
   /** z toho naplánovaných s poznámkou „flex“, u kterých se našla událost v kalendáři */
   flex: number;
+  /** z toho zakázky z webcalendar, jejichž dohodnutý termín v kalendáři technika chybí */
+  webcal?: number;
   /** kandidáti, jejichž adresu nejde najít na mapě */
   bezPolohy: number;
   /** zakázky ve dni technika bez dohledatelné adresy (v trase chybí) */
@@ -441,26 +444,40 @@ export async function navrhyProSlot(
   if (!s.dny.length) return { ...prazdne, den, chyba: `Technik ${t.jmeno} nemá v číselníku adresu výjezdu (nebo ji nejde najít na mapě).` };
 
   // Kandidáti se správnou dovedností; naplánované jen s termínem po slotu (přesun dopředu)
-  const vhodne = zakazky.filter((k) => t.skupiny.includes(skupinaZakazky(k.z.typAktivity)) && (!k.z.termin || k.z.termin.od > slot.od));
+  // … a zakázky z webcalendar, jejichž dohodnutý termín (ode dne slotu dál) v kalendáři technika chybí
+  const zacatekDne = atTime(datum, 0);
+  const vhodne = zakazky.filter((k) => t.skupiny.includes(skupinaZakazky(k.z.typAktivity)) && (!k.z.termin || k.z.termin.od > slot.od || (k.z.termin.od >= zacatekDne && !!webcalendar(k.z))));
   const bezTerminu = vhodne.filter((k) => !k.z.termin);
   const sTerminem = vhodne.filter((k) => k.z.termin);
 
   // Flex: událost zakázky v kalendářích techniků (do flexDni dní dopředu) + „flex“ v poznámce MWF nebo v události
   const flexKandidati: { k: ZakazkaKDoplneni; presun: NonNullable<Kandidat["presun"]> }[] = [];
+  // Webcalendar: zákazník si termín vybral sám, zakázka přišla s termínem jen v MWF – do kalendáře ji musíme zapsat my
+  const bezUdalosti: { k: ZakazkaKDoplneni; dohodnuty: { od: Date; do: Date } }[] = [];
   let nedostupne: string[] = [];
   if (sTerminem.length) {
     const doData = addDays(datum, opts.flexDni ?? 21);
     const kal = await nactiKalendare(zav.api, technici, atTime(datum, 0), atTime(doData, 0));
     nedostupne = kal.nedostupne;
     const podleO = new Map<string, UdalostTechnika>();
+    const podleAktivity = new Set<string>();
+    const texty: string[] = [];
     for (const u of kal.udalosti) {
       if (jeVolneOkno(u) || jeBlok(u)) continue;
       const o = oCislo(u);
       if (o) podleO.set(o, u);
+      if (u.appkoo) podleAktivity.add(u.appkoo);
+      texty.push(`${u.summary} ${u.description}`);
     }
     for (const k of sTerminem) {
       const u = podleO.get(k.z.idObjednavkyZaklad);
-      if (!u || u.od <= slot.od) continue;
+      if (!u) {
+        // událost se nenašla ani podle O-čísla v textu, ani podle odkazu AppKoo → termín v kalendáři chybí
+        const vKal = podleAktivity.has(k.z.idAktivity) || (!!k.z.idObjednavkyZaklad && texty.some((x) => x.includes(k.z.idObjednavkyZaklad)));
+        if (!vKal && !nedostupne.length && k.z.termin!.od >= zacatekDne && k.z.termin!.od < atTime(doData, 0) && webcalendar(k.z)) bezUdalosti.push({ k, dohodnuty: k.z.termin! });
+        continue;
+      }
+      if (u.od <= slot.od) continue;
       if (!jeFlex(k.z.poznamka) && !jeFlex(`${u.summary} ${u.description}`)) continue;
       const tu = technici.find((x) => x.jmeno === u.technik);
       if (!tu) continue;
@@ -468,17 +485,17 @@ export async function navrhyProSlot(
     }
   }
 
-  const vsichni = [...bezTerminu.map((k) => ({ k, presun: undefined })), ...flexKandidati];
+  const vsichni: { k: ZakazkaKDoplneni; presun?: NonNullable<Kandidat["presun"]> | undefined; dohodnuty?: { od: Date; do: Date } }[] = [...bezTerminu.map((k) => ({ k, presun: undefined })), ...flexKandidati, ...bezUdalosti];
   const body = await geokodujVse(zav.geokoder, vsichni.map((x) => adresaZakazky(x.k.z)).filter(Boolean));
   const kandidati: Kandidat[] = [];
   let bezPolohy = 0;
-  for (const { k, presun } of vsichni) {
+  for (const { k, presun, dohodnuty } of vsichni) {
     const bod = body.get(adresaZakazky(k.z));
     if (!bod) {
       bezPolohy++;
       continue;
     }
-    kandidati.push({ z: k.z, priorita: k.priorita, slaKonec: k.slaKonec, bod, ...(presun ? { presun } : {}) });
+    kandidati.push({ z: k.z, priorita: k.priorita, slaKonec: k.slaKonec, bod, ...(presun ? { presun } : {}), ...(dohodnuty ? { dohodnuty } : {}) });
   }
 
   const okno = { od: minutesOfDay(slot.od), do: minutesOfDay(slot.do) - 1 };
@@ -496,6 +513,7 @@ export async function navrhyProSlot(
     navrhy,
     kandidatu: vsichni.length,
     flex: flexKandidati.length,
+    webcal: bezUdalosti.length,
     bezPolohy,
     bezPolohyVeDni: s.bezPolohy.length,
     den,

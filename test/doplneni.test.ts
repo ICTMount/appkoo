@@ -67,6 +67,17 @@ describe("doplnění slotu (režim B)", () => {
     expect(n[0]!.duvody).toContain("přesun dopředu (flex)");
   });
 
+  it("webcalendar: termín zákazníka chybí v kalendáři – odpovídající slot je první volba, jiný jen po dohodě", () => {
+    const dohodnuty = { od: local(2026, 10, 16, 10, 0), do: local(2026, 10, 16, 12, 0) };
+    const n = doplnSlot(den, okno, [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("WEB", { lat: 50.05, lon: 14.3 }, { dohodnuty })], v);
+    expect(n.map((x) => x.kandidat.z.idAktivity)).toEqual(["WEB", "BLIZKO"]); // i s delším nájezdem jde nahoru
+    expect(n[0]!.duvody.join(" ")).toMatch(/WEBCALENDAR.*tento slot mu odpovídá/);
+    const jindy = { od: local(2026, 10, 19, 14, 0), do: local(2026, 10, 19, 16, 0) };
+    const m = doplnSlot(den, okno, [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("WEB", { lat: 50.05, lon: 14.3 }, { dohodnuty: jindy })], v);
+    expect(m.map((x) => x.kandidat.z.idAktivity)).toEqual(["BLIZKO", "WEB"]);
+    expect(m[1]!.duvody.join(" ")).toMatch(/jiný slot jen po dohodě/);
+  });
+
   it("zvýšit toleranci: zakázka, která by zdržela další termín, se nabídne s upozorněním", () => {
     // slot 10–12, v 12:00 pevná zakázka v Hloubětíně; kandidát daleko (Kladno) by další termín zdržel
     const tesny: DenSOkny = {

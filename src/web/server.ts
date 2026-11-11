@@ -667,6 +667,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
               ],
               blokace,
               upozorneni: brany?.upozorneni ?? [],
+              ...(doplnit ? { terminChybi: true } : {}),
               ...(detail.z.termin ? { termin: `${isoDate(detail.z.termin.od).split("-").reverse().join(".")} ${String(detail.z.termin.od.getUTCHours()).padStart(2, "0")}:${String(detail.z.termin.od.getUTCMinutes()).padStart(2, "0")}${detail.z.technik ? ` · ${detail.z.technik}` : ""}` } : {}),
             }
           : null;
@@ -704,7 +705,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         // našeptávač: nejoptimálnější VOLNY sloty vyznačené v mřížce + seznam vlevo
         let navrhy: NonNullable<Parameters<typeof strankaMrizky>[0]["navrhy"]> = [];
         let navrhChyba: string | undefined;
-        const oznaceni: OznaceniMrizky = { tato: puvodni ? { kalendar: puvodni.kalendar, eventId: puvodni.eventId } : null };
+        const oznaceni: OznaceniMrizky = { tato: puvodni ? { kalendar: puvodni.kalendar, eventId: puvodni.eventId } : null, dohodnuty: doplnit && detail?.z.termin ? detail.z.termin : null };
         if (volby.navrh && detail && planovac && !blokace.length) {
           try {
             // doporučení se počítá vždy ode dneška – pořadí je stejné v denním i týdenním pohledu a při listování

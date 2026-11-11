@@ -148,4 +148,10 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     // bez poloh se nic nepočítá
     expect(sestavMrizku(ud, technik, v).sloupce[0]!.pod[0]!.bloky[0]!.prejezd).toBeUndefined();
   });
+
+  it("webcalendar: VOLNY, který se kryje s dohodnutým termínem zákazníka, je označený", () => {
+    const m = sestavMrizku(UD, T, volby(), { dohodnuty: { od: new Date("2026-11-16T10:00:00Z"), do: new Date("2026-11-16T12:00:00Z") } });
+    const bloky = m.sloupce.flatMap((s) => s.pod.flatMap((p) => p.bloky));
+    expect(bloky.filter((b) => b.dohod).map((b) => b.cas)).toEqual(["10:00 – 12:00"]);
+  });
 });
