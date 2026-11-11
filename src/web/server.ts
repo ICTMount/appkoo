@@ -708,7 +708,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (volby.navrh && detail && planovac && !blokace.length) {
           try {
             const prvni = rozsah.dny[0]!;
-            const nab = await nabidniProZakazku(detail.z, kontext.nastaveni.pouzivatPriority ? detail.priorita : "P3", sla, kontext.technici, planovac, now, {
+            // doporučuje se jen mezi zobrazenými techniky – každý doporučený slot je tak v mřížce vidět
+            const nab = await nabidniProZakazku(detail.z, kontext.nastaveni.pouzivatPriority ? detail.priorita : "P3", sla, zobrazeni, planovac, now, {
               adresyZMwf: kontext.adresyZMwf,
               nastaveni: kontext.nastaveni.plan,
               dni: kontext.nastaveni.dniNabidky,
@@ -729,6 +730,13 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             navrhChyba = `Doporučení se nepodařilo spočítat: ${e instanceof Error ? e.message : String(e)}`;
             navrhy = [];
           }
+        }
+        // žádný doporučený slot v zobrazeném období → rovnou přepnout na den nejlepšího doporučení
+        if (navrhy.length && !navrhy.some((x) => rozsah.dny.includes(x.den)) && p.get("skok") !== "0") {
+          const q = new URLSearchParams(p);
+          q.set("den", navrhy[0]!.den);
+          q.set("skok", "0");
+          return presmeruj(`/kalendar?${q}`);
         }
         const smiPlanovat = !!detail && role !== "cteni" && zapis.zapnuty && zive && !blokace.length;
         return posli(res, 200, strankaMrizky({

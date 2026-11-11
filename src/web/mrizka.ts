@@ -323,7 +323,15 @@ button,input{font:inherit}
 .k-upoz{flex-basis:100%;background:#fef7e0;color:#5f4500;border:1px solid #f0d58a;border-radius:6px;padding:.3em .7em}
 .k-zive{font-size:.85em;color:#444746}
 .k-zive.zaloha{color:#8c1d18;font-weight:700}
-.ev.navrh .ev-b{outline:3px solid #1f1f1f;outline-offset:-3px}
+.ev.navrh .ev-b{outline:4px solid #1f1f1f;outline-offset:-4px;box-shadow:inset 0 0 0 7px #fdd835}
+.ev.navrh .ev-b{padding:.55em .7em}
+.ev.navrh .ev-znak{background:#fdd835;color:#000;font-size:1.15em;padding:.05em .6em;border:2px solid #1f1f1f}
+.s-navrhem .ev:not(.navrh):not(.tato) .ev-b{opacity:.3}
+.s-navrhem .ev:not(.navrh):not(.tato):hover .ev-b{opacity:1}
+.k-dop{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:.4em .6em}
+.k-dop a{display:inline-flex;align-items:center;gap:.4em;background:#fdd835;color:#000;border:2px solid #1f1f1f;border-radius:1em;padding:.1em .7em;font-weight:500}
+.k-dop a b{font-weight:700}
+.k-dop a.jinde{background:#fff}
 .ev.tato .ev-b{outline:3px dashed #1f1f1f;outline-offset:-3px}
 .ev-znak{margin-top:auto;align-self:flex-start;background:#fff;color:#0b5a2f;font-weight:700;border-radius:1em;padding:0 .5em}
 .k-navrhy{margin:.4em 0 0;padding:0;list-style:none;font-size:.9em}
@@ -436,6 +444,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
 <span>${esc(z.zakaznik ?? "")}${z.telefon ? ` · <a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a>` : ""}</span>
 <span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
 ${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>` : ""}
+${v.navrh && (s.navrhy ?? []).length ? `<div class="k-dop"><b>Nejoptimálnější VOLNY:</b>${s.navrhy!.map((n) => `<a class="${dny.includes(n.den) ? "" : "jinde"}" href="${esc(odkaz(v, { pohled: dny.includes(n.den) ? v.pohled : "den", den: n.den }))}" title="${esc(n.duvod)}"><b>${n.poradi}</b> ${esc(denKratce(n.den))} ${esc(n.cas)} · ${esc(n.technik)}</a>`).join("")}<span class="k-sedy">žlutě = v zobrazeném období, bíle = jiný den (klik přepne)</span></div>` : ""}
 ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat: ${z.blokace!.map(esc).join(" · ")}</div>` : ""}${(z.upozorneni ?? []).length ? `<div class="k-upoz">${z.upozorneni!.map(esc).join(" · ")}</div>` : ""}</div>`
     : "";
   const zive = s.zive === false
@@ -469,6 +478,6 @@ ${navrhy}
 <div class="k-pozn">Zrcadlo Google Kalendáře: časy a barvy podle zdroje. ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
 <div class="k-pozn">${esc(s.uzivatel)}</div>
 </form>
-<div class="k-mriz">${mrizka}</div>
+<div class="k-mriz${v.navrh && m.sloupce.some((sl) => sl.pod.some((p) => p.bloky.some((b) => b.navrh))) ? " s-navrhem" : ""}">${mrizka}</div>
 </div></div></body></html>`;
 }
