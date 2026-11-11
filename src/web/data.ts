@@ -11,6 +11,7 @@ import { pravidlaPriority } from "../config/ciselniky.js";
 import type { Infrastruktura, Zakazka } from "../import/mwfExport.js";
 import { pokusyZPoznamky, rozlozPoznamku } from "../import/notes.js";
 import { nactiNotifikaci, type UlozenaNotifikace } from "../ingest/notifikace.js";
+import { pripravSloupceZakazky } from "../db/zakazky.js";
 
 /** Řádek tabulky `zakazka` (jen sloupce, které web používá) */
 export interface ZakazkaRow {
@@ -30,6 +31,8 @@ export interface ZakazkaRow {
   subregion: string | null;
   balik: string | null;
   produkt: string | null;
+  zakladni_produkt: string | null;
+  kategorie_tt: string | null;
   prideleno: Date | null;
   termin_od: Date | null;
   termin_do: Date | null;
@@ -45,7 +48,7 @@ export interface ZakazkaRow {
 }
 
 const SLOUPCE = `id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, technik, stav_mwf, typ_aktivity, infrastruktura,
-  predobjednavka, zakaznik, telefony, psc, adresa, subregion, balik, produkt, prideleno, termin_od, termin_do, parkovani,
+  predobjednavka, zakaznik, telefony, psc, adresa, subregion, balik, produkt, zakladni_produkt, kategorie_tt, prideleno, termin_od, termin_do, parkovani,
   parkovani_nestandardni, vysledek, preferovany_datum, rfs, do_splneni_min, poznamka, pocet_mv, uzavreno`;
 
 /** Řádek z DB → doménová zakázka (poznámka se znovu rozloží na záznamy) */
@@ -70,6 +73,8 @@ export function zRadku(r: ZakazkaRow): Zakazka {
     subregion: r.subregion ?? "",
     balik: r.balik ?? "",
     produkt: r.produkt ?? "",
+    zakladniProdukt: r.zakladni_produkt ?? "",
+    kategorieTt: r.kategorie_tt ?? "",
     prideleno: r.prideleno,
     termin: r.termin_od ? { od: r.termin_od, do: r.termin_do ?? r.termin_od } : null,
     parkovani,
@@ -138,6 +143,7 @@ export function hodiSe(z: Zakazka, hledat: string): boolean {
 
 /** Fronta k volání: otevřené zakázky s prioritou, seřazené P1 → P0 a podle dalšího pokusu */
 export async function nactiFrontu(db: Dotaz, now: Date, filtr: Filtr = {}, pravidla?: PravidloPriority[]): Promise<Fronta> {
+  await pripravSloupceZakazky(db);
   const { rows } = await db.query<ZakazkaRow>(`SELECT ${SLOUPCE} FROM zakazka WHERE uzavreno IS NULL`);
   const pr = pravidla ?? (await nactiPravidla(db));
 
@@ -191,6 +197,7 @@ export interface Detail extends PolozkaFronty {
 }
 
 export async function nactiDetail(db: Dotaz, idAktivity: string, now: Date, pravidla?: PravidloPriority[]): Promise<Detail | null> {
+  await pripravSloupceZakazky(db);
   const { rows } = await db.query<ZakazkaRow>(`SELECT ${SLOUPCE} FROM zakazka WHERE id_aktivity = $1`, [idAktivity]);
   const r = rows[0];
   if (!r) return null;

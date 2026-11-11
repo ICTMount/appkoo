@@ -4,6 +4,7 @@
 
 import type { Zakazka } from "../import/mwfExport.js";
 import { instalacePredRfs, radekUdalostiPredRfs } from "../domain/predRfs.js";
+import { kombinaceZakazky, popisKombinace, zkratkaKombinace } from "../domain/kombinace.js";
 import { fmtDate, fmtTime } from "../domain/time.js";
 
 /** Údaje zjištěné při hovoru (kontrolní seznam call scriptu) */
@@ -70,7 +71,9 @@ export function sestavUdalost(
   slaKonec?: Date | null,
   koordinatorka?: string, // iniciály, např. „AP“
 ): UdalostKalendare {
-  const sluzba = z.typAktivity.includes("PIV") ? "PIV" : "FTTH";
+  const kombi = kombinaceZakazky(z);
+  // kombinovaná objednávka: v názvu „FTTH+IPTV“ / „FTTH+MESH“, v popisu řádek s počty zařízení
+  const sluzba = z.typAktivity.includes("PIV") ? "PIV" : kombi ? zkratkaKombinace(kombi) : "FTTH";
   // Stejný tvar jako dnešní události v kalendářích techniků:
   // „Bridge Hristov - FTTH CETIN O-8553401092 Bažantová SLA 17.10.2026 17:42 (AP)“
   const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
@@ -85,7 +88,8 @@ export function sestavUdalost(
     `TEL: ${z.telefony.join(", ")}${h.kontaktNaMiste ? ` · u instalace bude: ${h.kontaktNaMiste}` : ""}`,
     ...(h.flex ? [textFlex(h.flex, h.flexPoznamka)] : []),
     `${h.novaInstalace === false ? "Existující" : "Nová instalace"}${h.zasuvka ? ` – zásuvka ${h.zasuvka}` : ""}`,
-    `INSTALACE: Optický internet${h.iptv ? " / IPTV" : ""}`,
+    `INSTALACE: Optický internet${h.iptv || kombi?.iptv ? " / IPTV" : ""}${kombi?.mesh ? " / MESH" : ""}`,
+    ...(kombi ? [`KOMBINOVANÁ OBJEDNÁVKA: ${popisKombinace(kombi)}${kombi.mesh ? " – mesh aktivovat jen z MWF app, ověřit doručení" : ""}${kombi.iptv ? " – zapojit a ověřit i set-top box" : ""}`] : []),
     `ČÍSLO PATRA A BYTU: ${h.patro ?? "?"} / ${h.byt ?? "?"}`,
     `PATRA VOLNĚ PŘÍSTUPNÁ: ${ano(h.patraPristupna)}`,
     `STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran): ${h.stoupacka ?? "NEVÍM"}`,

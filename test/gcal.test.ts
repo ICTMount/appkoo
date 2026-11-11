@@ -31,6 +31,14 @@ describe("šablona události", () => {
     expect(sestavUdalost(zak({ ...predRfs, rfs: local(2026, 10, 1, 0, 0) }), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59)).description).not.toContain("PŘED RFS");
   });
 
+  it("kombinovaná objednávka: FTTH+IPTV v názvu, řádek s počty zařízení v popisu", () => {
+    const u = sestavUdalost(zak({ zakladniProdukt: "FTTH Subscription; TVoI", kategorieTt: "All:2|HDD:0/0|bezHDD:0/0|HDDready:0/0|HAG:0|ONT:1|WIFI:1; All:1|HDD:0/0|bezHDD:1/0|HDDready:0/0|HAG:0|ONT:0|WIFI:0" }), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59));
+    expect(u.summary).toBe("Hristov - FTTH+IPTV+MESH CETIN O-8532577900 Patera, Michal");
+    expect(u.description).toContain("INSTALACE: Optický internet / IPTV / MESH");
+    expect(u.description).toContain("KOMBINOVANÁ OBJEDNÁVKA: FTTH + IPTV (1× set-top box) + MESH (1)");
+    expect(sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59)).description).not.toContain("KOMBINOVANÁ");
+  });
+
   it("vyplní název, telefon, ID zakázky a skryté vlastnosti; čas v pražské zóně", () => {
     const u = sestavUdalost(zak(), "Hristov", local(2026, 10, 16, 10, 0), local(2026, 10, 16, 11, 59), { patro: "3", byt: "12", souhlasSVrtanim: false, caseid: "CZ-1", kz: "BRIDGE Sagemcom" }, local(2026, 10, 17, 14, 51), "AP");
     // stejný tvar jako dnešní události v kalendářích techniků

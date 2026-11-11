@@ -21,6 +21,7 @@ import { jeObrazek, type Nalez, type NalezLokality, type VysledekZdroje, type Zd
 import { webcalendar, type Webcalendar } from "../domain/webcalendar.js";
 import { migrace, zasuvkaUsed, type Migrace } from "../domain/migrace.js";
 import { instalacePredRfs, type InstalacePredRfs } from "../domain/predRfs.js";
+import { kombinaceZakazky, popisKombinace, type Kombinace } from "../domain/kombinace.js";
 import type { Zaznam } from "../import/notes.js";
 
 export function esc(s: unknown): string {
@@ -83,7 +84,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}.P0{background:var(--p0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}.pred-rfs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#283593;color:#fff;vertical-align:middle;margin-top:4px}.pred-rfs-pruh{border-left:4px solid #283593;background:rgba(40,53,147,.08);color:var(--text)}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
+.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}.pred-rfs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#283593;color:#fff;vertical-align:middle;margin-top:4px}.pred-rfs-pruh{border-left:4px solid #283593;background:rgba(40,53,147,.08);color:var(--text)}.kombi{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#fdd835;color:#000;border:1px solid #c6a700;vertical-align:middle;margin-top:4px}.kombi-pruh{border-left:4px solid #fdd835;background:rgba(253,216,53,.18);color:var(--text)}.kombi-pruh li{margin:2px 0}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy input{vertical-align:middle;margin:0 2px 0 0}.prilohy .na-disku{color:#2e7d32;text-decoration:none;font-weight:600}.ulozit-prilohy{margin-top:8px}nav.strankovani{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 4px;font-size:14px}nav.strankovani a,nav.strankovani b,nav.strankovani span{display:inline-block;min-width:30px;padding:6px 8px;text-align:center;border:1px solid var(--line);border-radius:6px}nav.strankovani b{background:var(--accent);color:#fff;border-color:var(--accent)}nav.strankovani a{text-decoration:none}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
@@ -256,6 +257,23 @@ function pruhPredRfs(p: InstalacePredRfs, technik: boolean): string {
   return `<div class="warn pred-rfs-pruh"><b>Instalace před RFS ${esc(p.rfsText)}</b> (postup TMCZ v1.0)<br>${technik ? technikKroky : `${koordinace}<br>${technikKroky}`}</div>`;
 }
 
+/** Kombinovaná objednávka: FTTH + IPTV (set-top box) / FTTH + MESH – výrazně žlutý štítek všude, kde je zakázka vidět */
+export const kombiStitek = (z: Parameters<typeof kombinaceZakazky>[0]) => {
+  const k = kombinaceZakazky(z);
+  return k ? ` <span class="kombi" title="Kombinovaná objednávka ${esc(popisKombinace(k))} – víc zařízení k instalaci, delší pracnost; set-top box / mesh musí být doručené před termínem">${esc(popisKombinace(k))}</span>` : "";
+};
+function pruhKombinace(k: Kombinace, technik: boolean): string {
+  const body: string[] = [];
+  if (k.iptv) {
+    body.push(`<li><b>IPTV</b>${k.setTopBoxu ? ` – <b>${k.setTopBoxu}× set-top box</b>` : " – set-top box"}: před termínem ověřit, že má zákazník set-top box doručený${technik ? "" : " (jinak termín posunout)"}; technik zapojuje a ověřuje i TV (STB ke kabelu/Wi-Fi, přihlášení, běžící vysílání).</li>`);
+  }
+  if (k.mesh) {
+    body.push(`<li><b>MESH</b> – <b>${k.mesh}× Wi-Fi jednotka</b>: ověřit doručení <b>min. 2 dny před termínem</b>; aktivace <b>pouze z MWF app</b> (zlaté pravidlo 9). Umístění jednotek domluvit se zákazníkem.</li>`);
+  }
+  body.push(`<li>Počítat s <b>delší pracností</b> (víc zařízení) – při plánování nechat delší okno${technik ? "" : "; zákazníkovi říct, že instalace zabere déle"}.</li>`);
+  return `<div class="warn kombi-pruh"><b>Kombinovaná objednávka: ${esc(popisKombinace(k))}</b><ul>${body.join("")}</ul></div>`;
+}
+
 /** Obsazená zásuvka (USED) – neplánovat, čeká se na PEP */
 export const usedStitek = (z: Parameters<typeof zasuvkaUsed>[0]) =>
   zasuvkaUsed(z) ? ` <span class="used" title="Zásuvka USED / obsazená – termín neplánovat, dokud PEP nepotvrdí uvolnění">ZÁSUVKA USED</span>` : "";
@@ -284,8 +302,8 @@ function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: stri
 }
 
 /** Sloupec P17: vlastník sítě a pod ním štítky předobjednávky / webcalendar */
-const p17Bunka = (z: { infrastruktura: string; predobjednavka?: boolean; zaznamy?: Zaznam[]; poznamka?: string; uvodPoznamky?: string }) =>
-  `${infraStitek(z.infrastruktura)}${z.predobjednavka ? `<br>${predobjStitek(z).trim()}` : ""}${webcalendar(z) ? `<br>${webcalStitek(z).trim()}` : ""}${migrace(z) ? `<br>${migraceStitek(z).trim()}` : ""}${zasuvkaUsed(z) ? `<br>${usedStitek(z).trim()}` : ""}`;
+const p17Bunka = (z: { infrastruktura: string; predobjednavka?: boolean; zaznamy?: Zaznam[]; poznamka?: string; uvodPoznamky?: string; zakladniProdukt?: string; kategorieTt?: string; produkt?: string }) =>
+  `${infraStitek(z.infrastruktura)}${z.predobjednavka ? `<br>${predobjStitek(z).trim()}` : ""}${webcalendar(z) ? `<br>${webcalStitek(z).trim()}` : ""}${migrace(z) ? `<br>${migraceStitek(z).trim()}` : ""}${zasuvkaUsed(z) ? `<br>${usedStitek(z).trim()}` : ""}${kombiStitek(z) ? `<br>${kombiStitek(z).trim()}` : ""}`;
 
 /** Buňka ID v seznamech: O-ID (+ předobjednávka), pod tím malým písmem ID S7 obj. a u předobjednávky RFS */
 const idBunka = (z: { idAktivity: string; idObjednavky: string; idS7: string; predobjednavka?: boolean; typAktivity: string; rfs?: Date | null }) =>
@@ -494,12 +512,13 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
       }`
     : `<span class="muted">bez historie</span>`;
 
-  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${webcalStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z)}${predobjStitek(z)}${webcalStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – instalace před datem RFS není možná, termíny se nabízejí až ode dne po RFS; realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity, !!plan.jenNahled) : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${(() => { const p = instalacePredRfs(z, now); return p ? pruhPredRfs(p, false) : ""; })()}
+${(() => { const k = kombinaceZakazky(z); return k ? pruhKombinace(k, false) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 ${plan.zprava ? `<div class="ok">${esc(plan.zprava)}</div>` : ""}
 <div class="grid">
@@ -522,6 +541,8 @@ ${radek("P17: Vlastník sítě", infraStitek(z.infrastruktura))}
 ${plan.iru ? radek("IRU lokalita", `<span class="iru"><b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
 ${radek("Typ aktivity", `${esc(z.typAktivity)}${predobjStitek(z)}`)}
 ${radek("P3: Typ balíčku", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
+${radek("P8: Základní produkt", esc(z.zakladniProdukt) || `<span class="muted">neuvedeno</span>`)}
+${z.kategorieTt ? radek("P9: Kategorie TT", `<small>${esc(z.kategorieTt)}</small>`) : ""}
 ${prioritySvisible ? radek("Priorita", `${prio(d.priorita)} ${esc(d.duvod)}`) : ""}
 ${radek("Preferované datum", esc(den(z.preferovanyDatum)))}
 ${radek("Datum RFS", esc(den(z.rfs)))}
@@ -560,11 +581,12 @@ ${sekcePlanovani(d, plan)}</section>`}`;
 
   // Technik v terénu: zákazník, adresa, telefon, patro/byt, předpis – to vše má v události v kalendáři.
   // Tady jen to, co tam není: upozornění, poznámky MWF, Chat a e-mail s přílohami, akce z notifikačního PDF, lokalita.
-  const teloTechnik = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} <small>${esc(z.zakaznik)}</small></h1>
+  const teloTechnik = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z)}${predobjStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} <small>${esc(z.zakaznik)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${(() => { const p = instalacePredRfs(z, now); return p ? pruhPredRfs(p, true) : ""; })()}
+${(() => { const k = kombinaceZakazky(z); return k ? pruhKombinace(k, true) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="card"><dl>
 ${radek("Stav MWF", esc(z.stavMwf))}
@@ -679,7 +701,7 @@ const slot = (od: Date, do_: Date) => `${denTydne(od)} ${fmtDate(od)} ${fmtTime(
 function hlavickaZakazky(d: Detail): string {
   const z = d.z;
   return `<p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← ${esc(z.idObjednavky || z.idAktivity)}</a></p>
-<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${predobjStitek(z)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
+<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z)}${predobjStitek(z)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
 }
 
 

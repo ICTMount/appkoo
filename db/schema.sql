@@ -37,6 +37,8 @@ CREATE TABLE zakazka (
   subregion         text,
   balik             text,
   produkt           text,
+  zakladni_produkt  text,                    -- P8: Základný produkt (FTTH Subscription; TVoI)
+  kategorie_tt      text,                    -- P9: Kategória TT (počty zařízení: set-top boxy, WIFI = mesh)
   prideleno         timestamp,
   termin_od         timestamp,
   termin_do         timestamp,

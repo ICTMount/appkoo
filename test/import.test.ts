@@ -12,7 +12,7 @@ const HLAVICKA = [
   "", "ID aktivity", "ID objednávky", "ID obj. v ext. systéme", "ID S7 obj.  ", "Pracovný zdroj", "Stav",
   "Typ aktivity", "Zákazník", "Kontakt", "Psč", "Adresa", "Subregión", "P3: Typ balíka", "Čas postúpenia dod.",
   "Dohodnutý termín", "Poznámka", "Dôvod parkovania", "Posledný dôvod parkovania", "P17: Vlastník siete",
-  "Výsledok dojednávania", "Preferovaný dátum", "Do splnění", "Dátum RFS", "Produkt",
+  "Výsledok dojednávania", "Preferovaný dátum", "Do splnění", "Dátum RFS", "Produkt", "P8: Základný produkt", "P9: Kategória TT",
 ];
 
 const POZNAMKA_1 = [
@@ -47,6 +47,7 @@ const BUF = export_([
   {
     "ID aktivity": "A2", "ID objednávky": "22000002", "ID obj. v ext. systéme": "O-2222222222:1", Stav: "Zaparkovaná", "Typ aktivity": "Inst_Pristupu_FTTH",
     Zákazník: "Dvořák Petr", "P17: Vlastník siete": "TMCZ", Poznámka: POZNAMKA_2,
+    "P8: Základný produkt": "FTTH Subscription; TVoI", "P9: Kategória TT": "All:1|HDD:0/0|bezHDD:0/0|HDDready:0/0|HAG:0|ONT:1|WIFI:0; All:1|HDD:0/0|bezHDD:1/0|HDDready:0/0|HAG:0|ONT:0|WIFI:0",
     "Dôvod parkovania": "Zákazník - nedostupný", "Výsledok dojednávania": "Márny výjazd",
   },
   {
@@ -77,6 +78,9 @@ describe("import MWF exportu", () => {
     expect(z1!.idObjednavkyMwf).toBe("22000001");
     expect(z1!.psc).toBe("15000");
     expect(z1!.telefony).toEqual(["777123456"]);
+    expect(z2!.zakladniProdukt).toBe("FTTH Subscription; TVoI"); // P8/P9 – kombinované objednávky (FTTH + IPTV / MESH)
+    expect(z2!.kategorieTt).toContain("bezHDD:1/0");
+    expect(z1!.zakladniProdukt).toBe("");
     expect(z1!.infrastruktura).toBe("CETIN");
     expect(z3!.infrastruktura).toBe("VDF");
     expect(z1!.doSplneniMin).toBe(-(7 * 24 * 60 + 2 * 24 * 60 + 3 * 60 + 4));

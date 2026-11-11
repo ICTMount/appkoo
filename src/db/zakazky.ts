@@ -5,6 +5,18 @@ import type { Zakazka } from "../import/mwfExport.js";
 import type { DoslyExport, Posouzeni, StavPrijmu } from "../ingest/prijem.js";
 import { ts, type Db, type Dotaz } from "./db.js";
 
+// Sloupce doplněné po prvním nasazení (kombinované objednávky) – přidají se při prvním použití
+const sloupcePripraveny = new WeakMap<object, Promise<unknown>>();
+export function pripravSloupceZakazky(db: Dotaz): Promise<unknown> {
+  let p = sloupcePripraveny.get(db);
+  if (!p) {
+    p = db.query("ALTER TABLE zakazka ADD COLUMN IF NOT EXISTS zakladni_produkt text, ADD COLUMN IF NOT EXISTS kategorie_tt text")
+      .catch((e) => { sloupcePripraveny.delete(db); throw e; });
+    sloupcePripraveny.set(db, p);
+  }
+  return p;
+}
+
 export async function nactiStavPrijmu(db: Dotaz): Promise<StavPrijmu> {
   const { rows } = await db.query<{ posledni: Date | null }>(
     "SELECT max(export_at) AS posledni FROM import_run WHERE vysledek = 'importovano'",
@@ -27,6 +39,7 @@ const VYSLEDEK_DB = { importovat: "importovano", preskocit: "preskoceno", odmitn
 
 /** Zapíše došlý soubor do logu; při „importovat“ v jedné transakci uloží i zakázky. */
 export async function ulozPrijem(db: Db, d: DoslyExport, p: Posouzeni): Promise<VysledekUlozeni | null> {
+  await pripravSloupceZakazky(db);
   return db.tx(async (q) => {
     const { rows } = await q.query<{ id: number }>(
       `INSERT INTO import_run (zdroj, soubor, hash, odesilatel, zdroj_id, export_at, vysledek, duvod, pocet, chybejici_sloupce, prijato)
@@ -70,16 +83,17 @@ async function ulozZakazky(q: Dotaz, zakazky: Zakazka[], importId: number, expor
 
     await q.query(
       `INSERT INTO zakazka (id_aktivity, id_objednavky, id_objednavky_mwf, id_objednavky_zaklad, id_s7, technik, stav_mwf, typ_aktivity,
-         infrastruktura, predobjednavka, zakaznik, telefony, psc, adresa, subregion, balik, produkt, prideleno, termin_od, termin_do,
+         infrastruktura, predobjednavka, zakaznik, telefony, psc, adresa, subregion, balik, produkt, zakladni_produkt, kategorie_tt, prideleno, termin_od, termin_do,
          parkovani, parkovani_skupina, parkovani_nestandardni, vysledek, preferovany_datum, rfs, do_splneni_min, poznamka, poznamka_hash,
          pocet_mv, prvni_import, posledni_import, uzavreno)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$31,NULL)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$33,NULL)
        ON CONFLICT (id_aktivity) DO UPDATE SET
          id_objednavky = EXCLUDED.id_objednavky, id_objednavky_mwf = EXCLUDED.id_objednavky_mwf, id_objednavky_zaklad = EXCLUDED.id_objednavky_zaklad,
          id_s7 = EXCLUDED.id_s7, technik = EXCLUDED.technik, stav_mwf = EXCLUDED.stav_mwf, typ_aktivity = EXCLUDED.typ_aktivity,
          infrastruktura = EXCLUDED.infrastruktura, predobjednavka = EXCLUDED.predobjednavka, zakaznik = EXCLUDED.zakaznik,
          telefony = EXCLUDED.telefony, psc = EXCLUDED.psc, adresa = EXCLUDED.adresa, subregion = EXCLUDED.subregion,
-         balik = EXCLUDED.balik, produkt = EXCLUDED.produkt, prideleno = EXCLUDED.prideleno, termin_od = EXCLUDED.termin_od,
+         balik = EXCLUDED.balik, produkt = EXCLUDED.produkt, zakladni_produkt = EXCLUDED.zakladni_produkt,
+         kategorie_tt = EXCLUDED.kategorie_tt, prideleno = EXCLUDED.prideleno, termin_od = EXCLUDED.termin_od,
          termin_do = EXCLUDED.termin_do, parkovani = EXCLUDED.parkovani, parkovani_skupina = EXCLUDED.parkovani_skupina,
          parkovani_nestandardni = EXCLUDED.parkovani_nestandardni, vysledek = EXCLUDED.vysledek,
          preferovany_datum = EXCLUDED.preferovany_datum, rfs = EXCLUDED.rfs, do_splneni_min = EXCLUDED.do_splneni_min,
@@ -88,7 +102,7 @@ async function ulozZakazky(q: Dotaz, zakazky: Zakazka[], importId: number, expor
       [
         z.idAktivity, z.idObjednavky, z.idObjednavkyMwf, z.idObjednavkyZaklad, z.idS7 || null, z.technik || null, z.stavMwf, z.typAktivity,
         z.infrastruktura, z.predobjednavka, z.zakaznik || null, z.telefony, z.psc || null, z.adresa || null, z.subregion || null,
-        z.balik || null, z.produkt || null, ts(z.prideleno), ts(z.termin?.od), ts(z.termin?.do), z.parkovani, z.parkovaniSkupina,
+        z.balik || null, z.produkt || null, z.zakladniProdukt || null, z.kategorieTt || null, ts(z.prideleno), ts(z.termin?.od), ts(z.termin?.do), z.parkovani, z.parkovaniSkupina,
         z.parkovaniNestandardni, z.vysledek, ts(z.preferovanyDatum), ts(z.rfs), z.doSplneniMin, z.poznamka, hash, z.pocetMv, importId,
       ],
     );

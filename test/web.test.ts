@@ -19,8 +19,8 @@ function pgliteDb(pg: PGlite): Db {
   };
 }
 
-const SLOUPCE = ["ID aktivity", "ID objednávky", "ID obj. v ext. systéme", "ID S7 obj.", "Pracovný zdroj", "Stav", "Typ aktivity", "Zákazník", "Kontakt", "Adresa", "Subregión", "Poznámka", "Dôvod parkovania", "Dohodnutý termín"];
-const radek = (o: Record<string, string>) => SLOUPCE.map((s) => (o[s] ?? "").replace(/;/g, ",")).join(";");
+const SLOUPCE = ["ID aktivity", "ID objednávky", "ID obj. v ext. systéme", "ID S7 obj.", "Pracovný zdroj", "Stav", "Typ aktivity", "Zákazník", "Kontakt", "Adresa", "Subregión", "Poznámka", "Dôvod parkovania", "Dohodnutý termín", "P8: Základný produkt", "P9: Kategória TT"];
+const radek = (o: Record<string, string>) => SLOUPCE.map((s) => (/[;"\n]/.test(o[s] ?? "") ? `"${(o[s] ?? "").replace(/"/g, '""')}"` : o[s] ?? "")).join(";");
 const csv = (radky: Record<string, string>[]) => iconv.encode([SLOUPCE.join(";"), ...radky.map(radek)].join("\r\n"), "win1250");
 
 // „Teď“ = 15.10.2026 10:00 Praha (čas v aplikaci = Praha uložená jako UTC)
@@ -31,6 +31,7 @@ const ZAKAZKY: Record<string, string>[] = [
   { "ID aktivity": "A1", "ID objednávky": "1", "ID obj. v ext. systéme": "O-8550000001", "ID S7 obj.": "1-D111", "Pracovný zdroj": "Jana Hadravová", "Stav": "Riešená dodávateľom - odovzdaná", "Typ aktivity": "Inst_Pristupu_FTTH", "Zákazník": "Novák, Jan", "Kontakt": "+420 603 111 222", "Adresa": "Pravá 1, Praha", "Subregión": "CZ_P_PH_2002" },
   // má termín v budoucnu → P0
   { "ID aktivity": "A2", "ID objednávky": "2", "ID obj. v ext. systéme": "O-8550000002", "Pracovný zdroj": "Hristov", "Stav": "Riešená dodávateľom - akceptovaná", "Typ aktivity": "CETIN_Inst_Pristupu_FTTH", "Zákazník": "Dvořák, Petr", "Subregión": "CZ_P_PH_2004",
+    "P8: Základný produkt": "FTTH Subscription; TVoI", "P9: Kategória TT": "All:2|HDD:0/0|bezHDD:0/0|HDDready:0/0|HAG:0|ONT:1|WIFI:1; All:1|HDD:0/0|bezHDD:1/0|HDDready:0/0|HAG:0|ONT:0|WIFI:0",
     "Poznámka": "[Dojednávania] 14.10.2026 9:07, Lenka Havlíčková (Vegacom): Zákazník: Dvořák, Petr (20.10.2026, 10:00 - 11:59)", "Dohodnutý termín": "20.10.2026 10:00 / 20.10.2026 11:59" },
   // nedovoláno včera → probíhá kontaktování
   { "ID aktivity": "A3", "ID objednávky": "3", "ID obj. v ext. systéme": "O-8550000003", "Pracovný zdroj": "Markéta Kraitlová", "Stav": "Riešená dodávateľom - odovzdaná", "Typ aktivity": "Inst_Pristupu_FTTH", "Zákazník": "Černá, <Eva>", "Subregión": "CZ_V_PA_1001",
@@ -130,6 +131,7 @@ describe("webový server", () => {
     expect(vysledky).toContain("O-8550000001");
     expect(vysledky).toContain("O-8550000002");
     expect(vysledky).toContain('class="infra i-CETIN"');
+    expect(vysledky).toContain('class="kombi"'); // kombinovaná objednávka je vidět i ve výsledcích hledání
     // počet výsledků v nadpisu; přes 30 výsledků se stránkuje (?strana=2, navigace ‹ Předchozí 1 2 Další ›)
     expect(vysledky).toMatch(/<small>\d+ zakázek<\/small>/);
     expect(vysledky).not.toContain('class="strankovani"');
@@ -151,11 +153,18 @@ describe("webový server", () => {
     expect(hd).toContain("Dvořák, Petr");
     expect(hd).toContain("P17: Vlastník sítě");
     expect(hd).toContain("Kam naplánovat");
+    // kombinovaná objednávka FTTH + IPTV + MESH: žlutý štítek v hlavičce, pruh s pokyny a řádek P8
+    expect(hd).toContain('class="kombi"');
+    expect(hd).toContain("FTTH + IPTV (1× set-top box) + MESH (1)");
+    expect(hd).toContain("Kombinovaná objednávka");
+    expect(hd).toContain("pouze z MWF app");
+    expect(hd).toContain("P8: Základní produkt");
     const a1 = await get("/zakazka/A1", "davidh@ictmount.com");
     expect(a1.headers.get("content-security-policy")).toContain("frame-src https://www.google.com");
     const h1 = await a1.text();
     expect(h1).toContain("Adresa a mapa");
     expect(h1).toContain("P3: Typ balíčku");
+    expect(h1).not.toContain('class="kombi"'); // běžná FTTH bez štítku
     expect(h1).toContain("https://www.google.com/maps?q=Prav%C3%A1%201%2C%20Praha");
     expect(h1.indexOf("Poznámka (nejnovější")).toBeLessThan(h1.indexOf("Kontaktování"));
     const hledani = await get("/?q=O-8550000003", "davidh@ictmount.com");

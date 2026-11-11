@@ -37,6 +37,10 @@ export interface Zakazka {
   subregion: string;
   balik: string;
   produkt: string;
+  /** „P8: Základný produkt“ – „FTTH Subscription; TVoI“ (kombinovaná objednávka FTTH + IPTV) */
+  zakladniProdukt: string;
+  /** „P9: Kategória TT“ – počty zařízení po skupinách (set-top boxy, WIFI = mesh) */
+  kategorieTt: string;
   prideleno: Date | null; // Čas postúpenia dod.
   termin: { od: Date; do: Date } | null;
   parkovani: Parkovani | null;
@@ -80,6 +84,8 @@ const COL = {
   doSplneni: "Do splnění",
   rfs: "Dátum RFS",
   produkt: "Produkt",
+  zakladniProdukt: "P8: Základný produkt",
+  kategorieTt: "P9: Kategória TT",
 } as const;
 
 function infrastruktura(vlastnik: string, typ: string): Infrastruktura {
@@ -154,6 +160,8 @@ export function importExport(buf: Buffer, exportAt: Date): VysledekImportu {
       subregion: get(COL.subregion),
       balik: get(COL.balik),
       produkt: get(COL.produkt),
+      zakladniProdukt: get(COL.zakladniProdukt),
+      kategorieTt: get(COL.kategorieTt),
       prideleno: parseCzDateTime(get(COL.prideleno)),
       termin: parseTermin(get(COL.termin), denExportu),
       parkovani,
