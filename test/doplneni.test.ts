@@ -35,14 +35,28 @@ describe("doplnění slotu (režim B)", () => {
     expect(n[0]!.kmNavic).toBeLessThan(n[1]!.kmNavic);
   });
 
-  it("výchozí: SLA pořadí neovlivní – rozhoduje, co slot nejlépe zaplní (km navíc)", () => {
+  it("rozhodují km navíc; SLA je jen doplňková váha, priorita se nepoužívá", () => {
     const sla = local(2026, 10, 16, 20, 0); // do 48 h od slotu
-    const kandidati = [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("SLA", { lat: 50.07, lon: 14.45 }, { slaKonec: sla })];
-    expect(doplnSlot(den, okno, kandidati, v)[0]!.kandidat.z.idAktivity).toBe("BLIZKO");
-    // zvýhodnění SLA jde zapnout v Nastavení plánování
-    const n = doplnSlot(den, okno, kandidati, v, { bonusSlaDo48h: 40 });
-    expect(n[0]!.kandidat.z.idAktivity).toBe("SLA");
-    expect(n[0]!.duvody).toContain("SLA do 48 h");
+    const kandidati = [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("SLA", { lat: 50.07, lon: 14.45 }, { slaKonec: sla, priorita: "P1" })];
+    // výchozí váha SLA (5 km do 48 h, 10 km po SLA) nepřebije výrazně kratší nájezd
+    const vychozi = doplnSlot(den, okno, kandidati, v);
+    expect(vychozi[0]!.kandidat.z.idAktivity).toBe("BLIZKO");
+    expect(vychozi[1]!.duvody).toContain("SLA do 48 h");
+    expect(vychozi[1]!.skore).toBeCloseTo(vychozi[1]!.kmNavic - 5, 5);
+    expect(vychozi[1]!.duvody.join(" ")).not.toMatch(/priorita/);
+    // při podobném nájezdu SLA rozhodne
+    const vedle = [kand("A", { lat: 50.1, lon: 14.52 }), kand("B", { lat: 50.1, lon: 14.521 }, { slaKonec: local(2026, 10, 15, 12, 0) })];
+    const n = doplnSlot(den, okno, vedle, v);
+    expect(n[0]!.kandidat.z.idAktivity).toBe("B");
+    expect(n[0]!.duvody).toContain("SLA už prošlo");
+    // váhu lze změnit v Nastavení plánování
+    expect(doplnSlot(den, okno, kandidati, v, { bonusSlaDo48h: 40 })[0]!.kandidat.z.idAktivity).toBe("SLA");
+  });
+
+  it("při stejném nájezdu má nenaplánovaná zakázka přednost před přesunem flex", () => {
+    const presun = { kalendar: "K2", eventId: "e9", technik: "Koval", od: local(2026, 10, 22, 10, 0) };
+    const n = doplnSlot(den, okno, [kand("FLEX", { lat: 50.1, lon: 14.52 }, { presun }), kand("NOVA", { lat: 50.1, lon: 14.52 })], v);
+    expect(n.map((x) => x.kandidat.z.idAktivity)).toEqual(["NOVA", "FLEX"]);
   });
 
   it("flex: přesouvá se jen dopředu, zakázka už ve dni se nenabízí", () => {

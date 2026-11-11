@@ -116,9 +116,24 @@ describe("pravidla plánování ze SKILLS v5", () => {
   it("přednost má zaplnění rozpracovaného dne, pak okno 10–14 (zadání fáze 1)", () => {
     const tech = (jmeno: string, navstevy: Navsteva[]): DenSOkny => ({ den: den(jmeno, B.hloubetin!, navstevy), volnaOkna: [{ od: h(8), do: h(9, 59) }, { od: h(10), do: h(11, 59) }] });
     const z = { id: "N", bod: B.strasnice!, trvani: 90, priorita: "P2" as const, slaKonec: null };
-    const m = nabidniTerminy(z, [tech("Plny", [nv("A", B.hloubetin!, h(14), h(15, 59)), nv("B", B.hloubetin!, h(16), h(17))]), tech("Volny", [])], v, "2026-10-15", {}, 4);
+    const dva = () => [tech("Plny", [nv("A", B.hloubetin!, h(14), h(15, 59)), nv("B", B.hloubetin!, h(16), h(17))]), tech("Volny", [])];
+    // výchozí: denní doba nehraje roli – při stejném nájezdu dřívější slot
+    const vychozi = nabidniTerminy(z, dva(), v, "2026-10-15", {}, 4);
+    expect(vychozi[0]).toMatchObject({ technik: "Plny", okno: { od: h(8) } });
+    expect(vychozi.at(-1)!.technik).toBe("Volny"); // prázdný den až nakonec
+    // preferované okno jde zapnout v Nastavení plánování
+    const m = nabidniTerminy(z, dva(), v, "2026-10-15", { penalizaceMimoPreferovaneKm: 8 }, 4);
     expect(m[0]).toMatchObject({ technik: "Plny", okno: { od: h(10) } });
-    expect(m.at(-1)!.technik).toBe("Volny"); // prázdný den až nakonec
+    expect(m.at(-1)!.technik).toBe("Volny");
+  });
+
+  it("slot po SLA prohraje se slotem v SLA do rozdílu 25 km; priorita ani odklad pořadí nemění", () => {
+    const z = { id: "N", bod: B.strasnice!, trvani: 90, slaKonec: local(2026, 10, 16, 12, 0) };
+    const d = (): DenSOkny[] => [{ den: den("Hristov", B.hloubetin!, [nv("X1", B.krc!, h(8), h(9, 59))]), volnaOkna: [{ od: h(10), do: h(11, 59) }, { od: h(14), do: h(15, 59) }] }];
+    const m = nabidniTerminy({ ...z, priorita: "P3" }, d(), v, "2026-10-15");
+    const vSla = m.find((x) => !x.poSla)!, po = m.find((x) => x.poSla)!;
+    expect(po.skore - po.kmNavic - (vSla.skore - vSla.kmNavic)).toBeCloseTo(25, 5);
+    expect(nabidniTerminy({ ...z, priorita: "P1" }, d(), v, "2026-10-01").map((x) => x.skore)).toEqual(m.map((x) => x.skore));
   });
 });
 

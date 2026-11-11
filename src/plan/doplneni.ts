@@ -4,7 +4,9 @@
 // dovedností – a navíc už naplánované zakázky s poznámkou „flex“ (zákazník je flexibilní), pokud
 // je slot dřív než jejich současný termín (přesun dopředu).
 // Každý kandidát se zkusmo vloží do trasy dne technika (TSP s časovými okny); řadí se podle
-// naléhavosti SLA a priority, pak podle km navíc. Zajížďka nad limit (75 km) se nenabízí.
+// km navíc (cíl: využít volný slot s co nejmenším nájezdem); SLA je jen doplňková váha, priorita
+// P1–P0 se nepoužívá. Při stejném skóre má nenaplánovaná zakázka přednost před přesunem „flex“
+// (přesun slot zaplní, ale jiný uvolní). Zajížďka nad limit (75 km) se nenabízí.
 
 import type { Priorita } from "../domain/priorita.js";
 import type { Zakazka } from "../import/mwfExport.js";
@@ -49,7 +51,6 @@ export interface NastaveniDoplneni {
   bonusSlaProslo: number;
   bonusSlaDo48h: number;
   bonusSlaDo5dni: number;
-  bonusPriorita: Record<Priorita, number>;
   trvaniMin: number;
   /** „zvýšit toleranci“: povolený pozdější příjezd na další zakázku jako podíl délky okna (0,25 = 25 %) */
   tolerance?: number;
@@ -57,11 +58,10 @@ export interface NastaveniDoplneni {
 
 export const NASTAVENI_DOPLNENI: NastaveniDoplneni = {
   maxZajizdkaKm: NASTAVENI_PLANU.maxZajizdkaKm, // 75 km – bude se zpřesňovat
-  // doplnění slotu: primární je slot zaplnit – SLA pořadí neovlivňuje (lze zapnout v Nastavení plánování)
-  bonusSlaProslo: 0,
-  bonusSlaDo48h: 0,
+  // doplnění slotu: rozhodují km navíc; SLA má jen mírnou váhu (v km), ladí se v Nastavení plánování
+  bonusSlaProslo: 10,
+  bonusSlaDo48h: 5,
   bonusSlaDo5dni: 0,
-  bonusPriorita: { P1: 20, P2: 10, P3: 0, P0: 0 },
   trvaniMin: 90,
 };
 
@@ -94,8 +94,6 @@ export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: V
         duvody.push(hodin <= 0 ? "SLA už prošlo" : hodin <= 48 ? "SLA do 48 h" : "SLA do 5 dní");
       }
     }
-    bonus += nast.bonusPriorita[k.priorita] ?? 0;
-    if (k.priorita === "P1" || k.priorita === "P2") duvody.push(`priorita ${k.priorita}`);
     if (k.presun) duvody.push("přesun dopředu (flex)");
     const pozde = Math.max(0, ...t.zastavky.map((x) => x.zpozdeni));
     if (pozde > 0) duvody.push(`další zakázka o ${Math.round(pozde)} min později`);
@@ -105,5 +103,5 @@ export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: V
     }
     vysledek.push({ kandidat: k, kmNavic, kmDne: t.km, poSla, skore: kmNavic - bonus, duvody });
   }
-  return vysledek.sort((a, b) => a.skore - b.skore).slice(0, pocet);
+  return vysledek.sort((a, b) => a.skore - b.skore || Number(!!a.kandidat.presun) - Number(!!b.kandidat.presun)).slice(0, pocet);
 }

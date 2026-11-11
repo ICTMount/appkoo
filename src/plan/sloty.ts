@@ -36,8 +36,6 @@ export interface NastaveniPlanu {
   maxZajizdkaKm: number;
   /** penalizace okna po termínu SLA (v km) */
   penalizacePoSlaKm: number;
-  /** penalizace za každý den odkladu podle priority (v km) */
-  penalizaceDneKm: Record<Priorita, number>;
   /** preferované okno pro termíny (SKILLS v5: primárně 10:00–14:00), mimo něj penalizace */
   preferovaneOkno: Okno;
   penalizaceMimoPreferovaneKm: number;
@@ -53,11 +51,10 @@ export interface NastaveniPlanu {
 
 export const NASTAVENI_PLANU: NastaveniPlanu = {
   maxZajizdkaKm: 75, // SKILLS v5, část 22: „max 75 km za férové“
-  penalizacePoSlaKm: 0, // SLA nabídku termínů neovlivňuje (lze zapnout v Nastavení plánování)
-  penalizaceDneKm: { P1: 15, P2: 8, P3: 3, P0: 0 },
+  penalizacePoSlaKm: 25, // slot po termínu SLA prohraje se slotem v SLA, pokud ten není o víc než 25 km dál
   preferovaneOkno: { od: 10 * 60, do: 14 * 60 },
-  penalizaceMimoPreferovaneKm: 8,
-  // pořadí kritérií: zaplnit den > SLA > km (prázdný den je dražší než okno po SLA)
+  penalizaceMimoPreferovaneKm: 0, // 0 = denní doba nehraje roli (cílem je využít každý VOLNY)
+  // pořadí kritérií: zaplnit den > SLA > km navíc; priorita P1–P0 a počet dní odkladu pořadí neovlivňují
   penalizacePrazdnyDenKm: 100,
   bonusZaZakazkuVeDniKm: 6,
   maxZakazekProBonus: 4,
@@ -107,19 +104,18 @@ export function nabidniTerminy(
       if (kmNavic > nast.maxZajizdkaKm) continue;
       const zacatek = new Date(den0(den.datum) + okno.od * 60_000);
       const poSla = !!z.slaKonec && zacatek > z.slaKonec;
-      const dniOdkladu = Math.max(0, Math.round((den0(den.datum) - den0(dnes)) / 86_400_000));
       const mimoPreferovane = okno.od < nast.preferovaneOkno.od || okno.od >= nast.preferovaneOkno.do;
       const skore =
         kmNavic +
         (poSla ? nast.penalizacePoSlaKm : 0) +
-        dniOdkladu * nast.penalizaceDneKm[z.priorita] +
         (mimoPreferovane ? nast.penalizaceMimoPreferovaneKm : 0) +
         cenaZaplneni(den.navstevy.length, nast) +
         (uprava ? uprava(den.datum, okno) : 0);
       moznosti.push({ technik: den.technik, datum: den.datum, okno, kmNavic, kmDne: t.km, poSla, skore, trasa: t });
     }
   }
-  return moznosti.sort((a, b) => a.skore - b.skore).slice(0, pocet);
+  // při shodě skóre dřívější termín
+  return moznosti.sort((a, b) => a.skore - b.skore || a.datum.localeCompare(b.datum) || a.okno.od - b.okno.od).slice(0, pocet);
 }
 
 export interface Prirazeni {
