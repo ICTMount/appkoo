@@ -25,6 +25,116 @@ export interface Notifikace {
   zoznam: string | null;
   /** Priebeh optický – řádky tabulky (Názov linky, A uzol, Z akcia); null = PDF načteno starší verzí, tabulka se ještě nečetla */
   priebeh: RadekPriebehu[] | null;
+  /** Zařízení ze všech oddílů „Zoznam KZ“ (ONT, mesh AP, set-top boxy); null = PDF načteno starší verzí */
+  zariadenia: Zariadenie[] | null;
+}
+
+/** Jeden řádek tabulky „Zoznam KZ“ */
+export interface Zariadenie {
+  /** „ONT - Optical Network Terminal“, „AP - Access Point“, „TVoI - Set-top-box“ */
+  typ: string;
+  /** „4FE 2FX“, „Mesh“, „LAN“ */
+  subtyp: string;
+  /** Add / Delete / Modify */
+  aktivita: string;
+  /** Spôsob doručenia: Technik (přiveze technik) / kurýr… */
+  doruceni: string;
+  model: string;
+  druh: "ont" | "mesh" | "stb" | "jine";
+}
+
+/** Slova buňky zalomené přes řádky: „Set-top-“ + „box“ → „Set-top-box“, samostatná pomlčka s mezerami */
+const spojSlova = (slova: string[]) => slova.reduce((acc, t) => (/\w-$/.test(acc) && t !== "-" ? acc + t : acc ? `${acc} ${t}` : t), "");
+
+const druhZariadenia = (typ: string, subtyp: string): Zariadenie["druh"] =>
+  /set-?top|\bSTB\b/i.test(typ) ? "stb" : /mesh/i.test(subtyp) || /access\s*point|^AP\b/i.test(typ) ? "mesh" : /\bONT\b/i.test(typ) ? "ont" : "jine";
+
+/**
+ * Všechny oddíly „Zoznam KZ“ (PDF jich má jeden na pracovní požadavek – zvlášť internet, zvlášť TV).
+ * Tabulka je v „-layout“ textu po sloupcích; jeden záznam je na 3–5 řádcích se slovem Aktivita (Add/ADD) uprostřed,
+ * ostatní řádky se přiřadí k nejbližšímu záznamu.
+ */
+export function parsujZariadenia(radky: string[]): Zariadenie[] {
+  type Sloupec = "model" | "aktivita" | "typ" | "subtyp" | "seriove" | "doruceni" | "vlastnictvo" | "mac" | "cpe" | "zoznam";
+  const vysledek: Zariadenie[] = [];
+  for (let i = 0; i < radky.length; i++) {
+    if (!/Zoznam KZ\s*:/i.test(radky[i]!)) continue;
+    const iHl = radky.findIndex((r, j) => j > i && j < i + 6 && /\bAktivita\b/.test(r) && /\bModel\b/.test(r));
+    if (iHl < 0) continue;
+    // střed slova záhlaví každého sloupce (buňky jsou centrované, slovo patří do sloupce s nejbližším středem);
+    // záhlaví posledních sloupců je na více řádcích („Sériove čislo / KZ“, „Sposob / doručenia“, „Zoznam / kompatibilných / zariadení“)
+    const stredy = new Map<Sloupec, number>();
+    let konecHl = iHl;
+    for (let j = Math.max(i + 1, iHl - 2); j < Math.min(radky.length, iHl + 4); j++) {
+      for (const s of slova(radky[j]!)) {
+        const stred = s.od + s.text.length / 2;
+        const t = s.text;
+        if (j === iHl && /^Model$/i.test(t)) stredy.set("model", stred);
+        else if (j === iHl && /^Aktivita$/i.test(t)) stredy.set("aktivita", stred);
+        else if (j === iHl && /^Typ$/i.test(t)) stredy.set("typ", stred);
+        else if (j === iHl && /^Subtyp$/i.test(t)) stredy.set("subtyp", stred);
+        else if (j === iHl && /^Vlastníctvo$/i.test(t)) stredy.set("vlastnictvo", stred);
+        else if (j === iHl && /^Mac$/i.test(t)) stredy.set("mac", stred + 4);
+        else if (j === iHl && /^CPE$/i.test(t)) stredy.set("cpe", stred + 3);
+        else if (/^Sériove$/i.test(t)) stredy.set("seriove", stred + 3);
+        else if (/^Sposob$/i.test(t)) stredy.set("doruceni", stred + 1);
+        else if (/^kompatibiln[yý]ch$/i.test(t)) { stredy.set("zoznam", stred); konecHl = Math.max(konecHl, j); }
+        else if (/^(KZ|doručenia|zariaden[ií]|Zoznam|čislo)$/i.test(t)) konecHl = Math.max(konecHl, j);
+      }
+    }
+    if (!stredy.has("aktivita") || !stredy.has("typ")) continue;
+    // hranice mezi sloupci = polovina mezi středy sousedních záhlaví; slovo patří do sloupce podle svého začátku
+    // (buňky jsou centrované, víceslovné hodnoty začínají vlevo od středu – střed slova by u nich klamal)
+    const poradi = [...stredy.entries()].sort((x, y) => x[1] - y[1]);
+    const sloupec = (s: { od: number; text: string }): Sloupec => {
+      let nej: Sloupec = poradi[0]![0];
+      for (let k = 1; k < poradi.length; k++) {
+        const hranice = (poradi[k - 1]![1] + poradi[k]![1]) / 2;
+        if (s.od + Math.min(2, s.text.length / 2) >= hranice) nej = poradi[k]![0];
+      }
+      return nej;
+    };
+    // řádky oddílu: až po další oddíl (text od okraje stránky; nová stránka začíná \f) nebo další Zoznam KZ
+    const telo: { od: number; text: string }[][] = [];
+    for (let j = konecHl + 1; j < radky.length; j++) {
+      const r = radky[j]!.replace(/^\f/, "");
+      if (/^\S/.test(r) || /Zoznam KZ\s*:/i.test(r)) break;
+      telo.push(slova(r));
+    }
+    const maAkt = (s: { od: number; text: string }[]) => s.some((x) => sloupec(x) === "aktivita" && /^(Add|Delete|Modify|Remove|Pridaj|Zru[sš]|Zme[nň])/i.test(x.text));
+    const maTyp = (s: { od: number; text: string }[]) => s.some((x) => sloupec(x) === "typ");
+    // záznam = řádek se slovem Aktivita + řádky s textem Typu těsně nad ním + vše pod ním až k dalšímu záznamu
+    const zacatky: number[] = [];
+    telo.forEach((s, j) => {
+      if (!maAkt(s)) return;
+      let z = j;
+      const predchozi = zacatky.length ? zacatky[zacatky.length - 1]! : -1;
+      const predchoziAkt = zacatky.length ? telo.findIndex((t, q) => q >= predchozi && maAkt(t)) : -1;
+      // nahoru jen přes řádky, které jsou blíž tomuto záznamu než předchozímu (text buňky je svisle centrovaný kolem řádku s Aktivitou)
+      while (z - 1 > predchozi && telo[z - 1]!.length && maTyp(telo[z - 1]!) && !maAkt(telo[z - 1]!) && (predchoziAkt < 0 || j - (z - 1) < (z - 1) - predchoziAkt)) z--;
+      zacatky.push(z);
+    });
+    if (!zacatky.length) { i = konecHl; continue; }
+    zacatky.forEach((od, k) => {
+      const do_ = k + 1 < zacatky.length ? zacatky[k + 1]! : telo.length;
+      const z = { typ: [] as string[], subtyp: [] as string[], aktivita: [] as string[], doruceni: [] as string[], model: [] as string[] };
+      for (let j = od; j < do_; j++) {
+        for (const x of telo[j]!) {
+          const c = sloupec(x);
+          if (c === "typ") z.typ.push(x.text);
+          else if (c === "subtyp") z.subtyp.push(x.text);
+          else if (c === "aktivita") z.aktivita.push(x.text);
+          else if (c === "doruceni") z.doruceni.push(x.text);
+          else if (c === "zoznam") z.model.push(x.text);
+        }
+      }
+      const typ = spojSlova(z.typ);
+      const subtyp = z.subtyp.join(" ");
+      vysledek.push({ typ, subtyp, aktivita: z.aktivita.join(" "), doruceni: z.doruceni.join(" "), model: z.model.join(" ").replace(/\s*\|\s*/g, " | ").trim(), druh: druhZariadenia(typ, subtyp) });
+    });
+    i = konecHl;
+  }
+  return vysledek;
 }
 
 export interface UlozenaNotifikace extends Notifikace {
@@ -111,7 +221,7 @@ export function parsujNotifikaci(text: string, nazevSouboru = "", bboxHtml = "")
   }
   const kzRadky = iKz >= 0 ? [radky[iKz]!.replace(/^[\s\S]*?Zoznam KZ\s*:/i, (m) => " ".repeat(m.length)), ...radky.slice(iKz + 1)] : [];
   const { cpeMode, zoznam } = parsujKz(kzRadky);
-  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, idS7, predpis: predpis.filter((p) => p !== ""), cpeMode, zoznam, priebeh: bboxHtml ? parsujPriebeh(bboxHtml) : [] };
+  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, idS7, predpis: predpis.filter((p) => p !== ""), cpeMode, zoznam, priebeh: bboxHtml ? parsujPriebeh(bboxHtml) : [], zariadenia: parsujZariadenia(radky) };
 }
 
 /** Text PDF přes poppler (`pdftotext -layout`), v image je balík poppler-utils. */
@@ -155,6 +265,7 @@ function priprav(db: Dotaz): Promise<unknown> {
       .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_objednavky_zaklad text"))
       .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_s7 text[]"))
       .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS priebeh jsonb"))
+      .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS zariadenia jsonb"))
       .then(() => db.query("UPDATE notifikace_pdf SET id_objednavky_zaklad = upper(substring(id_objednavky from '^O-[0-9]+')) WHERE id_objednavky_zaklad IS NULL AND id_objednavky IS NOT NULL"))
       .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC)"))
       .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC)"))
@@ -178,11 +289,11 @@ export async function ulozNotifikaci(db: Dotaz, n: UlozenaNotifikace | { souborI
     return;
   }
   await db.query(
-    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, chyba)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, NULL)
+    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, zariadenia, chyba)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, NULL)
      ON CONFLICT (soubor_id) DO UPDATE SET id_aktivity = EXCLUDED.id_aktivity, id_objednavky = EXCLUDED.id_objednavky, id_objednavky_zaklad = EXCLUDED.id_objednavky_zaklad,
-       id_s7 = EXCLUDED.id_s7, predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, priebeh = EXCLUDED.priebeh, chyba = NULL, nacteno = now()`,
-    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.idS7, n.predpis, n.cpeMode, n.zoznam, JSON.stringify(n.priebeh)],
+       id_s7 = EXCLUDED.id_s7, predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, priebeh = EXCLUDED.priebeh, zariadenia = EXCLUDED.zariadenia, chyba = NULL, nacteno = now()`,
+    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.idS7, n.predpis, n.cpeMode, n.zoznam, JSON.stringify(n.priebeh), JSON.stringify(n.zariadenia ?? [])],
   );
 }
 
@@ -195,15 +306,15 @@ export async function nactiNotifikaci(db: Dotaz, idAktivity: string, klice: { id
     await priprav(db);
     const zaklad = klice.idObjednavkyZaklad ? zakladniCisloObjednavky(klice.idObjednavkyZaklad) : null;
     const s7 = klice.idS7?.trim().toUpperCase() || null;
-    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; id_s7: string[] | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null; priebeh: RadekPriebehu[] | null }>(
-      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh FROM notifikace_pdf
+    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; id_s7: string[] | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null; priebeh: RadekPriebehu[] | null; zariadenia: Zariadenie[] | null }>(
+      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, zariadenia FROM notifikace_pdf
         WHERE chyba IS NULL AND (id_aktivity = $1 OR ($2::text IS NOT NULL AND $2 = ANY(id_s7)) OR ($3::text IS NOT NULL AND id_objednavky_zaklad = $3))
         ORDER BY (id_aktivity = $1) DESC, ($2::text IS NOT NULL AND $2 = ANY(id_s7)) DESC, vznik DESC LIMIT 1`,
       [idAktivity, s7, zaklad],
     );
     const r = rows[0];
     if (!r) return null;
-    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam, priebeh: Array.isArray(r.priebeh) ? r.priebeh : null };
+    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam, priebeh: Array.isArray(r.priebeh) ? r.priebeh : null, zariadenia: Array.isArray(r.zariadenia) ? r.zariadenia : null };
   } catch {
     return null; // detail zakázky nesmí spadnout kvůli notifikacím
   }
@@ -230,10 +341,10 @@ export async function importujNotifikace(
   const naText = deps.textZPdf ?? textZPdf;
   const naBbox = deps.bboxZPdf ?? bboxZPdf;
   // neúspěšné soubory se po dni zkusí znovu (výpadek Drive apod.); PDF načtená starší verzí (bez tabulky Priebeh,
-  // nebo bez sloupce Typ linky v ní) se přečtou znovu
+  // bez sloupce Typ linky v ní, nebo bez zařízení ze Zoznamu KZ) se přečtou znovu
   const { rows } = await db.query<{ soubor_id: string }>(
     `SELECT soubor_id FROM notifikace_pdf
-      WHERE (chyba IS NULL AND priebeh IS NOT NULL AND (priebeh = '[]'::jsonb OR priebeh->0 ? 'typLinky'))
+      WHERE (chyba IS NULL AND priebeh IS NOT NULL AND (priebeh = '[]'::jsonb OR priebeh->0 ? 'typLinky') AND zariadenia IS NOT NULL)
          OR (chyba IS NOT NULL AND nacteno > now() - interval '1 day')`,
   );
   const znama = new Set(rows.map((r) => r.soubor_id));

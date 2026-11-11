@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS notifikace_pdf (
   cpe_mode      text,                        -- Zoznam KZ → CPE Mode
   zoznam        text,                        -- Zoznam KZ → Zoznam kompatibilných zariadení
   priebeh       jsonb,                       -- Priebeh optický: [{nazovLinky, aUzol, zAkcia}]
+  zariadenia    jsonb,                       -- zařízení ze Zoznamu KZ: [{typ, subtyp, aktivita, doruceni, model, druh}]
   chyba         text,                        -- proč se PDF nepodařilo přečíst (NULL = v pořádku)
   nacteno       timestamptz NOT NULL DEFAULT now()
 );

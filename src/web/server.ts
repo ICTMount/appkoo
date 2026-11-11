@@ -442,7 +442,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const casDo = nestd?.do ?? vyb.do;
         // náhled události (nadpis a místo tak, jak budou v kalendáři) – formulář vypadá jako událost v Google Kalendáři
         const nahled = (() => {
-          const u = sestavUdalost(detail.z, technik.nazevVKalendari, casOd, casDo, udajeZFormulare(formular), slaKonec(detail.z, stav.posledniExport ?? now), inicialy(kontext.koordinatorky, email));
+          const u = sestavUdalost(detail.z, technik.nazevVKalendari, casOd, casDo, udajeZFormulare(formular), slaKonec(detail.z, stav.posledniExport ?? now), inicialy(kontext.koordinatorky, email), detail.notifikace);
           return { summary: nestd?.nadpis ?? u.summary, location: u.location ?? "" };
         })();
         // pravý sloupec: den technika v kalendáři (s vyznačeným slotem) a zakázky naplánované ten den v okolí
@@ -460,7 +460,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
 
         const sla = slaKonec(detail.z, stav.posledniExport ?? now);
         const slozkaZak = await nactiSlozku(db, detail.z.idObjednavkyZaklad);
-        const udalost = sestavUdalost(detail.z, technik.nazevVKalendari, casOd, casDo, { ...udajeZFormulare(formular), ...(slozkaZak ? { dokumenty: slozkaZak.odkaz } : {}) }, sla, inicialy(kontext.koordinatorky, email));
+        const udalost = sestavUdalost(detail.z, technik.nazevVKalendari, casOd, casDo, { ...udajeZFormulare(formular), ...(slozkaZak ? { dokumenty: slozkaZak.odkaz } : {}) }, sla, inicialy(kontext.koordinatorky, email), detail.notifikace);
         if (nestd?.nadpis) udalost.summary = nestd.nadpis;
         const { api } = await n.planovac();
         try {

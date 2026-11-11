@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { parsujKz, parsujNotifikaci } from "../src/ingest/notifikace.js";
+import { parsujKz, parsujNotifikaci, parsujZariadenia } from "../src/ingest/notifikace.js";
 import { kVytvoreni, parsujPriebeh, radekPriebehu, textBunky } from "../src/ingest/priebeh.js";
 
 // Výřez textu notifikačního PDF (pdftotext -layout) pro O-8555864483_22243701#1-DDWX4YA
@@ -42,9 +42,46 @@ Priebeh partnera:
                                                  KZ              doručenia                                          kompatibilných
                                                                                                                     zariadení
 
-  ONT - Optical    Add        4FE 2FX                            Technik      Rent                       Route      Sagemcom
-  Network                                                                                                           5670
-  Terminal
+                            ONT - Optical                                                                           Sagemcom
+                     Add               4FE 2FX                   Technik      Rent                       Route
+                              Network                                                                               5670
+                             Terminal
+`;
+
+// Dva oddíly „Zoznam KZ“ z notifikace 1-CR59111 (CETIN, mesh) a z TVoI objednávky (set-top boxy); druhý oddíl je na nové stránce (\f)
+const TEXT_KZ = `Zoznam KZ:
+  Spôsob inštalácie    Technik
+                                                               Sériove čislo    Sposob                                                       Zoznam
+       Model          Aktivita       Typ          Subtyp                                      Vlastníctvo    Mac adresa     CPE Mode
+                                                                    KZ         doručenia                                                  kompatibilných
+                                                                                                                                            zariadení
+                                 AP - Access                                                                                                Sercomm
+                       Add                         Mesh                         Technik          Rent
+                                    Point                                                                                                  RP562BDT
+                                 AP - Access                                                                                                Sercomm
+                       Add                         Mesh                         Technik          Rent
+                                    Point                                                                                                  RP562BDT
+                                 ONT - Optical                                                                                             Sagemcom
+                       Add                        4FE 2FX                       Technik          Rent                         Route
+                                   Network                                                                                                    5670
+                                  Terminal
+\fPracovní požadavek:                26843733
+Zoznam KZ:
+                                                         Sériove čislo    Sposob                                      Zoznam
+       Model       Aktivita        Typ          Subtyp                                  Vlastníctvo   Mac adresa
+                                                              KZ         doručenia                                 kompatibilných
+                                                                                                                     zariadení
+                              TVoI - Set-top-                                                                          KAON
+                    ADD                          LAN                     Technik           Rent
+                                   box                                                                              KSTB6077 |
+                                                                                                                   Skyworth STB-
+                                                                                                                      HY4403
+                              TVoI - Set-top-                                                                          KAON
+                    ADD                          LAN                     Technik           Rent
+                                   box                                                                              KSTB6077 |
+                                                                                                                   Skyworth STB-
+                                                                                                                      HY4403
+Pracovní požadavek:                26843734
 `;
 
 describe("notifikační PDF z MWF", () => {
@@ -62,6 +99,15 @@ describe("notifikační PDF z MWF", () => {
     expect(n.predpis.some((r) => /Názov OLT/.test(r))).toBe(false); // konec předchozího oddílu na řádku nadpisu
     expect(n.cpeMode).toBe("Route");
     expect(n.zoznam).toBe("Sagemcom 5670");
+  });
+
+  it("Zoznam KZ → zařízení: ONT, mesh AP (6 řádků, centrované buňky přes 3 řádky), set-top boxy ve druhém oddílu", () => {
+    expect(parsujNotifikaci(TEXT, "19846155.pdf")!.zariadenia).toEqual([{ typ: "ONT - Optical Network Terminal", subtyp: "4FE 2FX", aktivita: "Add", doruceni: "Technik", model: "Sagemcom 5670", druh: "ont" }]);
+    const z = parsujZariadenia(TEXT_KZ.split("\n"));
+    expect(z.map((x) => x.druh)).toEqual(["mesh", "mesh", "ont", "stb", "stb"]);
+    expect(z[0]).toEqual({ typ: "AP - Access Point", subtyp: "Mesh", aktivita: "Add", doruceni: "Technik", model: "Sercomm RP562BDT", druh: "mesh" });
+    expect(z[2]!.typ).toBe("ONT - Optical Network Terminal");
+    expect(z[3]).toMatchObject({ typ: "TVoI - Set-top-box", subtyp: "LAN", aktivita: "ADD", doruceni: "Technik", model: "KAON KSTB6077 | Skyworth STB- HY4403" });
   });
 
   it("ID aktivity vezme z názvu souboru, když v textu chybí", () => {

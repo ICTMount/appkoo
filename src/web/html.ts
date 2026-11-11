@@ -21,7 +21,7 @@ import { jeObrazek, type Nalez, type NalezLokality, type VysledekZdroje, type Zd
 import { webcalendar, type Webcalendar } from "../domain/webcalendar.js";
 import { migrace, zasuvkaUsed, type Migrace } from "../domain/migrace.js";
 import { instalacePredRfs, type InstalacePredRfs } from "../domain/predRfs.js";
-import { kombinaceZakazky, popisKombinace, type Kombinace } from "../domain/kombinace.js";
+import { kombinaceZakazky, popisKombinace, privezeTechnik, type Kombinace, type NotifikaceProKombinaci } from "../domain/kombinace.js";
 import type { Zaznam } from "../import/notes.js";
 
 export function esc(s: unknown): string {
@@ -258,17 +258,23 @@ function pruhPredRfs(p: InstalacePredRfs, technik: boolean): string {
 }
 
 /** Kombinovaná objednávka: FTTH + IPTV (set-top box) / FTTH + MESH – výrazně žlutý štítek všude, kde je zakázka vidět */
-export const kombiStitek = (z: Parameters<typeof kombinaceZakazky>[0]) => {
-  const k = kombinaceZakazky(z);
-  return k ? ` <span class="kombi" title="Kombinovaná objednávka ${esc(popisKombinace(k))} – víc zařízení k instalaci, delší pracnost; set-top box / mesh musí být doručené před termínem">${esc(popisKombinace(k))}</span>` : "";
+export const kombiStitek = (z: Parameters<typeof kombinaceZakazky>[0], n?: NotifikaceProKombinaci | null) => {
+  const k = kombinaceZakazky(z, n);
+  return k ? ` <span class="kombi" title="Kombinovaná objednávka ${esc(popisKombinace(k))} – víc zařízení k instalaci, delší pracnost (zdroj: ${k.zdroj.map((s) => (s === "pdf" ? "notifikační PDF" : "export MWF")).join(" + ")})">${esc(popisKombinace(k))}</span>` : "";
 };
 function pruhKombinace(k: Kombinace, technik: boolean): string {
   const body: string[] = [];
+  const dodani = (d: string | undefined, jinak: string) => {
+    const t = privezeTechnik(d);
+    if (t === true) return `<b>přiveze technik</b> (Zoznam KZ: doručení Technik – vzít ze skladu, u zákazníka nic nečekat)`;
+    if (t === false) return `doručení <b>${esc(d!)}</b> – ${jinak}`;
+    return jinak;
+  };
   if (k.iptv) {
-    body.push(`<li><b>IPTV</b>${k.setTopBoxu ? ` – <b>${k.setTopBoxu}× set-top box</b>` : " – set-top box"}: před termínem ověřit, že má zákazník set-top box doručený${technik ? "" : " (jinak termín posunout)"}; technik zapojuje a ověřuje i TV (STB ke kabelu/Wi-Fi, přihlášení, běžící vysílání).</li>`);
+    body.push(`<li><b>IPTV</b>${k.setTopBoxu ? ` – <b>${k.setTopBoxu}× set-top box</b>` : " – set-top box"}: ${dodani(k.doruceni.stb, `před termínem ověřit, že má zákazník set-top box doručený${technik ? "" : " (jinak termín posunout)"}`)}; technik zapojuje a ověřuje i TV (STB ke kabelu/Wi-Fi, přihlášení, běžící vysílání).</li>`);
   }
   if (k.mesh) {
-    body.push(`<li><b>MESH</b> – <b>${k.mesh}× Wi-Fi jednotka</b>: ověřit doručení <b>min. 2 dny před termínem</b>; aktivace <b>pouze z MWF app</b> (zlaté pravidlo 9). Umístění jednotek domluvit se zákazníkem.</li>`);
+    body.push(`<li><b>MESH</b> – <b>${k.mesh}× Wi-Fi jednotka</b>: ${dodani(k.doruceni.mesh, "ověřit doručení <b>min. 2 dny před termínem</b>")}; aktivace <b>pouze z MWF app</b> (zlaté pravidlo 9). Umístění jednotek domluvit se zákazníkem.</li>`);
   }
   body.push(`<li>Počítat s <b>delší pracností</b> (víc zařízení) – při plánování nechat delší okno${technik ? "" : "; zákazníkovi říct, že instalace zabere déle"}.</li>`);
   return `<div class="warn kombi-pruh"><b>Kombinovaná objednávka: ${esc(popisKombinace(k))}</b><ul>${body.join("")}</ul></div>`;
@@ -401,6 +407,20 @@ export function strankovaniNav(dotaz: string, strana: number, stran: number): st
   }</nav>`;
 }
 
+/** Řádky Zoznamu KZ sečtené podle typu: „2× AP – Access Point (Mesh) · Sercomm RP562BDT · přiveze technik“ */
+function zarizeniNotifikace(z: NonNullable<Detail["notifikace"]>["zariadenia"]): string {
+  if (!z) return `<span class="muted">přečte se při příštím běhu importu</span>`;
+  if (!z.length) return `<span class="muted">v PDF nenalezeno</span>`;
+  const skupiny = new Map<string, { n: number; x: (typeof z)[number] }>();
+  for (const x of z) {
+    const k = [x.aktivita, x.typ, x.subtyp, x.model, x.doruceni].join("|");
+    const g = skupiny.get(k);
+    if (g) g.n++;
+    else skupiny.set(k, { n: 1, x });
+  }
+  return `<ul class="predpis">${[...skupiny.values()].map(({ n, x }) => `<li>${n > 1 ? `<b>${n}×</b> ` : ""}${x.druh === "mesh" || x.druh === "stb" ? `<b>${esc(x.typ)}</b>` : esc(x.typ)}${x.subtyp ? ` (${esc(x.subtyp)})` : ""}${x.model ? ` · ${esc(x.model)}` : ""}${x.aktivita && !/^add$/i.test(x.aktivita) ? ` · ${esc(x.aktivita)}` : ""}${x.doruceni ? ` · ${privezeTechnik(x.doruceni) ? "přiveze technik" : `doručení: ${esc(x.doruceni)}`}` : ""}</li>`).join("")}</ul>`;
+}
+
 /** Výpis z notifikačního PDF z MWF: „Inštalačný predpis k“ celý, ze „Zoznam KZ“ jen CPE Mode a kompatibilní zařízení */
 export function sekceNotifikace(n: Detail["notifikace"]): string {
   const odkaz = n ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(n.souborId)}/view" target="_blank" rel="noopener">PDF</a>` : "";
@@ -420,7 +440,7 @@ ${priebeh()}
 <h3>Inštalačný predpis k</h3>
 ${n.predpis.length ? `<ul class="predpis">${n.predpis.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<span class="muted">v PDF chybí</span>`}
 <h3>Zoznam KZ</h3>
-<dl>${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>`;
+<dl>${radek("Zařízení", zarizeniNotifikace(n.zariadenia))}${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>`;
   return `<div class="card kompakt notif"><h2 class="s-ikonou"><span class="i-drive">${IKONA.drive}</span>Výpis z notifikačního PDF${n ? ` <small class="muted">${esc(n.nazev)} · ${esc(fmtDate(n.vznik))} · ${odkaz}</small>` : ""}</h2><div class="posun">${telo}</div></div>`;
 }
 
@@ -512,13 +532,13 @@ export function strankaZakazky(d: Detail, stav: StavImportu, uzivatel: string, n
       }`
     : `<span class="muted">bez historie</span>`;
 
-  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z)}${predobjStitek(z)}${webcalStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
+  const telo = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z, d.notifikace)}${predobjStitek(z)}${webcalStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} ${prio(d.priorita)} <small>${esc(z.zakaznik)}${s7(z) ? ` · ID S7 obj. ${esc(s7(z))}` : ""} · ID aktivity ${esc(z.idAktivity)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – instalace před datem RFS není možná, termíny se nabízejí až ode dne po RFS; realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity, !!plan.jenNahled) : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${(() => { const p = instalacePredRfs(z, now); return p ? pruhPredRfs(p, false) : ""; })()}
-${(() => { const k = kombinaceZakazky(z); return k ? pruhKombinace(k, false) : ""; })()}
+${(() => { const k = kombinaceZakazky(z, d.notifikace); return k ? pruhKombinace(k, false) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 ${plan.zprava ? `<div class="ok">${esc(plan.zprava)}</div>` : ""}
 <div class="grid">
@@ -581,12 +601,12 @@ ${sekcePlanovani(d, plan)}</section>`}`;
 
   // Technik v terénu: zákazník, adresa, telefon, patro/byt, předpis – to vše má v události v kalendáři.
   // Tady jen to, co tam není: upozornění, poznámky MWF, Chat a e-mail s přílohami, akce z notifikačního PDF, lokalita.
-  const teloTechnik = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z)}${predobjStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} <small>${esc(z.zakaznik)}</small></h1>
+  const teloTechnik = `<h1>${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z, d.notifikace)}${predobjStitek(z)}${migraceStitek(z)}${usedStitek(z)}${predRfsStitek(instalacePredRfs(z, now))} <small>${esc(z.zakaznik)}</small></h1>
 ${z.predobjednavka ? `<div class="warn predobj-pruh"><b>Předobjednávka</b> (${esc(z.typAktivity)}) – realizace až po změně na standardní zakázku v MWF${z.rfs ? ` (RFS ${esc(den(z.rfs))})` : ""}.</div>` : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${(() => { const p = instalacePredRfs(z, now); return p ? pruhPredRfs(p, true) : ""; })()}
-${(() => { const k = kombinaceZakazky(z); return k ? pruhKombinace(k, true) : ""; })()}
+${(() => { const k = kombinaceZakazky(z, d.notifikace); return k ? pruhKombinace(k, true) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 <div class="card"><dl>
 ${radek("Stav MWF", esc(z.stavMwf))}
@@ -701,7 +721,7 @@ const slot = (od: Date, do_: Date) => `${denTydne(od)} ${fmtDate(od)} ${fmtTime(
 function hlavickaZakazky(d: Detail): string {
   const z = d.z;
   return `<p><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">← ${esc(z.idObjednavky || z.idAktivity)}</a></p>
-<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z)}${predobjStitek(z)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
+<h1>Termín pro ${esc(z.idObjednavky || z.idAktivity)} ${infraStitek(z.infrastruktura)}${kombiStitek(z, d.notifikace)}${predobjStitek(z)} <small>${esc(z.zakaznik)} · ${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))} · ${esc(z.typAktivity)}</small></h1>`;
 }
 
 

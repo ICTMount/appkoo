@@ -4,7 +4,7 @@
 
 import type { Zakazka } from "../import/mwfExport.js";
 import { instalacePredRfs, radekUdalostiPredRfs } from "../domain/predRfs.js";
-import { kombinaceZakazky, popisKombinace, zkratkaKombinace } from "../domain/kombinace.js";
+import { kombinaceZakazky, popisKombinace, privezeTechnik, zkratkaKombinace, type NotifikaceProKombinaci } from "../domain/kombinace.js";
 import { fmtDate, fmtTime } from "../domain/time.js";
 
 /** Údaje zjištěné při hovoru (kontrolní seznam call scriptu) */
@@ -70,8 +70,9 @@ export function sestavUdalost(
   h: UdajeHovoru = {},
   slaKonec?: Date | null,
   koordinatorka?: string, // iniciály, např. „AP“
+  notifikace?: NotifikaceProKombinaci | null, // notifikační PDF (Zoznam KZ) – kombinované objednávky
 ): UdalostKalendare {
-  const kombi = kombinaceZakazky(z);
+  const kombi = kombinaceZakazky(z, notifikace);
   // kombinovaná objednávka: v názvu „FTTH+IPTV“ / „FTTH+MESH“, v popisu řádek s počty zařízení
   const sluzba = z.typAktivity.includes("PIV") ? "PIV" : kombi ? zkratkaKombinace(kombi) : "FTTH";
   // Stejný tvar jako dnešní události v kalendářích techniků:
@@ -89,7 +90,7 @@ export function sestavUdalost(
     ...(h.flex ? [textFlex(h.flex, h.flexPoznamka)] : []),
     `${h.novaInstalace === false ? "Existující" : "Nová instalace"}${h.zasuvka ? ` – zásuvka ${h.zasuvka}` : ""}`,
     `INSTALACE: Optický internet${h.iptv || kombi?.iptv ? " / IPTV" : ""}${kombi?.mesh ? " / MESH" : ""}`,
-    ...(kombi ? [`KOMBINOVANÁ OBJEDNÁVKA: ${popisKombinace(kombi)}${kombi.mesh ? " – mesh aktivovat jen z MWF app, ověřit doručení" : ""}${kombi.iptv ? " – zapojit a ověřit i set-top box" : ""}`] : []),
+    ...(kombi ? [`KOMBINOVANÁ OBJEDNÁVKA: ${popisKombinace(kombi)}${kombi.mesh ? ` – mesh aktivovat jen z MWF app${privezeTechnik(kombi.doruceni.mesh) ? ", jednotky přiveze technik" : ", ověřit doručení"}` : ""}${kombi.iptv ? ` – zapojit a ověřit i set-top box${privezeTechnik(kombi.doruceni.stb) ? " (přiveze technik)" : ""}` : ""}`] : []),
     `ČÍSLO PATRA A BYTU: ${h.patro ?? "?"} / ${h.byt ?? "?"}`,
     `PATRA VOLNĚ PŘÍSTUPNÁ: ${ano(h.patraPristupna)}`,
     `STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran): ${h.stoupacka ?? "NEVÍM"}`,
