@@ -416,6 +416,11 @@ export async function navrhyProSlot(
 ): Promise<NavrhySlotu> {
   const t = slot.technik;
   const datum = isoDate(slot.od);
+  // předobjednávka nejde instalovat před RFS: do slotu se nabízí až ode dne po RFS (stejné pravidlo jako u nabídky termínů a zápisu)
+  zakazky = zakazky.filter((k) => {
+    const nejdrive = nejdrivePodleRfs(k.z);
+    return !nejdrive || datum >= nejdrive;
+  });
   const prazdne: NavrhySlotu = { navrhy: [], kandidatu: 0, flex: 0, bezPolohy: 0, bezPolohyVeDni: 0, den: [], nedostupne: [] };
 
   const denKal = await nactiKalendare(zav.api, [t], atTime(datum, 0), atTime(addDays(datum, 1), 0));
