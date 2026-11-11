@@ -248,82 +248,89 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
 
 const CSS = `
 *{box-sizing:border-box}
-body{margin:0;font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:clamp(12px,.42vw + 5px,21px);color:#1f1f1f;background:#fff}
-a{color:#1967d2;text-decoration:none}a:hover{text-decoration:underline}
+:root{color-scheme:light dark;--panel:#fff;--text:#1d1d1b;--muted:#5f5f5a;--line:#dadce0;--okraj:#747775;--hover:#f1f3f4;--accent:#1f5fbf;--vyb-bg:#d3e3fd;--vyb-fg:#0b2e6b;--vyb2:#eef3fd}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#3a3935;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}}
+:root[data-theme=dark]{--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#3a3935;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+body{margin:0;font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:clamp(12px,.42vw + 5px,21px);color:var(--text);background:var(--panel)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 button,input{font:inherit}
 .k{height:100vh;min-height:620px;display:flex;flex-direction:column}
-.k-lista{display:flex;flex-wrap:wrap;align-items:center;gap:.3em .9em;padding:.45em 1em;border-bottom:1px solid #dadce0}
-.k-logo{font-size:1.35em;font-weight:700;color:#1967d2}
+.k-lista{display:flex;flex-wrap:wrap;align-items:center;gap:.3em .9em;padding:.45em 1em;border-bottom:1px solid var(--line)}
+.k-logo{font-size:1.35em;font-weight:700;color:var(--accent)}
 .k-zak{font-size:1.15em;font-weight:500}
-.k-sedy{color:#444746}
+.k-sedy{color:var(--muted)}
 .k-nav{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:.5em}
-.k-tl{display:inline-flex;align-items:center;min-height:36px;padding:0 1.1em;border-radius:18px;border:1px solid #747775;background:#fff;font-weight:500;color:#1f1f1f}
-.k-tl:hover{background:#f1f3f4;text-decoration:none}
-.k-sipka{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:36px;border-radius:18px;font-size:1.5em;color:#444746}
-.k-sipka:hover{background:#f1f3f4;text-decoration:none}
+.k-tl{display:inline-flex;align-items:center;min-height:36px;padding:0 1.1em;border-radius:18px;border:1px solid var(--okraj);background:var(--panel);font-weight:500;color:var(--text)}
+.k-tl:hover{background:var(--hover);text-decoration:none}
+.k-sipka{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:36px;border-radius:18px;font-size:1.5em;color:var(--muted)}
+.k-sipka:hover{background:var(--hover);text-decoration:none}
 .k-datum{font-size:1.35em}
-.k-prep{display:flex;border:1px solid #747775;border-radius:18px;overflow:hidden}
-.k-prep a{display:inline-flex;align-items:center;min-height:36px;padding:0 1.2em;font-weight:500;color:#1f1f1f}
-.k-prep a+a{border-left:1px solid #747775}
-.k-prep a.on{background:#d3e3fd;color:#0b2e6b}
+.k-prep{display:flex;border:1px solid var(--okraj);border-radius:18px;overflow:hidden}
+.k-prep a{display:inline-flex;align-items:center;min-height:36px;padding:0 1.2em;font-weight:500;color:var(--text)}
+.k-prep a+a{border-left:1px solid var(--okraj)}
+.k-prep a.on{background:var(--vyb-bg);color:var(--vyb-fg)}
 .k-telo{display:flex;flex-wrap:wrap;flex:1;min-height:0}
 .k-panel{flex:0 0 16em;max-width:100%;padding:.5em .9em .9em;display:flex;flex-direction:column;gap:.1em;overflow-y:auto;max-height:100%}
 .k-panel label{display:flex;align-items:center;gap:.6em;min-height:26px;cursor:pointer}
 .k-panel input[type=checkbox]{width:1.2em;height:1.2em;flex:none}
 .k-panel b{font-weight:500;margin:.5em 0 .3em}
 .k-panel .k-tl{justify-content:center;margin-top:.6em;cursor:pointer}
-.k-pozn{color:#444746;font-size:.9em;margin-top:.6em}
-.k-panel label small{display:block;color:#444746;font-size:.8em;line-height:1.1}
+.k-pozn{color:var(--muted);font-size:.9em;margin-top:.6em}
+.k-panel label small{display:block;color:var(--muted);font-size:.8em;line-height:1.1}
 .k-panel label>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mm{margin:.2em 0 .6em;font-size:.82em}
 .mm-h{display:flex;align-items:center;justify-content:space-between;white-space:nowrap;font-weight:500;font-size:1.1em;padding:0 .2em .3em}
-.mm-h span+span{display:flex}.mm-h a{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;border-radius:50%;color:#444746;font-size:1.3em}
-.mm-h a:hover{background:#f1f3f4;text-decoration:none}
+.mm-h span+span{display:flex}.mm-h a{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;border-radius:50%;color:var(--muted);font-size:1.3em}
+.mm-h a:hover{background:var(--hover);text-decoration:none}
 .mm table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:center}
-.mm th{font-weight:400;color:#444746;padding:.15em 0}
+.mm th{font-weight:400;color:var(--muted);padding:.15em 0}
 .mm td{padding:0}
-.mm td.t{color:#444746;background:#f1f3f4;font-size:.9em}
-.mm td a{display:inline-flex;align-items:center;justify-content:center;width:1.9em;height:1.9em;border-radius:50%;color:#1f1f1f}
-.mm td a:hover{background:#f1f3f4;text-decoration:none}
-.mm td a.jiny{color:#80868b}
-.mm td a.dnes{background:#1967d2;color:#fff}
-.mm td a.vyb{background:#d3e3fd;color:#0b2e6b}
-.mm tr.vyb td{background:#eef3fd}.mm tr.vyb td.t{background:#d3e3fd}
+.mm td.t{color:var(--muted);background:var(--hover);font-size:.9em}
+.mm td a{display:inline-flex;align-items:center;justify-content:center;width:1.9em;height:1.9em;border-radius:50%;color:var(--text)}
+.mm td a:hover{background:var(--hover);text-decoration:none}
+.mm td a.jiny{color:var(--muted)}
+.mm td a.dnes{background:var(--accent);color:var(--panel)}
+.mm td a.vyb{background:var(--vyb-bg);color:var(--vyb-fg)}
+.mm tr.vyb td{background:var(--vyb2)}.mm tr.vyb td.t{background:var(--vyb-bg)}
 .ev-b b,.tip b{font-weight:700}
 .k-mriz{flex:999 1 560px;min-width:0;min-height:0;overflow-x:auto;display:flex}
 .k-vnitrek{flex:1;display:flex;flex-direction:column;padding-right:.5em}
 .k-hl,.k-grid{display:flex}
-.k-grid{flex:1;min-height:0;border-top:1px solid #dadce0}
+.k-grid{flex:1;min-height:0;border-top:1px solid var(--line)}
 .k-osa{width:3.4em;flex:none;display:flex;flex-direction:column}
-.k-osa div{flex:1 1 0;font-size:.8em;color:#444746;text-align:right;padding-right:.5em}
-.k-sl{min-width:0;border-left:1px solid #dadce0}
+.k-osa div{flex:1 1 0;font-size:.8em;color:var(--muted);text-align:right;padding-right:.5em}
+.k-sl{min-width:0;border-left:1px solid var(--line)}
 .k-hl .k-sl{text-align:center;padding:.25em .2em 0}
 .k-hl .k-sl>div:first-child{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .k-pods{display:flex}
-.k-pods div{flex:1 1 0;min-width:0;font-size:.8em;color:#444746;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:.2em}
-.k-grid .k-sl{display:flex;background-image:linear-gradient(to bottom,#dadce0 1px,transparent 1px)}
+.k-pods div{flex:1 1 0;min-width:0;font-size:.8em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:.2em}
+.k-grid .k-sl{display:flex;background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px)}
 .k-pod{flex:1 1 0;min-width:0;position:relative}
 .ev{position:absolute;left:1px;right:2px}
-.ev-b{display:flex;flex-direction:column;gap:1px;width:100%;height:100%;border-radius:4px;padding:.15em .4em;overflow:hidden;border:1px solid #fff;font-size:.9em;line-height:1.2;text-decoration:none}
+.ev-b{display:flex;flex-direction:column;gap:1px;width:100%;height:100%;border-radius:4px;padding:.15em .4em;overflow:hidden;border:1px solid var(--panel);font-size:.9em;line-height:1.2;text-decoration:none}
 .ev-b:hover{text-decoration:none;filter:brightness(.93)}
 .ev-b span:first-child{font-weight:500}
-.tip{display:none;position:absolute;width:24em;max-width:60vw;background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.7em .9em;font-size:14px;line-height:1.4;text-align:left}
+.tip{display:none;position:absolute;width:24em;max-width:60vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.7em .9em;font-size:14px;line-height:1.4;text-align:left}
 .tip-n{display:flex;gap:.6em;align-items:flex-start;font-size:1.1em;font-weight:500}
 .tip-n i{flex:none;width:.9em;height:.9em;border-radius:3px;margin-top:.3em}
-.tip-c{color:#444746;margin:.2em 0 .4em 1.5em}
+.tip-c{color:var(--muted);margin:.2em 0 .4em 1.5em}
 .tip div.r{margin-left:1.5em;overflow-wrap:anywhere}
 .ev:hover,.ev:focus-within{z-index:5}
 .ev:hover .tip,.ev:focus-within .tip{display:block}
-.k-prazdno{padding:2em;color:#444746}
-.k-zakazka{display:flex;flex-wrap:wrap;align-items:center;gap:.25em .8em;padding:.4em 1em;border-bottom:1px solid #dadce0;background:#f8fafd}
-.k-zakazka .oid{font-size:1.2em;font-weight:700}
-.k-chip{display:inline-block;font-size:.8em;font-weight:700;padding:.05em .5em;border-radius:4px;border:1px solid #747775;background:#fff}
+.k-prazdno{padding:2em;color:var(--muted)}
+.k-zakazka{margin:.6em 1em .2em;border:2px solid var(--accent);border-radius:10px;padding:.7em 1em .6em;background:color-mix(in srgb,var(--accent) 6%,var(--panel));box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-wrap:wrap;align-items:center;gap:.3em .8em}
+.k-zakazka h2{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:.2em .6em;margin:0 0 .2em;font-size:20px;font-weight:700;color:var(--accent)}
+.k-zakazka h2 small{font-size:13px;font-weight:400;color:var(--muted)}
+.k-zakazka h2 small a{color:inherit;text-decoration:underline}
+.k-zakazka h2 .k-tl{margin-left:auto;font-size:13px;min-height:32px}
+.k-chip{display:inline-block;font-size:.8em;font-weight:700;padding:.05em .5em;border-radius:4px;border:1px solid var(--okraj);background:var(--panel)}
 .k-chip.zl{background:#fdd835;border-color:#a88c00;color:#000}
 .k-blok{flex-basis:100%;background:#fce8e6;color:#8c1d18;border:1px solid #f1aeb5;border-radius:6px;padding:.3em .7em;font-weight:500}
 .k-upoz{flex-basis:100%;background:#fef7e0;color:#5f4500;border:1px solid #f0d58a;border-radius:6px;padding:.3em .7em}
-.k-zive{font-size:.85em;color:#444746}
+.k-zive{font-size:.85em;color:var(--muted)}
 .k-zive.zaloha{color:#8c1d18;font-weight:700}
-.ev.navrh .ev-b{outline:4px solid #1f1f1f;outline-offset:-4px;box-shadow:inset 0 0 0 7px #fdd835}
+.ev.navrh .ev-b{outline:4px solid var(--text);outline-offset:-4px;box-shadow:inset 0 0 0 7px #fdd835}
 .ev.navrh .ev-b{padding:.55em .7em}
 .ev.navrh .ev-znak{background:#fdd835;color:#000;font-size:1.15em;padding:.05em .6em;border:2px solid #1f1f1f}
 .s-navrhem .ev:not(.navrh):not(.tato) .ev-b{opacity:.3}
@@ -332,7 +339,7 @@ button,input{font:inherit}
 .k-dop a{display:inline-flex;align-items:center;gap:.4em;background:#fdd835;color:#000;border:2px solid #1f1f1f;border-radius:1em;padding:.1em .7em;font-weight:500}
 .k-dop a b{font-weight:700}
 .k-dop a.jinde{background:#fff}
-.ev.tato .ev-b{outline:3px dashed #1f1f1f;outline-offset:-3px}
+.ev.tato .ev-b{outline:3px dashed var(--text);outline-offset:-3px}
 .ev-znak{margin-top:auto;align-self:flex-start;background:#fff;color:#0b5a2f;font-weight:700;border-radius:1em;padding:0 .5em}
 .k-navrhy{margin:.4em 0 0;padding:0;list-style:none;font-size:.9em}
 .k-navrhy li{margin:.25em 0}
@@ -440,8 +447,9 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const slaText = (t: Date) => `${DNY_KR[t.getUTCDay()]!.toLowerCase()} ${t.getUTCDate()}.${t.getUTCMonth() + 1}. ${hm(t)}`;
   const adrZ = z ? castAdresy(z.adresa) : null;
   const pruh = z
-    ? `<div class="k-zakazka"><a class="oid" href="/zakazka/${encodeURIComponent(z.idAktivity)}" title="Zpět na detail zakázky">${esc(z.oid)}</a>${z.infra ? `<span class="k-chip">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => `<span class="k-chip zl">${esc(x)}</span>`).join("")}
-<span>${esc(z.zakaznik ?? "")}${z.telefon ? ` · <a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a>` : ""}</span>
+    ? `<div class="k-zakazka"><h2>Kam naplánovat <small><a href="/zakazka/${encodeURIComponent(z.idAktivity)}" title="Zpět na detail zakázky">${esc(z.oid)}</a>${z.zakaznik ? ` · ${esc(z.zakaznik)}` : ""}</small><a class="k-tl" href="/zakazka/${encodeURIComponent(z.idAktivity)}">← Detail zakázky</a></h2>
+${z.infra ? `<span class="k-chip">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => `<span class="k-chip zl">${esc(x)}</span>`).join("")}
+${z.telefon ? `<span><a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a></span>` : ""}
 <span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
 ${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>` : ""}
 ${v.navrh && (s.navrhy ?? []).length ? `<div class="k-dop"><b>Nejoptimálnější VOLNY:</b>${s.navrhy!.map((n) => `<a class="${dny.includes(n.den) ? "" : "jinde"}" href="${esc(odkaz(v, { pohled: dny.includes(n.den) ? v.pohled : "den", den: n.den }))}" title="${esc(n.duvod)}"><b>${n.poradi}</b> ${esc(denKratce(n.den))} ${esc(n.cas)} · ${esc(n.technik)}</a>`).join("")}<span class="k-sedy">žlutě = v zobrazeném období, bíle = jiný den (klik přepne)</span></div>` : ""}
@@ -462,7 +470,7 @@ ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="120">
 <title>${z ? `${esc(z.oid)} – ` : ""}Kalendář techniků – AppKoo</title><style>${CSS}</style></head><body><div class="k">
 <div class="k-lista"><a class="k-logo" href="/">AppKoo</a>${
-    z ? `<span class="k-zak">Kam naplánovat</span>` : `<span class="k-zak">Kalendář techniků</span>`
+    `<span class="k-zak">Kalendář techniků</span>`
   }${zive}<a class="k-tl" href="${esc(odkaz(v, {}))}">Obnovit</a>
 <div class="k-nav"><a class="k-tl" href="${esc(odkaz(v, { den: dnes }))}">Dnes</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, -krok) }))}" aria-label="Předchozí">‹</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, krok) }))}" aria-label="Další">›</a><span class="k-datum">${esc(datum)}</span>
 <span class="k-prep"><a class="${v.pohled === "den" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "den" }))}">Den</a><a class="${v.pohled === "tyden" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "tyden" }))}">Týden</a></span></div></div>
