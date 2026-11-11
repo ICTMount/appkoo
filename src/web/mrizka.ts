@@ -535,7 +535,7 @@ ${miniMesic(v, dnes)}
 ${s.technici.map((t) => `<label><input type="checkbox" name="t" value="${esc(t.jmeno)}"${vybrano(t) ? " checked" : ""} style="accent-color:${s.barvy.get(t.kalendar) ?? VYCHOZI_BARVA}"><span title="${esc(t.vyjezd ? `výjezd: ${t.vyjezd}` : t.jmeno)}">${esc(t.jmeno)}${t.vyjezd ? `<small>${esc(t.vyjezd)}</small>` : ""}</span></label>`).join("\n")}
 <button class="k-tl" type="submit">Zobrazit výběr</button>
 ${navrhy}
-<div class="k-pozn">Zrcadlo Google Kalendáře: časy a barvy podle zdroje. ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
+<div class="k-pozn">Data z Google Kalendářů techniků (účet tmcz01). ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
 <div class="k-pozn">${esc(s.uzivatel)}</div>
 </form>
 <div class="k-mriz${v.navrh && m.sloupce.some((sl) => sl.pod.some((p) => p.bloky.some((b) => b.navrh))) ? " s-navrhem" : ""}">${mrizka}</div>
