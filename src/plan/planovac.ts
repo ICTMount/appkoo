@@ -82,7 +82,9 @@ export function kontrolaBran(z: Zakazka, f: Fakta, blokovane: Polozka[], opts: {
     upozorneni.push(`Dohodnutý termín ${isoDate(z.termin.od).split("-").reverse().join(".")} ${String(z.termin.od.getUTCHours()).padStart(2, "0")}:${String(z.termin.od.getUTCMinutes()).padStart(2, "0")} zatím není v kalendáři technika – zapište ho na dohodnutý termín (nahoře v nabídce), nebo na náhradní; náhradní termín změňte i v MWF.`);
   } else if (z.termin && !opts.presun) blokace.push("Zakázka už má dohodnutý termín – přesunout lze jen zakázku s poznámkou „flex“ (režim doplnění slotu).");
   if (z.termin && opts.presun) upozorneni.push(`Přesun: zakázka má termín ${isoDate(z.termin.od).split("-").reverse().join(".")} – po zápisu se původní událost vrátí na VOLNY; změňte termín i v MWF.`);
-  if (z.predobjednavka) {
+  // předobjednávka bez data RFS se naplánovat nemůže – není podle čeho určit nejdřívější den (RFS + 1)
+  if (z.predobjednavka && !z.rfs) blokace.push("Předobjednávka bez data RFS – termín nelze naplánovat, dokud RFS není známé (nebo se typ zakázky nezmění na FTTH).");
+  if (z.predobjednavka && z.rfs) {
     const rfs = z.rfs ? ` (RFS ${isoDate(z.rfs).split("-").reverse().join(".")})` : "";
     upozorneni.push(`Předobjednávka${rfs} – instalace před datem RFS není možná; termíny se nabízejí až ode dne po RFS, realizace až po změně na standardní zakázku v MWF.`);
   }
