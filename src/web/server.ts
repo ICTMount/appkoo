@@ -707,14 +707,13 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const oznaceni: OznaceniMrizky = { tato: puvodni ? { kalendar: puvodni.kalendar, eventId: puvodni.eventId } : null };
         if (volby.navrh && detail && planovac && !blokace.length) {
           try {
-            const prvni = rozsah.dny[0]!;
+            // doporučení se počítá vždy ode dneška – pořadí je stejné v denním i týdenním pohledu a při listování
             // doporučuje se jen mezi zobrazenými techniky – každý doporučený slot je tak v mřížce vidět
             const nab = await nabidniProZakazku(detail.z, kontext.nastaveni.pouzivatPriority ? detail.priorita : "P3", sla, zobrazeni, planovac, now, {
               adresyZMwf: kontext.adresyZMwf,
               nastaveni: kontext.nastaveni.plan,
               dni: kontext.nastaveni.dniNabidky,
               trvaniMin: kontext.nastaveni.delkaPraceMin,
-              ...(prvni > dnes ? { odData: prvni } : {}),
               ...(doplnit && detail.z.termin ? { dohodnuty: detail.z.termin } : {}),
             });
             if (nab.chyba) navrhChyba = nab.chyba;

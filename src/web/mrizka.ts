@@ -378,6 +378,8 @@ button,input{font:inherit}
 .s-navrhem .ev{background:var(--panel);border-radius:4px}
 .s-navrhem .ev:not(.navrh):not(.tato) .ev-b{opacity:.3}
 .s-navrhem .ev:not(.navrh):not(.tato):hover .ev-b{opacity:1}
+@keyframes blik{0%,100%{box-shadow:0 0 0 0 rgba(253,216,53,0)}50%{box-shadow:0 0 0 10px rgba(253,216,53,.9)}}
+.ev:target{z-index:4;border-radius:6px;animation:blik .8s ease-in-out 4}
 .k-dop{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:.4em .6em}
 .k-dop a{display:inline-flex;align-items:center;gap:.4em;background:#fdd835;color:#000;border:2px solid #1f1f1f;border-radius:1em;padding:.1em .7em;font-weight:500}
 .k-dop a b{font-weight:700}
@@ -487,7 +489,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
       : `<div class="ev-b" tabindex="0" style="${styl}">${obsah}</div>`;
     const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${prejezdDetail}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}${lzePlanovat ? `<div class="r"><b>Klik = naplánovat ${esc(z!.oid)} do tohoto slotu.</b></div>` : ""}${b.navrh ? `<div class="r">Nejoptimálnější ${b.navrh.poradi}: ${esc(b.navrh.duvod)}</div>` : ""}</div>`;
-    return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}" style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
+    return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}"${b.navrh ? ` id="navrh-${b.navrh.poradi}"` : ""} style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
@@ -504,7 +506,7 @@ ${z.infra ? `<span class="k-chip">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []
 ${z.telefon ? `<span><a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a></span>` : ""}
 <span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
 ${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>` : ""}
-${v.navrh && (s.navrhy ?? []).length ? `<div class="k-dop"><b>Nejoptimálnější VOLNY:</b>${s.navrhy!.map((n) => `<a class="${dny.includes(n.den) ? "" : "jinde"}" href="${esc(odkaz(v, { pohled: dny.includes(n.den) ? v.pohled : "den", den: n.den }))}" title="${esc(n.duvod)}"><b>${n.poradi}</b> ${esc(denKratce(n.den))} ${esc(n.cas)} · ${esc(n.technik)}</a>`).join("")}<span class="k-sedy">žlutě = v zobrazeném období, bíle = jiný den (klik přepne)</span></div>` : ""}
+${v.navrh && (s.navrhy ?? []).length ? `<div class="k-dop"><b>Nejoptimálnější VOLNY:</b>${s.navrhy!.map((n) => `<a class="${dny.includes(n.den) ? "" : "jinde"}" href="${esc(odkaz(v, { pohled: "den", den: n.den }))}#navrh-${n.poradi}" title="${esc(n.duvod)} – klik zobrazí den a slot"><b>${n.poradi}</b> ${esc(denKratce(n.den))} ${esc(n.cas)} · ${esc(n.technik)}</a>`).join("")}<span class="k-sedy">klik zobrazí den technika a doporučený slot</span></div>` : ""}
 ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat: ${z.blokace!.map(esc).join(" · ")}</div>` : ""}${(z.upozorneni ?? []).length ? `<div class="k-upoz">${z.upozorneni!.map(esc).join(" · ")}</div>` : ""}</div>`
     : "";
   const zive = s.zive === false
@@ -514,7 +516,7 @@ ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat
     ? `<a class="k-tl${v.navrh ? "" : " zel"}" href="${esc(odkaz(v, { navrh: !v.navrh }))}">${v.navrh ? "Skrýt nejoptimálnější VOLNY" : "Vybrat nejoptimálnější VOLNY"}</a>${
         v.navrh
           ? s.navrhChyba ? `<div class="k-pozn">${esc(s.navrhChyba)}</div>`
-            : (s.navrhy ?? []).length ? `<ol class="k-navrhy">${s.navrhy!.map((n) => `<li><a href="${esc(odkaz(v, { pohled: "den", den: n.den }))}"><b>${n.poradi}. ${esc(denKratce(n.den))} ${esc(n.cas)}</b> ${esc(n.technik)}</a><br><span class="k-sedy">${esc(n.duvod)}</span></li>`).join("")}</ol>`
+            : (s.navrhy ?? []).length ? `<ol class="k-navrhy">${s.navrhy!.map((n) => `<li><a href="${esc(odkaz(v, { pohled: "den", den: n.den }))}#navrh-${n.poradi}"><b>${n.poradi}. ${esc(denKratce(n.den))} ${esc(n.cas)}</b> ${esc(n.technik)}</a><br><span class="k-sedy">${esc(n.duvod)}</span></li>`).join("")}</ol>`
             : `<div class="k-pozn">V prohledaném období žádný vhodný volný slot.</div>`
           : ""
       }`
