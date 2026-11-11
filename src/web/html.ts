@@ -86,7 +86,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}.pred-rfs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#283593;color:#fff;vertical-align:middle;margin-top:4px}.pred-rfs-pruh{border-left:4px solid #283593;background:rgba(40,53,147,.08);color:var(--text)}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
-.zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy input{vertical-align:middle;margin:0 2px 0 0}.prilohy .na-disku{color:#2e7d32;text-decoration:none;font-weight:600}.ulozit-prilohy{margin-top:8px}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
+.zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy input{vertical-align:middle;margin:0 2px 0 0}.prilohy .na-disku{color:#2e7d32;text-decoration:none;font-weight:600}.ulozit-prilohy{margin-top:8px}nav.strankovani{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 4px;font-size:14px}nav.strankovani a,nav.strankovani b,nav.strankovani span{display:inline-block;min-width:30px;padding:6px 8px;text-align:center;border:1px solid var(--line);border-radius:6px}nav.strankovani b{background:var(--accent);color:#fff;border-color:var(--accent)}nav.strankovani a{text-decoration:none}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
 .zaznam .hl{font-size:12px;color:var(--muted)}.zaznam.veg .hl b{color:var(--accent)}
 h1{font-size:20px;margin:4px 0 12px}h1 small{font-size:14px;color:var(--muted);font-weight:400}
 .nowrap{white-space:nowrap}
@@ -348,23 +348,39 @@ export function strankaVysledku(
   stav: StavImportu,
   uzivatel: string,
   casti?: Casti,
-  rozsah?: { celkem: number; vse: boolean },
+  strankovani?: { celkem: number; strana: number; stran: number; naStranku: number },
 ): string {
   const radky = polozky.map(
     ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid">${idBunka(z)}</td>
 <td>${p17Bunka(z)}</td><td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}</td>
 <td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td>${prioTd(priorita)}</tr>`,
   );
-  const celkem = rozsah?.celkem ?? polozky.length;
-  const pocet =
-    celkem > polozky.length
-      ? `${polozky.length} z ${celkem} zakázek · <a href="/?q=${encodeURIComponent(dotaz)}&vse=1">zobrazit vše</a>`
-      : `${celkem} zakázek${rozsah?.vse && celkem > 30 ? ` · <a href="/?q=${encodeURIComponent(dotaz)}">jen prvních 30</a>` : ""}`;
+  const sp = strankovani ?? { celkem: polozky.length, strana: 1, stran: 1, naStranku: polozky.length || 1 };
+  const od = sp.celkem ? (sp.strana - 1) * sp.naStranku + 1 : 0;
+  const doN = Math.min(sp.celkem, sp.strana * sp.naStranku);
+  const pocet = sp.stran > 1 ? `${od}–${doN} z ${sp.celkem} zakázek` : `${sp.celkem} zakázek`;
   const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${pocet}</small></h1>
 <div class="tbl"><table><thead><tr><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th>${prioTh()}</tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF (otevřených i uzavřených) nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
+${strankovaniNav(dotaz, sp.strana, sp.stran)}
 ${sekceZdroju(zdroje)}`;
   return stranka("Hledání", uzivatel, stav, telo, { dotaz });
+}
+
+/** Stránkování výsledků: ‹ Předchozí · 1 2 … 5 · Další › (čísla kolem aktuální strany, první a poslední vždy) */
+export function strankovaniNav(dotaz: string, strana: number, stran: number): string {
+  if (stran <= 1) return "";
+  const odkaz = (n: number) => `/?q=${encodeURIComponent(dotaz)}${n > 1 ? `&strana=${n}` : ""}`;
+  const cisla: (number | null)[] = [];
+  for (let n = 1; n <= stran; n++) {
+    if (n === 1 || n === stran || Math.abs(n - strana) <= 2) cisla.push(n);
+    else if (cisla.at(-1) !== null) cisla.push(null);
+  }
+  return `<nav class="strankovani" aria-label="Stránky výsledků">${
+    strana > 1 ? `<a href="${odkaz(strana - 1)}">‹ Předchozí</a>` : `<span class="muted">‹ Předchozí</span>`
+  }${cisla.map((n) => (n === null ? `<span class="muted">…</span>` : n === strana ? `<b aria-current="page">${n}</b>` : `<a href="${odkaz(n)}">${n}</a>`)).join("")}${
+    strana < stran ? `<a href="${odkaz(strana + 1)}">Další ›</a>` : `<span class="muted">Další ›</span>`
+  }</nav>`;
 }
 
 /** Výpis z notifikačního PDF z MWF: „Inštalačný predpis k“ celý, ze „Zoznam KZ“ jen CPE Mode a kompatibilní zařízení */

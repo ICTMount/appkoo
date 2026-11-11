@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "../src/db/db.js";
 import { local } from "../src/domain/time.js";
+import { strankovaniNav } from "../src/web/html.js";
 import { prijmiSoubory } from "../src/jobs/importJob.js";
 import { hodiSe, nactiDetail, nactiFrontu, zRadku } from "../src/web/data.js";
 import { bezRovna, esc } from "../src/web/html.js";
@@ -129,9 +130,9 @@ describe("webový server", () => {
     expect(vysledky).toContain("O-8550000001");
     expect(vysledky).toContain("O-8550000002");
     expect(vysledky).toContain('class="infra i-CETIN"');
-    // počet výsledků v nadpisu; víc než 30 → „N z M · zobrazit vše“ (?vse=1 ukáže až 500)
+    // počet výsledků v nadpisu; přes 30 výsledků se stránkuje (?strana=2, navigace ‹ Předchozí 1 2 Další ›)
     expect(vysledky).toMatch(/<small>\d+ zakázek<\/small>/);
-    expect(vysledky).not.toContain("zobrazit vše");
+    expect(vysledky).not.toContain('class="strankovani"');
   });
 
   it("escapuje data z MWF (žádné HTML z poznámek a jmen)", async () => {
@@ -210,5 +211,22 @@ describe("hledání zakázky", () => {
     expect(tel.headers.get("location")).toBe("/zakazka/A1");
     expect((await get("/?q=606666615", "davidh@ictmount.com")).headers.get("location")).toBe("/zakazka/A3");
     expect((await get("/?q=Dvorak", "davidh@ictmount.com")).headers.get("location")).toBe("/zakazka/A2");
+  });
+});
+
+describe("stránkování výsledků hledání", () => {
+  it("čísla kolem aktuální strany, první a poslední vždy, výpustka mezi; na jedné straně nic", () => {
+    expect(strankovaniNav("lutín", 1, 1)).toBe("");
+    const n = strankovaniNav("lutín", 3, 9);
+    expect(n).toContain('<a href="/?q=lut%C3%ADn&strana=2">‹ Předchozí</a>');
+    expect(n).toContain('<a href="/?q=lut%C3%ADn&strana=4">Další ›</a>');
+    expect(n).toContain('<b aria-current="page">3</b>');
+    expect(n).toContain('<a href="/?q=lut%C3%ADn">1</a>'); // první strana bez parametru
+    expect(n).toContain('&strana=9">9</a>');
+    expect(n).toContain("…");
+    expect(n).not.toContain('&strana=7"');
+    const prvni = strankovaniNav("lutín", 1, 2);
+    expect(prvni).toContain('<span class="muted">‹ Předchozí</span>');
+    expect(strankovaniNav("lutín", 2, 2)).toContain('<span class="muted">Další ›</span>');
   });
 });
