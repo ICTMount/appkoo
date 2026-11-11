@@ -27,6 +27,54 @@ export interface Notifikace {
   priebeh: RadekPriebehu[] | null;
   /** Zařízení ze všech oddílů „Zoznam KZ“ (ONT, mesh AP, set-top boxy); null = PDF načteno starší verzí */
   zariadenia: Zariadenie[] | null;
+  /** Oddíly PDF po pracovních požadavcích (kombinovaná objednávka má FTTH a IPTV zvlášť); null = načteno starší verzí */
+  oddily: OddilNotifikace[] | null;
+}
+
+/** Jeden pracovní požadavek v PDF – u kombinované objednávky je nadřazená služba vždy FTTH, IPTV je její část */
+export interface OddilNotifikace {
+  /** číslo pracovního požadavku („26843734“) */
+  pozadavek: string;
+  /** FTTH / IPTV / jiné (z „Metóda/popis inst“: optic… / tvoi…) */
+  sluzba: "FTTH" | "IPTV" | string;
+  /** řádky „Inštalačný predpis k“ tohoto oddílu */
+  predpis: string[];
+  /** TVoI: účet (Login) a balíček – heslo se nepřenáší, je v PDF */
+  tv?: { ucet: string; balicek: string };
+}
+
+/** „Inštalačný predpis k“ v úseku řádků (až po „Zoznam KZ:“) */
+function predpisZ(radky: string[]): string[] {
+  const iPredpis = radky.findIndex((r) => /Inštalačný predpis k/i.test(r));
+  const iKz = radky.findIndex((r, i) => i > iPredpis && /Zoznam KZ\s*:/i.test(r));
+  const predpis: string[] = [];
+  if (iPredpis < 0) return predpis;
+  const konec = iKz >= 0 ? iKz + 1 : radky.length;
+  for (let i = iPredpis; i < konec; i++) {
+    let r = radky[i]!;
+    if (i === iPredpis) r = r.slice(r.search(/Inštalačný predpis k/i) + "Inštalačný predpis k".length); // na stejném řádku bývá konec předchozího oddílu
+    if (i === iKz) r = r.replace(/Zoznam KZ\s*:[\s\S]*$/i, ""); // „Zoznam KZ:“ bývá na konci posledního řádku poznámky
+    const c = uklid(r);
+    if (c) predpis.push(c);
+  }
+  return predpis.filter((p) => p !== "");
+}
+
+/** Oddíly PDF: od každého „Pracovní požadavek:“ k dalšímu; bez nich jeden oddíl z celého textu */
+export function parsujOddily(radky: string[]): OddilNotifikace[] {
+  const zacatky = radky.map((r, i) => (/^\f?Pracovní požadavek\s*:/i.test(r) ? i : -1)).filter((i) => i >= 0);
+  const useky = zacatky.length ? zacatky.map((z, k) => radky.slice(z, zacatky[k + 1] ?? radky.length)) : [radky];
+  return useky.map((u) => {
+    const text = u.join("\n");
+    const pozadavek = /Pracovní požadavek\s*:\s*(\d+)/i.exec(text)?.[1] ?? "";
+    const metoda = /\b(tvoi|optic|piv|fwa|dsl)\w*(?:\s+\w+){0,2}\s*\//i.exec(text)?.[1]?.toLowerCase();
+    const sluzba = metoda === "tvoi" ? "IPTV" : metoda === "optic" ? "FTTH" : metoda ? metoda.toUpperCase() : /Typ technológie\s*:\s*TVoI/i.test(text) ? "IPTV" : "FTTH";
+    const ucet = /Id účtu\s*:\s*(\S+)/i.exec(text)?.[1];
+    const balicek = /Typ technológie\s*:\s*TVoI[\s\S]*?Názov\s*:\s*([^\n]+)/i.exec(text)?.[1];
+    const o: OddilNotifikace = { pozadavek, sluzba, predpis: predpisZ(u) };
+    if (sluzba === "IPTV" && ucet) o.tv = { ucet, balicek: uklid(balicek ?? "") };
+    return o;
+  });
 }
 
 /** Jeden řádek tabulky „Zoznam KZ“ */
@@ -208,20 +256,12 @@ export function parsujNotifikaci(text: string, nazevSouboru = "", bboxHtml = "")
 
   const iPredpis = radky.findIndex((r) => /Inštalačný predpis k/i.test(r));
   const iKz = radky.findIndex((r, i) => i > iPredpis && /Zoznam KZ\s*:/i.test(r));
-  const predpis: string[] = [];
-  if (iPredpis >= 0) {
-    const konec = iKz >= 0 ? iKz + 1 : radky.length;
-    for (let i = iPredpis; i < konec; i++) {
-      let r = radky[i]!;
-      if (i === iPredpis) r = r.slice(r.search(/Inštalačný predpis k/i) + "Inštalačný predpis k".length); // na stejném řádku bývá konec předchozího oddílu
-      if (i === iKz) r = r.replace(/Zoznam KZ\s*:[\s\S]*$/i, ""); // „Zoznam KZ:“ bývá na konci posledního řádku poznámky
-      const c = uklid(r);
-      if (c) predpis.push(c);
-    }
-  }
+  // předpis zakázky = předpis nadřazené služby (FTTH); u kombinované objednávky má IPTV svůj oddíl (viz oddily)
+  const oddily = parsujOddily(radky);
+  const predpis = (oddily.find((o) => o.sluzba === "FTTH") ?? oddily[0])?.predpis ?? predpisZ(radky);
   const kzRadky = iKz >= 0 ? [radky[iKz]!.replace(/^[\s\S]*?Zoznam KZ\s*:/i, (m) => " ".repeat(m.length)), ...radky.slice(iKz + 1)] : [];
   const { cpeMode, zoznam } = parsujKz(kzRadky);
-  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, idS7, predpis: predpis.filter((p) => p !== ""), cpeMode, zoznam, priebeh: bboxHtml ? parsujPriebeh(bboxHtml) : [], zariadenia: parsujZariadenia(radky) };
+  return { idAktivity, idObjednavky, idObjednavkyZaklad: idObjednavky ? zakladniCisloObjednavky(idObjednavky) : null, idS7, predpis, cpeMode, zoznam, priebeh: bboxHtml ? parsujPriebeh(bboxHtml) : [], zariadenia: parsujZariadenia(radky), oddily };
 }
 
 /** Text PDF přes poppler (`pdftotext -layout`), v image je balík poppler-utils. */
@@ -266,6 +306,7 @@ function priprav(db: Dotaz): Promise<unknown> {
       .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS id_s7 text[]"))
       .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS priebeh jsonb"))
       .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS zariadenia jsonb"))
+      .then(() => db.query("ALTER TABLE notifikace_pdf ADD COLUMN IF NOT EXISTS oddily jsonb"))
       .then(() => db.query("UPDATE notifikace_pdf SET id_objednavky_zaklad = upper(substring(id_objednavky from '^O-[0-9]+')) WHERE id_objednavky_zaklad IS NULL AND id_objednavky IS NOT NULL"))
       .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_aktivita ON notifikace_pdf (id_aktivity, vznik DESC)"))
       .then(() => db.query("CREATE INDEX IF NOT EXISTS notifikace_pdf_objednavka ON notifikace_pdf (id_objednavky_zaklad, vznik DESC)"))
@@ -289,11 +330,11 @@ export async function ulozNotifikaci(db: Dotaz, n: UlozenaNotifikace | { souborI
     return;
   }
   await db.query(
-    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, zariadenia, chyba)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, NULL)
+    `INSERT INTO notifikace_pdf (soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, zariadenia, oddily, chyba)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13::jsonb, NULL)
      ON CONFLICT (soubor_id) DO UPDATE SET id_aktivity = EXCLUDED.id_aktivity, id_objednavky = EXCLUDED.id_objednavky, id_objednavky_zaklad = EXCLUDED.id_objednavky_zaklad,
-       id_s7 = EXCLUDED.id_s7, predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, priebeh = EXCLUDED.priebeh, zariadenia = EXCLUDED.zariadenia, chyba = NULL, nacteno = now()`,
-    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.idS7, n.predpis, n.cpeMode, n.zoznam, JSON.stringify(n.priebeh), JSON.stringify(n.zariadenia ?? [])],
+       id_s7 = EXCLUDED.id_s7, predpis = EXCLUDED.predpis, cpe_mode = EXCLUDED.cpe_mode, zoznam = EXCLUDED.zoznam, priebeh = EXCLUDED.priebeh, zariadenia = EXCLUDED.zariadenia, oddily = EXCLUDED.oddily, chyba = NULL, nacteno = now()`,
+    [n.souborId, n.nazev, n.vznik, n.idAktivity, n.idObjednavky, n.idObjednavkyZaklad, n.idS7, n.predpis, n.cpeMode, n.zoznam, JSON.stringify(n.priebeh), JSON.stringify(n.zariadenia ?? []), JSON.stringify(n.oddily ?? [])],
   );
 }
 
@@ -306,15 +347,15 @@ export async function nactiNotifikaci(db: Dotaz, idAktivity: string, klice: { id
     await priprav(db);
     const zaklad = klice.idObjednavkyZaklad ? zakladniCisloObjednavky(klice.idObjednavkyZaklad) : null;
     const s7 = klice.idS7?.trim().toUpperCase() || null;
-    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; id_s7: string[] | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null; priebeh: RadekPriebehu[] | null; zariadenia: Zariadenie[] | null }>(
-      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, zariadenia FROM notifikace_pdf
+    const { rows } = await db.query<{ soubor_id: string; nazev: string; vznik: Date; id_aktivity: string; id_objednavky: string | null; id_objednavky_zaklad: string | null; id_s7: string[] | null; predpis: string[] | null; cpe_mode: string | null; zoznam: string | null; priebeh: RadekPriebehu[] | null; zariadenia: Zariadenie[] | null; oddily: OddilNotifikace[] | null }>(
+      `SELECT soubor_id, nazev, vznik, id_aktivity, id_objednavky, id_objednavky_zaklad, id_s7, predpis, cpe_mode, zoznam, priebeh, zariadenia, oddily FROM notifikace_pdf
         WHERE chyba IS NULL AND (id_aktivity = $1 OR ($2::text IS NOT NULL AND $2 = ANY(id_s7)) OR ($3::text IS NOT NULL AND id_objednavky_zaklad = $3))
         ORDER BY (id_aktivity = $1) DESC, ($2::text IS NOT NULL AND $2 = ANY(id_s7)) DESC, vznik DESC LIMIT 1`,
       [idAktivity, s7, zaklad],
     );
     const r = rows[0];
     if (!r) return null;
-    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam, priebeh: Array.isArray(r.priebeh) ? r.priebeh : null, zariadenia: Array.isArray(r.zariadenia) ? r.zariadenia : null };
+    return { souborId: r.soubor_id, nazev: r.nazev, vznik: new Date(r.vznik), idAktivity: r.id_aktivity, idObjednavky: r.id_objednavky, idObjednavkyZaklad: r.id_objednavky_zaklad, idS7: r.id_s7 ?? [], predpis: r.predpis ?? [], cpeMode: r.cpe_mode, zoznam: r.zoznam, priebeh: Array.isArray(r.priebeh) ? r.priebeh : null, zariadenia: Array.isArray(r.zariadenia) ? r.zariadenia : null, oddily: Array.isArray(r.oddily) ? r.oddily : null };
   } catch {
     return null; // detail zakázky nesmí spadnout kvůli notifikacím
   }
@@ -344,7 +385,7 @@ export async function importujNotifikace(
   // bez sloupce Typ linky v ní, nebo bez zařízení ze Zoznamu KZ) se přečtou znovu
   const { rows } = await db.query<{ soubor_id: string }>(
     `SELECT soubor_id FROM notifikace_pdf
-      WHERE (chyba IS NULL AND priebeh IS NOT NULL AND (priebeh = '[]'::jsonb OR priebeh->0 ? 'typLinky') AND zariadenia IS NOT NULL)
+      WHERE (chyba IS NULL AND priebeh IS NOT NULL AND (priebeh = '[]'::jsonb OR priebeh->0 ? 'typLinky') AND zariadenia IS NOT NULL AND oddily IS NOT NULL)
          OR (chyba IS NOT NULL AND nacteno > now() - interval '1 day')`,
   );
   const znama = new Set(rows.map((r) => r.soubor_id));

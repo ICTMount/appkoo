@@ -407,6 +407,16 @@ export function strankovaniNav(dotaz: string, strana: number, stran: number): st
   }</nav>`;
 }
 
+/** „Inštalačný predpis k“ – u kombinované objednávky zvlášť za FTTH (nadřazená služba, první) a za IPTV (její část) */
+function predpisyNotifikace(n: NonNullable<Detail["notifikace"]>): string {
+  const seznam = (p: string[]) => (p.length ? `<ul class="predpis">${p.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<span class="muted">v PDF chybí</span>`);
+  const oddily = n.oddily ?? [];
+  if (oddily.length < 2) return `<h3>Inštalačný predpis k</h3>\n${seznam(n.predpis)}`;
+  const poradi = [...oddily].sort((a, b) => (a.sluzba === "FTTH" ? 0 : 1) - (b.sluzba === "FTTH" ? 0 : 1));
+  return poradi.map((o) => `<h3>Inštalačný predpis k – ${esc(o.sluzba)}${o.sluzba !== "FTTH" ? " <small class=\"muted\">(část kombinované objednávky)</small>" : ""} <small class="muted">prac. požadavek ${esc(o.pozadavek)}</small></h3>
+${o.tv ? `<p>IPTV účet <b>${esc(o.tv.ucet)}</b>${o.tv.balicek ? `, balíček <b>${esc(o.tv.balicek)}</b>` : ""} <span class="muted">(heslo je v PDF)</span></p>` : ""}${seznam(o.predpis)}`).join("\n");
+}
+
 /** Řádky Zoznamu KZ sečtené podle typu: „2× AP – Access Point (Mesh) · Sercomm RP562BDT · přiveze technik“ */
 function zarizeniNotifikace(z: NonNullable<Detail["notifikace"]>["zariadenia"]): string {
   if (!z) return `<span class="muted">přečte se při příštím běhu importu</span>`;
@@ -437,8 +447,7 @@ export function sekceNotifikace(n: Detail["notifikace"]): string {
     ? `<span class="muted">Notifikační PDF k této aktivitě zatím nedorazilo.</span>`
     : `<h3>Priebeh optický – akce technika <small class="muted">Názov linky / A uzol / Akcia na linke / Z akcia / Typ linky</small></h3>
 ${priebeh()}
-<h3>Inštalačný predpis k</h3>
-${n.predpis.length ? `<ul class="predpis">${n.predpis.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>` : `<span class="muted">v PDF chybí</span>`}
+${predpisyNotifikace(n)}
 <h3>Zoznam KZ</h3>
 <dl>${radek("Zařízení", zarizeniNotifikace(n.zariadenia))}${radek("CPE Mode", esc(n.cpeMode ?? "") || `<span class="muted">neuvedeno</span>`)}${radek("Zoznam kompatibilných zariadení", esc(n.zoznam ?? "") || `<span class="muted">neuvedeno</span>`)}</dl>`;
   return `<div class="card kompakt notif"><h2 class="s-ikonou"><span class="i-drive">${IKONA.drive}</span>Výpis z notifikačního PDF${n ? ` <small class="muted">${esc(n.nazev)} · ${esc(fmtDate(n.vznik))} · ${odkaz}</small>` : ""}</h2><div class="posun">${telo}</div></div>`;
