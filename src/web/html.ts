@@ -245,7 +245,7 @@ export const predobjStitek = (z: { predobjednavka?: boolean }) =>
   z.predobjednavka ? ` <span class="predobj" title="Předobjednávka – instalace před datem RFS není možná; termíny až ode dne po RFS, realizace po změně na standardní zakázku v MWF">PŘEDOBJEDNÁVKA</span>` : "";
 /** Zakázka z webového kalendáře – přišla už s termínem, který si zákazník vybral sám */
 export const webcalStitek = (z: { zaznamy?: Zaznam[] }) =>
-  webcalendar(z) ? ` <span class="webcal" title="Webcalendar – zákazník si termín vybral sám, zakázka přišla s dohodnutým termínem">WEBCALENDAR</span>` : "";
+  webcalendar(z) ? ` <span class="webcal" title="Webcalendar – zakázka byla přidělena s dohodnutým termínem (zákazník si ho vybral sám)">WEBCALENDAR</span>` : "";
 /** SWAP / FIS MOP – migrace s tvrdým pravidlem termínu (zlatá pravidla 4 a 5) */
 export const migraceStitek = (z: Parameters<typeof migrace>[0]) => {
   const m = migrace(z);
@@ -300,9 +300,9 @@ function pruhWebcal(w: NonNullable<PlanovaniZakazky["webcal"]>, idAktivity: stri
   const kdy = `${fmtDate(w.at)} ${fmtTime(w.at)}`;
   const termin = w.termin ? ` <b>${esc(w.termin)}</b>` : "";
   if (w.vKalendari) {
-    return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – původní termín${termin} (${esc(kdy)}). V kalendáři je zapsaný u <b>${esc(w.vKalendari.technik)}</b> ${esc(`${fmtDate(w.vKalendari.od)} ${fmtTime(w.vKalendari.od)}–${fmtTime(w.vKalendari.do)}`)}.</div>`;
+    return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zakázka byla přidělena s dohodnutým termínem${termin} (${esc(kdy)}). V kalendáři je zapsaná u <b>${esc(w.vKalendari.technik)}</b> ${esc(`${fmtDate(w.vKalendari.od)} ${fmtTime(w.vKalendari.od)}–${fmtTime(w.vKalendari.do)}`)}.</div>`;
   }
-  return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zákazník si sám vybral termín${termin} (${esc(kdy)}). Termín je <b>jen v MWF, v kalendáři technika chybí</b> – zapište ho do GCAL na dohodnutý, nebo náhradní termín.${bezTlacitka ? "" : `<a class="btn" href="/zakazka/${encodeURIComponent(idAktivity)}#planovani">Doplánovat do GCAL ↓</a>`}</div>`;
+  return `<div class="warn webcal-pruh"><b>WEBCALENDAR</b> – zakázka byla <b>přidělena s dohodnutým termínem</b>${termin} (zákazník si ho vybral sám, ${esc(kdy)}). V kalendáři technika zatím není – plánuje se stejně jako ostatní zakázky.${bezTlacitka ? "" : `<a class="btn" href="/zakazka/${encodeURIComponent(idAktivity)}#planovani">Naplánovat ↓</a>`}</div>`;
 }
 
 /** Sloupec P17: vlastník sítě a pod ním štítky předobjednávky / webcalendar */
@@ -1143,5 +1143,5 @@ ${v.chyba ? `<div class="err">${esc(v.chyba)}</div>` : ""}
 ${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
 <div class="tbl"><table><thead><tr><th>#</th><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th>${prioTh()}<th>Do splnění</th><th>Km navíc</th><th>Proč</th><th></th></tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="9" class="muted">${v.chyba ? "" : "Žádná vhodná zakázka v dosahu (max 75 km zajížďky)."}</td></tr>`}</tbody></table></div>
-<p class="muted">Kandidátů ${v.kandidatu} (z toho flex k přesunu ${v.flex}${v.webcal ? `, webcalendar bez události v kalendáři ${v.webcal}` : ""}). Pořadí: km navíc oproti trase dne, SLA jen jako doplňková váha; při shodě má nenaplánovaná zakázka přednost před přesunem flex. Zákazníkovi je vždy potřeba zavolat a termín potvrdit.</p>`;
+<p class="muted">Kandidátů ${v.kandidatu} (z toho flex k přesunu ${v.flex}${v.webcal ? `, přidělené s dohodnutým termínem (webcalendar) ${v.webcal}` : ""}). Pořadí: km navíc oproti trase dne, SLA jen jako doplňková váha; při shodě má nenaplánovaná zakázka přednost před přesunem flex. Zákazníkovi je vždy potřeba zavolat a termín potvrdit.</p>`;
 }

@@ -661,6 +661,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
               sla,
               stitky: [
                 ...(() => { const k = kombinaceZakazky(detail.z, detail.notifikace); return k ? [{ text: popisKombinace(k), druh: "kombi" as const }] : []; })(),
+                ...(webcalendar(detail.z) ? [{ text: "WEBCALENDAR", druh: "webcal" as const }] : []),
                 ...(detail.z.predobjednavka ? [{ text: "PŘEDOBJEDNÁVKA", druh: "predobj" as const }] : []),
                 ...(() => { const r = instalacePredRfs(detail.z, now); return r ? [{ text: `PŘED RFS ${r.rfsText}`, druh: "pred-rfs" as const }] : []; })(),
                 ...(zasuvkaUsed(detail.z) ? [{ text: "ZÁSUVKA USED", druh: "used" as const }] : []),

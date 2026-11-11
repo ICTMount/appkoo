@@ -76,7 +76,7 @@ export interface ZakazkaMrizky {
   /** konec SLA („Praha v UTC“) */
   sla?: Date | null;
   /** FTTH + IPTV, PŘED RFS, ZÁSUVKA USED, PŘEDOBJEDNÁVKA… (druh určuje barvu – stejnou jako v detailu zakázky) */
-  stitky?: (string | { text: string; druh: "kombi" | "predobj" | "pred-rfs" | "used" })[];
+  stitky?: (string | { text: string; druh: "kombi" | "predobj" | "pred-rfs" | "used" | "webcal" })[];
   /** zlatá pravidla, která plánování blokují */
   blokace?: string[];
   upozorneni?: string[];
@@ -323,7 +323,7 @@ button,input{font:inherit}
 .k-panel>*{flex-shrink:0}
 .k-panel>b{font-weight:600;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px}
 .k-panel .k-tl{justify-content:center;margin-top:8px;cursor:pointer;font-size:13px}
-.k-chybi{color:#e5484d;font-weight:600}.k-pozn{color:var(--muted);font-size:12px;margin-top:8px}.zdr{display:inline-block;font-size:10.5px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;white-space:nowrap;line-height:1.5}
+.k-pozn{color:var(--muted);font-size:12px;margin-top:8px}.zdr{display:inline-block;font-size:10.5px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;white-space:nowrap;line-height:1.5}
 .k-panel label small{display:block;color:var(--muted);font-size:11px;line-height:1.15}
 .k-panel label>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mm{margin:2px 0 8px;font-size:12px}
@@ -385,7 +385,7 @@ button,input{font:inherit}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .i-TMCZ{color:#ff5fb0}:root:not([data-theme=light]) .i-CETIN{color:#6fb0ff}:root:not([data-theme=light]) .i-VDF{color:#ff6b6b}}
 :root[data-theme=dark] .i-TMCZ{color:#ff5fb0}:root[data-theme=dark] .i-CETIN{color:#6fb0ff}:root[data-theme=dark] .i-VDF{color:#ff6b6b}
 .st{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;color:#fff}
-.st-kombi{background:#fdd835;color:#000;border:1px solid #c6a700;font-weight:800}.st-predobj{background:#7b1fa2}.st-pred-rfs{background:#283593}.st-used{background:#ef6c00}
+.st-kombi{background:#fdd835;color:#000;border:1px solid #c6a700;font-weight:800}.st-predobj{background:#7b1fa2}.st-pred-rfs{background:#283593}.st-used{background:#ef6c00}.st-webcal{background:#00796b}
 .k-blok{flex-basis:100%;background:#fde8e8;color:#8a1c1c;border-radius:6px;padding:8px 12px}
 .k-upoz{flex-basis:100%;background:#fff4e0;color:#8a5300;border-radius:6px;padding:8px 12px}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .k-blok{background:#3b1717;color:#ff9e9e}:root:not([data-theme=light]) .k-upoz{background:#3a2c12;color:#ffcc80}}
@@ -530,7 +530,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
 ${z.infra ? `<span class="infra i-${esc(z.infra)}">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => (typeof x === "string" ? { text: x, druh: "kombi" } : x)).map((x) => `<span class="st st-${x.druh}">${esc(x.text)}</span>`).join("")}
 ${z.telefon ? `<span><a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a></span>` : ""}
 <span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
-${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? (z.terminChybi ? `<span class="k-chybi">dohodnutý termín <b>${esc(z.termin)}</b> v kalendáři technika chybí – klikněte na VOLNY označený „termín zákazníka“; jiný slot jen po dohodě se zákazníkem</span>` : `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>`) : ""}
+${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? (z.terminChybi ? `<span>přidělena s dohodnutým termínem <b>${esc(z.termin)}</b> – v kalendáři technika zatím není; odpovídající VOLNY je označený „termín zákazníka“</span>` : `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>`) : ""}
 ${v.navrh && (s.navrhy ?? []).length ? `<div class="k-dop"><b>Nejoptimálnější VOLNY:</b>${s.navrhy!.map((n) => `<a class="${dny.includes(n.den) ? "" : "jinde"}" href="${esc(odkaz(v, { pohled: "den", den: n.den }))}#navrh-${n.poradi}" title="${esc(n.duvod)} – klik zobrazí den a slot"><b>${n.poradi}</b> ${esc(denKratce(n.den))} ${esc(n.cas)} · ${esc(n.technik)}</a>`).join("")}<span class="k-sedy">klik zobrazí den technika a doporučený slot</span></div>` : ""}
 ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat: ${z.blokace!.map(esc).join(" · ")}</div>` : ""}${(z.upozorneni ?? []).length ? `<div class="k-upoz">${z.upozorneni!.map(esc).join(" · ")}</div>` : ""}</div>`
     : "";

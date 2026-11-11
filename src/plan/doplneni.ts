@@ -34,7 +34,7 @@ export interface Kandidat {
   bod: Bod;
   /** naplánovaná zakázka s „flex“ – kde je dnes (po zápisu se vrátí na VOLNY) */
   presun?: { kalendar: string; eventId: string; technik: string; od: Date };
-  /** zakázka z webcalendar: dohodnutý termín je jen v MWF, v kalendáři technika chybí – zapíše se jako nová událost */
+  /** zakázka přidělená s dohodnutým termínem (webcalendar): termín je jen v MWF, v kalendáři technika chybí – zapíše se jako nová událost */
   dohodnuty?: { od: Date; do: Date };
 }
 
@@ -97,13 +97,12 @@ export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: V
       }
     }
     if (k.presun) duvody.push("přesun dopředu (flex)");
-    // webcalendar: slot, který se kryje s termínem zákazníka, je vždy první volba; jiný slot jen po dohodě
-    let naTermin = false;
+    // přidělená s dohodnutým termínem (webcalendar): stejný proces a pořadí jako ostatní, jen je to na první pohled vidět
     if (k.dohodnuty) {
       const konec = new Date(Date.parse(`${d.datum}T00:00:00Z`) + (okno.do + 1) * 60_000);
-      naTermin = k.dohodnuty.od < konec && k.dohodnuty.do > start;
+      const naTermin = k.dohodnuty.od < konec && k.dohodnuty.do > start;
       const kdy = `${k.dohodnuty.od.getUTCDate()}.${k.dohodnuty.od.getUTCMonth() + 1}. ${k.dohodnuty.od.getUTCHours()}:${String(k.dohodnuty.od.getUTCMinutes()).padStart(2, "0")}`;
-      duvody.push(naTermin ? `WEBCALENDAR – termín zákazníka ${kdy} chybí v kalendáři, tento slot mu odpovídá` : `WEBCALENDAR – termín zákazníka ${kdy} chybí v kalendáři; jiný slot jen po dohodě se zákazníkem`);
+      duvody.push(`přidělena s dohodnutým termínem ${kdy} (webcalendar)${naTermin ? " – tento slot mu odpovídá" : ""}`);
     }
     const pozde = Math.max(0, ...t.zastavky.map((x) => x.zpozdeni));
     if (pozde > 0) duvody.push(`další zakázka o ${Math.round(pozde)} min později`);
@@ -111,7 +110,7 @@ export function doplnSlot(den: DenSOkny, okno: Okno, kandidati: Kandidat[], v: V
     if (sem && sem.prijezd - (t.zastavky[t.zastavky.indexOf(sem) - 1]?.konec ?? d.pracujeOd) > 30) {
       duvody.push(`přejezd ${Math.round(sem.prijezd - (t.zastavky[t.zastavky.indexOf(sem) - 1]?.konec ?? d.pracujeOd))} min`);
     }
-    vysledek.push({ kandidat: k, kmNavic, kmDne: t.km, poSla, skore: kmNavic - bonus - (naTermin ? 100_000 : 0), duvody });
+    vysledek.push({ kandidat: k, kmNavic, kmDne: t.km, poSla, skore: kmNavic - bonus, duvody });
   }
   return vysledek.sort((a, b) => a.skore - b.skore || Number(!!a.kandidat.presun) - Number(!!b.kandidat.presun)).slice(0, pocet);
 }

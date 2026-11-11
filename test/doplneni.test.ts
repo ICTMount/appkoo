@@ -67,15 +67,15 @@ describe("doplnění slotu (režim B)", () => {
     expect(n[0]!.duvody).toContain("přesun dopředu (flex)");
   });
 
-  it("webcalendar: termín zákazníka chybí v kalendáři – odpovídající slot je první volba, jiný jen po dohodě", () => {
+  it("přidělená s dohodnutým termínem (webcalendar): stejné pořadí jako ostatní, jen je označená", () => {
     const dohodnuty = { od: local(2026, 10, 16, 10, 0), do: local(2026, 10, 16, 12, 0) };
     const n = doplnSlot(den, okno, [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("WEB", { lat: 50.05, lon: 14.3 }, { dohodnuty })], v);
-    expect(n.map((x) => x.kandidat.z.idAktivity)).toEqual(["WEB", "BLIZKO"]); // i s delším nájezdem jde nahoru
-    expect(n[0]!.duvody.join(" ")).toMatch(/WEBCALENDAR.*tento slot mu odpovídá/);
+    expect(n.map((x) => x.kandidat.z.idAktivity)).toEqual(["BLIZKO", "WEB"]); // rozhodují km navíc
+    expect(n[1]!.duvody.join(" ")).toMatch(/přidělena s dohodnutým termínem 16\.10\. 10:00 \(webcalendar\) – tento slot mu odpovídá/);
     const jindy = { od: local(2026, 10, 19, 14, 0), do: local(2026, 10, 19, 16, 0) };
     const m = doplnSlot(den, okno, [kand("BLIZKO", { lat: 50.1, lon: 14.52 }), kand("WEB", { lat: 50.05, lon: 14.3 }, { dohodnuty: jindy })], v);
     expect(m.map((x) => x.kandidat.z.idAktivity)).toEqual(["BLIZKO", "WEB"]);
-    expect(m[1]!.duvody.join(" ")).toMatch(/jiný slot jen po dohodě/);
+    expect(m[1]!.duvody.join(" ")).toMatch(/přidělena s dohodnutým termínem 19\.10\. 14:00 \(webcalendar\)$/);
   });
 
   it("zvýšit toleranci: zakázka, která by zdržela další termín, se nabídne s upozorněním", () => {

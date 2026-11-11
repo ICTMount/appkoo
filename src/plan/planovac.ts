@@ -298,7 +298,7 @@ export async function nabidniProZakazku(
     dnes,
     opts.nastaveni,
     (opts.pocet ?? 5) * 10,
-    opts.dohodnuty ? (den, okno) => (naDohodnuty(den, okno) ? -100_000 : 0) : undefined,
+    // zakázka přidělená s dohodnutým termínem (webcalendar) se plánuje stejně jako ostatní – slot termínu se jen označí, pořadí neovlivní
   );
 
   console.log(JSON.stringify({ severity: "INFO", message: `nabídka ${z.idObjednavkyZaklad}: kalendáře ${msKalendare} ms (${udalosti.length} událostí, ${citelni.length} techniků), dny+geokód ${msDny} ms, sloty ${Date.now() - tSloty} ms` }));
