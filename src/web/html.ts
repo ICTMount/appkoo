@@ -103,7 +103,7 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-hlava{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}.gc-barva{flex:none;width:16px;height:16px;border-radius:4px;background:#795548;margin-top:9px}
 .gc-nadpis{font-size:22px;font-weight:400;line-height:1.25}.gc-kdy{color:var(--muted);font-size:14px;margin-top:4px}
 .gc-blok{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}.gc-blok>.gc-ikona{flex:none;width:20px;height:20px;color:var(--muted);margin-top:2px}.gc-blok>.gc-ikona svg{width:20px;height:20px}
-.gc-misto{font-size:14px;padding-top:2px}.gc-popis{flex:1;min-width:0;font-size:13.5px;line-height:1.9}
+.gc-misto{font-size:14px;padding-top:2px}.gc-popis{flex:1;min-width:0;font-size:13px;line-height:1.9}
 .gc-radek{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}.gc-stitek{font-weight:600;letter-spacing:.01em}.gc-mezi{color:var(--text)}
 .gc-radek{padding:3px 8px;margin:2px 0;border-radius:6px;border-left:3px solid transparent}
 .gc-povinne{background:var(--warn-bg,#fff4d6);border-left-color:#e65100}.gc-povinne .gc-stitek{color:#e65100}.gc-povinne input,.gc-povinne select{border:1px solid #e65100;background:var(--panel)}

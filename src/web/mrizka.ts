@@ -74,8 +74,8 @@ export interface ZakazkaMrizky {
   infra?: string;
   /** konec SLA („Praha v UTC“) */
   sla?: Date | null;
-  /** FTTH + IPTV, PŘED RFS, ZÁSUVKA USED, PŘEDOBJEDNÁVKA… */
-  stitky?: string[];
+  /** FTTH + IPTV, PŘED RFS, ZÁSUVKA USED, PŘEDOBJEDNÁVKA… (druh určuje barvu – stejnou jako v detailu zakázky) */
+  stitky?: (string | { text: string; druh: "kombi" | "predobj" | "pred-rfs" | "used" })[];
   /** zlatá pravidla, která plánování blokují */
   blokace?: string[];
   upozorneni?: string[];
@@ -284,39 +284,42 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
 
 const CSS = `
 *{box-sizing:border-box}
-:root{color-scheme:light dark;--panel:#fff;--text:#1d1d1b;--muted:#5f5f5a;--line:#c4c7cc;--line2:#eceef1;--okraj:#747775;--hover:#f1f3f4;--accent:#1f5fbf;--vyb-bg:#d3e3fd;--vyb-fg:#0b2e6b;--vyb2:#eef3fd}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#4a4944;--line2:#2b2a27;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}}
-:root[data-theme=dark]{--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#4a4944;--line2:#2b2a27;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}
+/* barvy, písmo, tlačítka a štítky jsou stejné jako ve zbytku aplikace (web/html.ts) */
+:root{color-scheme:light dark;--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#e3e2dd;--line2:#f1f0ec;--okraj:#e3e2dd;--hover:#f1f0ec;--accent:#1f5fbf;--vyb-bg:#dfe9f9;--vyb-fg:#123c7c;--vyb2:#eef3fb}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#161615;--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#34332f;--line2:#292825;--okraj:#34332f;--hover:#2a2a27;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}}
+:root[data-theme=dark]{--bg:#161615;--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#34332f;--line2:#292825;--okraj:#34332f;--hover:#2a2a27;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
-body{margin:0;font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:clamp(12px,.42vw + 5px,21px);color:var(--text);background:var(--panel)}
+body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--text);background:var(--bg)}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
 button,input{font:inherit}
 .k{height:100vh;min-height:620px;display:flex;flex-direction:column}
-.k-lista{display:flex;flex-wrap:wrap;align-items:center;gap:.3em .9em;padding:.45em 1em;border-bottom:1px solid var(--line)}
-.k-logo{font-size:1.35em;font-weight:700;color:var(--accent)}
-.k-zak{font-size:1.15em;font-weight:500}
+.k-lista{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:8px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.k-zal{display:flex;gap:6px;flex-wrap:wrap}.k-zal a{padding:7px 14px;border-radius:6px;color:var(--text);font-weight:600}.k-zal a:hover{background:var(--hover);text-decoration:none}.k-zal a.on{background:var(--accent);color:#fff}
+.k-logo{font-size:20px;font-weight:700;color:var(--accent)}
+.k-zak{font-size:15px;font-weight:600}
 .k-sedy{color:var(--muted)}
-.k-nav{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:.5em}
-.k-tl{display:inline-flex;align-items:center;min-height:36px;padding:0 1.1em;border-radius:18px;border:1px solid var(--okraj);background:var(--panel);font-weight:500;color:var(--text)}
+.k-nav{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.k-tl{display:inline-flex;align-items:center;min-height:34px;padding:6px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);font-weight:600;color:var(--text)}
 .k-tl:hover{background:var(--hover);text-decoration:none}
-.k-sipka{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:36px;border-radius:18px;font-size:1.5em;color:var(--muted)}
+.k-sipka{display:inline-flex;align-items:center;justify-content:center;min-width:36px;min-height:34px;border-radius:6px;border:1px solid var(--line);background:var(--panel);font-size:18px;color:var(--text)}
 .k-sipka:hover{background:var(--hover);text-decoration:none}
-.k-datum{font-size:1.35em}
-.k-prep{display:flex;border:1px solid var(--okraj);border-radius:18px;overflow:hidden}
-.k-prep a{display:inline-flex;align-items:center;min-height:36px;padding:0 1.2em;font-weight:500;color:var(--text)}
-.k-prep a+a{border-left:1px solid var(--okraj)}
-.k-prep a.on{background:var(--vyb-bg);color:var(--vyb-fg)}
+.k-datum{font-size:18px;font-weight:600}
+.k-prep{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.k-prep a{display:inline-flex;align-items:center;min-height:34px;padding:6px 14px;font-weight:600;color:var(--text)}
+.k-prep a+a{border-left:1px solid var(--line)}
+.k-prep a.on{background:var(--accent);color:#fff}
 .k-telo{display:flex;flex-wrap:wrap;flex:1;min-height:0}
-.k-panel{flex:0 0 16em;max-width:100%;padding:.5em .9em .9em;display:flex;flex-direction:column;gap:.1em;overflow-y:auto;max-height:100%}
+.k-panel{flex:0 0 232px;max-width:100%;padding:8px 14px 14px 20px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;max-height:100%;font-size:13px}
 .k-panel label{display:flex;align-items:center;gap:.6em;min-height:26px;cursor:pointer}
 .k-panel input[type=checkbox]{width:1.2em;height:1.2em;flex:none}
-.k-panel b{font-weight:500;margin:.5em 0 .3em}
-.k-panel .k-tl{justify-content:center;margin-top:.6em;cursor:pointer}
-.k-pozn{color:var(--muted);font-size:.9em;margin-top:.6em}
-.k-panel label small{display:block;color:var(--muted);font-size:.8em;line-height:1.1}
+.k-panel>*{flex-shrink:0}
+.k-panel>b{font-weight:600;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px}
+.k-panel .k-tl{justify-content:center;margin-top:8px;cursor:pointer;font-size:13px}
+.k-pozn{color:var(--muted);font-size:12px;margin-top:8px}
+.k-panel label small{display:block;color:var(--muted);font-size:11px;line-height:1.15}
 .k-panel label>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mm{margin:.2em 0 .6em;font-size:.82em}
-.mm-h{display:flex;align-items:center;justify-content:space-between;white-space:nowrap;font-weight:500;font-size:1.1em;padding:0 .2em .3em}
+.mm{margin:2px 0 8px;font-size:12px}
+.mm-h{display:flex;align-items:center;justify-content:space-between;white-space:nowrap;font-weight:600;font-size:13px;padding:0 2px 4px}
 .mm-h span+span{display:flex}.mm-h a{display:inline-flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;border-radius:50%;color:var(--muted);font-size:1.3em}
 .mm-h a:hover{background:var(--hover);text-decoration:none}
 .mm table{width:100%;border-collapse:collapse;table-layout:fixed;text-align:center}
@@ -335,7 +338,8 @@ button,input{font:inherit}
 .ev-b .ev-dole,.ev-b span.ev-dole:first-child{font-weight:400}
 .ev-km{background:rgba(0,0,0,.45);color:#fff;border-radius:1em;padding:0 .5em;font-weight:500;white-space:nowrap;font-size:.95em}
 .ev.navrh .ev-dole{left:10px;right:10px;bottom:9px}
-.k-mriz{flex:999 1 560px;min-width:0;min-height:0;overflow-x:auto;display:flex}
+/* text v mřížce roste s šířkou monitoru (1080p → 4K), okolní prvky mají pevné velikosti jako zbytek aplikace */
+.k-mriz{flex:999 1 560px;min-width:0;min-height:0;overflow-x:auto;display:flex;background:var(--panel);border-left:1px solid var(--line);font-size:clamp(12px,.42vw + 5px,19px)}
 .k-vnitrek{flex:1;display:flex;flex-direction:column;padding-right:.5em}
 .k-hl,.k-grid{display:flex}
 .k-grid{flex:1;min-height:0;border-top:1px solid var(--line)}
@@ -361,16 +365,24 @@ button,input{font:inherit}
 .ev:hover,.ev:focus-within{z-index:5}
 .ev:hover .tip,.ev:focus-within .tip{display:block}
 .k-prazdno{padding:2em;color:var(--muted)}
-.k-zakazka{margin:.6em 1em .2em;border:2px solid var(--accent);border-radius:10px;padding:.7em 1em .6em;background:color-mix(in srgb,var(--accent) 6%,var(--panel));box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-wrap:wrap;align-items:center;gap:.3em .8em}
-.k-zakazka h2{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:.2em .6em;margin:0 0 .2em;font-size:20px;font-weight:700;color:var(--accent)}
+/* stejný rámeček jako .planovani v detailu zakázky */
+.k-zakazka{margin:12px 20px 10px;border:2px solid var(--accent);border-radius:10px;padding:14px 16px 12px;background:color-mix(in srgb,var(--accent) 6%,var(--panel));box-shadow:0 2px 10px rgba(0,0,0,.06);display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.k-zakazka h2{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0 0 6px;font-size:20px;font-weight:700;color:var(--accent)}
 .k-zakazka h2 small{font-size:13px;font-weight:400;color:var(--muted)}
 .k-zakazka h2 small a{color:inherit;text-decoration:underline}
 .k-zakazka h2 .k-tl{margin-left:auto;font-size:13px;min-height:32px}
-.k-chip{display:inline-block;font-size:.8em;font-weight:700;padding:.05em .5em;border-radius:4px;border:1px solid var(--okraj);background:var(--panel)}
-.k-chip.zl{background:#fdd835;border-color:#a88c00;color:#000}
-.k-blok{flex-basis:100%;background:#fce8e6;color:#8c1d18;border:1px solid #f1aeb5;border-radius:6px;padding:.3em .7em;font-weight:500}
-.k-upoz{flex-basis:100%;background:#fef7e0;color:#5f4500;border:1px solid #f0d58a;border-radius:6px;padding:.3em .7em}
-.k-zive{font-size:.85em;color:var(--muted)}
+/* štítky stejné jako v detailu zakázky: vlastník sítě (.infra), kombinace, předobjednávka, před RFS, USED */
+.infra{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;border:1px solid currentColor;white-space:nowrap}
+.i-TMCZ{color:#d1006b}.i-CETIN{color:#1769c2}.i-VDF{color:#d10000}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .i-TMCZ{color:#ff5fb0}:root:not([data-theme=light]) .i-CETIN{color:#6fb0ff}:root:not([data-theme=light]) .i-VDF{color:#ff6b6b}}
+:root[data-theme=dark] .i-TMCZ{color:#ff5fb0}:root[data-theme=dark] .i-CETIN{color:#6fb0ff}:root[data-theme=dark] .i-VDF{color:#ff6b6b}
+.st{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;color:#fff}
+.st-kombi{background:#fdd835;color:#000;border:1px solid #c6a700;font-weight:800}.st-predobj{background:#7b1fa2}.st-pred-rfs{background:#283593}.st-used{background:#ef6c00}
+.k-blok{flex-basis:100%;background:#fde8e8;color:#8a1c1c;border-radius:6px;padding:8px 12px}
+.k-upoz{flex-basis:100%;background:#fff4e0;color:#8a5300;border-radius:6px;padding:8px 12px}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .k-blok{background:#3b1717;color:#ff9e9e}:root:not([data-theme=light]) .k-upoz{background:#3a2c12;color:#ffcc80}}
+:root[data-theme=dark] .k-blok{background:#3b1717;color:#ff9e9e}:root[data-theme=dark] .k-upoz{background:#3a2c12;color:#ffcc80}
+.k-zive{font-size:12px;color:var(--muted)}
 .k-zive.zaloha{color:#8c1d18;font-weight:700}
 .ev.navrh .ev-b{outline:4px solid var(--text);outline-offset:-4px;box-shadow:inset 0 0 0 7px #fdd835}
 .ev.navrh .ev-b{padding:.55em .7em}
@@ -388,7 +400,7 @@ button,input{font:inherit}
 .ev-znak{background:#fff;color:#0b5a2f;font-weight:700;border-radius:1em;padding:0 .5em}
 .k-navrhy{margin:.4em 0 0;padding:0;list-style:none;font-size:.9em}
 .k-navrhy li{margin:.25em 0}
-.k-panel .k-tl.zel{background:#0b8043;border-color:#0b8043;color:#fff}
+.k-panel .k-tl.zel{background:var(--accent);border-color:var(--accent);color:#fff}
 `;
 
 export interface StrankaMrizky {
@@ -502,7 +514,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const adrZ = z ? castAdresy(z.adresa) : null;
   const pruh = z
     ? `<div class="k-zakazka"><h2>Kam naplánovat <small><a href="/zakazka/${encodeURIComponent(z.idAktivity)}" title="Zpět na detail zakázky">${esc(z.oid)}</a>${z.zakaznik ? ` · ${esc(z.zakaznik)}` : ""}</small><a class="k-tl" href="/zakazka/${encodeURIComponent(z.idAktivity)}">← Detail zakázky</a></h2>
-${z.infra ? `<span class="k-chip">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => `<span class="k-chip zl">${esc(x)}</span>`).join("")}
+${z.infra ? `<span class="infra i-${esc(z.infra)}">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => (typeof x === "string" ? { text: x, druh: "kombi" } : x)).map((x) => `<span class="st st-${x.druh}">${esc(x.text)}</span>`).join("")}
 ${z.telefon ? `<span><a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a></span>` : ""}
 <span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
 ${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>` : ""}
@@ -524,7 +536,7 @@ ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="120">
 <title>${z ? `${esc(z.oid)} – ` : ""}Kalendář techniků – AppKoo</title><style>${CSS}</style></head><body><div class="k">
 <div class="k-lista"><a class="k-logo" href="/">AppKoo</a>${
-    `<span class="k-zak">Kalendář techniků</span>`
+    `<nav class="k-zal"><a href="/">Plánovat zakázku</a><a href="/technik">Doplnit technika</a><a class="on" href="/kalendar">Kalendář techniků</a></nav>`
   }${zive}<a class="k-tl" href="${esc(odkaz(v, {}))}">Obnovit</a>
 <div class="k-nav"><a class="k-tl" href="${esc(odkaz(v, { den: dnes }))}">Dnes</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, -krok) }))}" aria-label="Předchozí">‹</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, krok) }))}" aria-label="Další">›</a><span class="k-datum">${esc(datum)}</span>
 <span class="k-prep"><a class="${v.pohled === "den" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "den" }))}">Den</a><a class="${v.pohled === "tyden" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "tyden" }))}">Týden</a></span></div></div>
