@@ -513,7 +513,7 @@ ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat
     ? `<span class="k-zive zaloha">Google Kalendář neodpovídá – záloha z databáze${s.synchronizace ? ` (stav k ${hm(s.synchronizace)})` : ""}, plánovat teď nelze.</span>`
     : s.nacteno ? `<span class="k-zive">živě z Google Kalendáře · načteno ${hm(s.nacteno)}:${String(s.nacteno.getUTCSeconds()).padStart(2, "0")}</span>` : "";
   const navrhy = z && !(z.blokace ?? []).length
-    ? `<a class="k-tl${v.navrh ? "" : " zel"}" href="${esc(odkaz(v, { navrh: !v.navrh }))}">${v.navrh ? "Skrýt nejoptimálnější VOLNY" : "Vybrat nejoptimálnější VOLNY"}</a>${
+    ? `<a class="k-tl${v.navrh ? "" : " zel"}" href="${esc(odkaz(v, { navrh: !v.navrh }) + (v.navrh ? "" : "&skok=1"))}">${v.navrh ? "Skrýt nejoptimálnější VOLNY" : "Vybrat nejoptimálnější VOLNY"}</a>${
         v.navrh
           ? s.navrhChyba ? `<div class="k-pozn">${esc(s.navrhChyba)}</div>`
             : (s.navrhy ?? []).length ? `<ol class="k-navrhy">${s.navrhy!.map((n) => `<li><a href="${esc(odkaz(v, { pohled: "den", den: n.den }))}#navrh-${n.poradi}"><b>${n.poradi}. ${esc(denKratce(n.den))} ${esc(n.cas)}</b> ${esc(n.technik)}</a><br><span class="k-sedy">${esc(n.duvod)}</span></li>`).join("")}</ol>`

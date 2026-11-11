@@ -748,10 +748,10 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           }
         }
         // žádný doporučený slot v zobrazeném období → rovnou přepnout na den nejlepšího doporučení
-        if (navrhy.length && !navrhy.some((x) => rozsah.dny.includes(x.den)) && p.get("skok") !== "0") {
+        if (navrhy.length && !navrhy.some((x) => rozsah.dny.includes(x.den)) && p.get("skok") === "1") {
           const q = new URLSearchParams(p);
           q.set("den", navrhy[0]!.den);
-          q.set("skok", "0");
+          q.delete("skok");
           return presmeruj(`/kalendar?${q}`);
         }
         const smiPlanovat = !!detail && role !== "cteni" && zapis.zapnuty && zive && !blokace.length;
