@@ -211,6 +211,10 @@ CREATE TABLE IF NOT EXISTS kalendar_udalost (
   cas            timestamptz,                  -- začátek („Praha v UTC“)
   odkaz          text,
   hledani        text NOT NULL,                -- summary + description + location, malá písmena bez diakritiky
+  konec          timestamptz,                  -- konec události („Praha v UTC“) – mřížka kalendáře
+  barva_id       text,                         -- colorId události (10 = VOLNY), null = barva kalendáře
+  kalendar_barva text,                         -- barva kalendáře technika (#rrggbb)
+  celodenni      boolean NOT NULL DEFAULT false,
   PRIMARY KEY (kalendar, id)
 );
 CREATE INDEX IF NOT EXISTS kalendar_udalost_cas ON kalendar_udalost (cas);

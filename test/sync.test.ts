@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import { describe, expect, it } from "vitest";
 import type { Db } from "../src/db/db.js";
-import { hledejChatDb, hledejKalendarDb, hledejNaLokaliteDb, odemkniSync, stavSynchronizace, synchronizujChat, synchronizujKalendare, zamekSync } from "../src/zdroje/sync.js";
+import { hledejChatDb, hledejKalendarDb, hledejNaLokaliteDb, odemkniSync, stavSynchronizace, synchronizujChat, synchronizujKalendare, udalostiMrizky, zamekSync } from "../src/zdroje/sync.js";
 import { hledejVsude, synchronizovano, type ZavislostiZdroju } from "../src/zdroje/hledani.js";
 
 const pgliteDb = (pg: PGlite): Db => ({
@@ -16,7 +16,7 @@ describe("synchronizace kalendářů a Chatu do databáze", () => {
     let kolo = 0;
     const volani: { updatedMin?: string; showDeleted?: boolean }[] = [];
     const cal = {
-      calendarList: { list: async () => ({ data: { items: [{ id: "K1", summary: "Vajc Tomas" }, { id: "svatky@group.v.calendar.google.com", summary: "Svátky" }] } }) },
+      calendarList: { list: async () => ({ data: { items: [{ id: "K1", summary: "Vajc Tomas", backgroundColor: "#3f51b5" }, { id: "svatky@group.v.calendar.google.com", summary: "Svátky" }] } }) },
       events: {
         list: async (p: { updatedMin?: string; showDeleted?: boolean }) => {
           volani.push({ updatedMin: p.updatedMin, showDeleted: p.showDeleted });
@@ -26,7 +26,8 @@ describe("synchronizace kalendářů a Chatu do databáze", () => {
                 ? [
                     { id: "a", status: "confirmed", summary: "Vajc - FTTH O-85511111111 Novák", location: "Krčská 991/63, Praha 4", start: { dateTime: "2026-05-04T10:00:00+02:00" }, htmlLink: "https://cal/a" },
                     { id: "b", status: "confirmed", summary: "Vajc - FTTH O-85522222222 Malá", description: "S7 1-D4O3JTD", location: "Krčská 991/12", start: { dateTime: "2026-08-04T10:00:00+02:00" } },
-                    { id: "c", status: "confirmed", summary: "Vajc - VOLNY", location: "Krčská 991", start: { dateTime: "2026-08-06T10:00:00+02:00" } },
+                    { id: "c", status: "confirmed", summary: "Vajc - VOLNY", location: "Krčská 991", colorId: "10", start: { dateTime: "2026-08-06T10:00:00+02:00" }, end: { dateTime: "2026-08-06T12:00:00+02:00" } },
+                    { id: "cely", status: "confirmed", summary: "Vajc dovolená", start: { date: "2026-08-06" }, end: { date: "2026-08-07" } },
                   ]
                 : [
                     // přírůstek: jedna nová, jedna zrušená
@@ -41,7 +42,10 @@ describe("synchronizace kalendářů a Chatu do databáze", () => {
     const now = new Date("2026-10-16T12:00:00Z");
     expect(await stavSynchronizace(db, "kalendare")).toBeNull();
     const r = await synchronizujKalendare(db, cal, now);
-    expect(r).toMatchObject({ kalendaru: 1, udalosti: 3 });
+    expect(r).toMatchObject({ kalendaru: 1, udalosti: 4 });
+    // mřížka kalendáře: konec, barva události i kalendáře; celodenní se nevrací
+    const mr = await udalostiMrizky(db, ["K1"], new Date("2026-08-06T00:00:00Z"), new Date("2026-08-07T00:00:00Z"));
+    expect(mr.map((x) => [x.summary, x.od.toISOString(), x.do.toISOString(), x.barvaId, x.kalendarBarva])).toEqual([["Vajc - VOLNY", "2026-08-06T10:00:00.000Z", "2026-08-06T12:00:00.000Z", "10", "#3f51b5"]]);
     expect(await stavSynchronizace(db, "kalendare")).not.toBeNull();
     expect(await synchronizovano(db, "kalendare")).toBe(true);
 

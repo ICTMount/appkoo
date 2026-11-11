@@ -41,6 +41,9 @@ import { tedPraha } from "../domain/time.js";
 import { faktaZakazky } from "../domain/priorita.js";
 import { kalendarApi, obsadVolnySlot, SlotObsazen, udalostZakazky, vratitNaVolny } from "../gcal/kalendar.js";
 import { propisKombinaciDoKalendare } from "../gcal/kombinaceKalendar.js";
+import { rozsahMrizky, sestavMrizku, strankaMrizky, type VolbyMrizky } from "./mrizka.js";
+import { stavSynchronizace, udalostiMrizky } from "../zdroje/sync.js";
+import { skupinaZakazky } from "../plan/planovac.js";
 import { kombinaceZakazky, zkratkaKombinace } from "../domain/kombinace.js";
 import { sestavUdalost } from "../gcal/udalost.js";
 import { odhadVzdalenosti } from "../plan/geo.js";
@@ -205,7 +208,7 @@ function posli(res: ServerResponse, kod: number, html: string) {
   html = html
     .replace(/<!--konfigurace:(on|off)-->/, (_, on) => (role === "spravce" ? `<a href="/konfigurace" class="konfig${on === "on" ? " on" : ""}">⚙ Konfigurace</a>` : ""))
     .replace("<!--role-->", role ? ` · ${POPIS_ROLE[role]}` : "")
-    .replace(/<!--doplnit:(on|off)-->/, (_, on) => (role === "technik" ? "" : `<a href="/technik" class="${on === "on" ? "on" : ""}">Doplnit technika</a>`));
+    .replace(/<!--doplnit:(on|off)-->/, (_, on) => (role === "technik" ? "" : `<a href="/technik" class="${on === "on" ? "on" : ""}">Doplnit technika</a><a href="/kalendar">Kalendář techniků</a>`));
   const hlavicky: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
@@ -617,6 +620,34 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             return Number.isInteger(k) && k >= 0 && url.searchParams.has("prilohy") ? (k === 0 ? "Nic nového k uložení – vybrané přílohy už ve složce jsou." : `${k} ${k === 1 ? "soubor uložen" : k < 5 ? "soubory uloženy" : "souborů uloženo"} do složky zakázky.`) : null;
           })(),
         }));
+      }
+
+      // ---------- Kalendář techniků: zrcadlo Google Kalendáře (den / týden), zatím jen pro čtení ----------
+      if (url.pathname === "/kalendar") {
+        if (role === "technik") return posli(res, 403, strankaChyby(403, "Kalendář techniků je jen pro koordinaci."));
+        const p = url.searchParams;
+        const dnes = isoDate(now);
+        const denP = p.get("den") ?? "";
+        const kontext = await nactiKontext(db);
+        const zId = p.get("z");
+        const detail = zId ? await nactiDetail(db, zId, now) : null;
+        const technici = kontext.technici.map((t) => ({ jmeno: t.jmeno, nazevVKalendari: t.nazevVKalendari, kalendar: t.kalendar }));
+        // výchozí výběr: u zakázky technici s odpovídající dovedností (FTTH / PIV / SAT), jinak všichni
+        const vychozi = detail ? kontext.technici.filter((t) => t.skupiny.includes(skupinaZakazky(detail.z.typAktivity))).map((t) => t.jmeno) : [];
+        const volby: VolbyMrizky = {
+          pohled: p.get("pohled") === "tyden" ? "tyden" : "den",
+          den: /^\d{4}-\d{2}-\d{2}$/.test(denP) && !Number.isNaN(Date.parse(denP)) ? denP : dnes,
+          vybrani: p.has("t") ? p.getAll("t").filter((j) => technici.some((t) => t.jmeno === j)) : vychozi,
+          jenVolny: p.get("volne") === "1",
+          zakazka: detail ? { idAktivity: detail.z.idAktivity, oid: detail.z.idObjednavkyZaklad || detail.z.idAktivity, adresa: detail.z.adresa } : null,
+        };
+        const rozsah = rozsahMrizky(volby);
+        const [udalosti, synchronizace, barvy] = await Promise.all([
+          udalostiMrizky(db, technici.map((t) => t.kalendar), rozsah.od, rozsah.do),
+          stavSynchronizace(db, "kalendare"),
+          db.query<{ kalendar: string; barva: string }>("SELECT kalendar, max(kalendar_barva) AS barva FROM kalendar_udalost WHERE kalendar_barva IS NOT NULL GROUP BY kalendar").then((r) => new Map(r.rows.map((x) => [x.kalendar, x.barva]))).catch(() => new Map<string, string>()),
+        ]);
+        return posli(res, 200, strankaMrizky({ volby, technici, barvy, mrizka: sestavMrizku(udalosti, technici, volby), synchronizace, uzivatel: email }, dnes));
       }
 
       // ---------- Doplnit technika: jeho dny nahoře, vhodné zakázky do vybraného slotu dole ----------

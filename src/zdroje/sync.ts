@@ -41,6 +41,13 @@ CREATE TABLE IF NOT EXISTS sync_stav (
 
 // Trigramový index (pg_trgm) jsme zkusili a zavrhli: na db-f1-micro zdržoval zápis desítek tisíc řádků
 // na desítky minut, zatímco hledání bez indexu trvá stovky ms. Dříve založené indexy se odstraní.
+// Sloupce pro mřížku kalendáře (konec, barvy) – doplněné později
+const SLOUPCE_MRIZKY = `
+ALTER TABLE kalendar_udalost ADD COLUMN IF NOT EXISTS konec timestamptz;
+ALTER TABLE kalendar_udalost ADD COLUMN IF NOT EXISTS barva_id text;
+ALTER TABLE kalendar_udalost ADD COLUMN IF NOT EXISTS kalendar_barva text;
+ALTER TABLE kalendar_udalost ADD COLUMN IF NOT EXISTS celodenni boolean NOT NULL DEFAULT false`;
+
 const ODSTRANIT_INDEXY = `
 DROP INDEX IF EXISTS kalendar_udalost_hledani_trgm;
 DROP INDEX IF EXISTS chat_zprava_hledani_trgm`;
@@ -51,6 +58,7 @@ export function pripravSync(db: Dotaz): Promise<unknown> {
   if (!p) {
     p = (async () => {
       for (const sql of TABULKY.split(";").map((x) => x.trim()).filter(Boolean)) await db.query(sql);
+      for (const sql of SLOUPCE_MRIZKY.split(";").map((x) => x.trim()).filter(Boolean)) await db.query(sql);
       for (const sql of ODSTRANIT_INDEXY.split(";").map((x) => x.trim()).filter(Boolean)) await db.query(sql).catch(() => undefined);
     })().catch((e) => {
       pripraveno.delete(db);
@@ -73,12 +81,15 @@ async function zapisUdalosti(db: Db, kalendar: string, seznam: UdalostVPameti[],
     for (let i = 0; i < seznam.length; i += 500) {
       const davka = seznam.slice(i, i + 500);
       await q.query(
-        `INSERT INTO kalendar_udalost (kalendar, id, kalendar_nazev, summary, location, description, cas, odkaz, hledani)
-         SELECT $1, * FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::text[], $9::text[])
+        `INSERT INTO kalendar_udalost (kalendar, id, kalendar_nazev, summary, location, description, cas, odkaz, hledani, konec, barva_id, kalendar_barva, celodenni)
+         SELECT $1, * FROM unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::text[], $9::text[], $10::timestamptz[], $11::text[], $12::text[], $13::boolean[])
          ON CONFLICT (kalendar, id) DO UPDATE SET kalendar_nazev = EXCLUDED.kalendar_nazev, summary = EXCLUDED.summary, location = EXCLUDED.location,
-           description = EXCLUDED.description, cas = EXCLUDED.cas, odkaz = EXCLUDED.odkaz, hledani = EXCLUDED.hledani
-         WHERE (kalendar_udalost.summary, kalendar_udalost.location, kalendar_udalost.description, kalendar_udalost.cas, kalendar_udalost.odkaz)
-               IS DISTINCT FROM (EXCLUDED.summary, EXCLUDED.location, EXCLUDED.description, EXCLUDED.cas, EXCLUDED.odkaz)`,
+           description = EXCLUDED.description, cas = EXCLUDED.cas, odkaz = EXCLUDED.odkaz, hledani = EXCLUDED.hledani,
+           konec = EXCLUDED.konec, barva_id = EXCLUDED.barva_id, kalendar_barva = EXCLUDED.kalendar_barva, celodenni = EXCLUDED.celodenni
+         WHERE (kalendar_udalost.summary, kalendar_udalost.location, kalendar_udalost.description, kalendar_udalost.cas, kalendar_udalost.odkaz,
+                kalendar_udalost.konec, kalendar_udalost.barva_id, kalendar_udalost.kalendar_barva, kalendar_udalost.celodenni)
+               IS DISTINCT FROM (EXCLUDED.summary, EXCLUDED.location, EXCLUDED.description, EXCLUDED.cas, EXCLUDED.odkaz,
+                EXCLUDED.konec, EXCLUDED.barva_id, EXCLUDED.kalendar_barva, EXCLUDED.celodenni)`,
         [
           kalendar,
           davka.map((u) => u.id),
@@ -89,6 +100,10 @@ async function zapisUdalosti(db: Db, kalendar: string, seznam: UdalostVPameti[],
           davka.map((u) => u.cas),
           davka.map((u) => u.odkaz),
           davka.map((u) => u.hledani),
+          davka.map((u) => u.konec ?? null),
+          davka.map((u) => u.barvaId ?? null),
+          davka.map((u) => u.kalendarBarva ?? null),
+          davka.map((u) => !!u.celodenni),
         ],
       );
     }
@@ -121,13 +136,16 @@ export async function synchronizujKalendare(db: Db, cal: calendar_v3.Calendar, n
   const okno = oknoUdalosti(now);
   const { rows: stavy } = await db.query<{ klic: string; kdy: Date }>("SELECT klic, kdy FROM sync_stav WHERE klic LIKE 'kal:%'");
   const posledni = new Map(stavy.map((r) => [r.klic.slice(4), new Date(r.kdy)]));
+  // kalendáře nahrané před zavedením mřížky (události bez konce) se jednou nahrají znovu celé
+  const { rows: stare } = await db.query<{ kalendar: string }>("SELECT DISTINCT kalendar FROM kalendar_udalost WHERE konec IS NULL AND cas IS NOT NULL AND cas >= now() - interval '30 days'");
+  const bezKonce = new Set(stare.map((r) => r.kalendar));
   let celkem = 0;
   let plne = 0;
   await poDavkach(
     kalendare.map((k) => async () => {
       const zacatek = new Date();
       const minule = posledni.get(k.id);
-      const nahradit = !minule || Date.now() - minule.getTime() > PLNE_NACTENI_MS;
+      const nahradit = !minule || Date.now() - minule.getTime() > PLNE_NACTENI_MS || bezKonce.has(k.id);
       // rezerva 10 min – změny provedené těsně před minulým během se nesmí ztratit
       const { udalosti, smazane } = await nactiUdalostiKalendare(cal, k, okno, nahradit ? undefined : new Date(minule!.getTime() - 10 * 60_000).toISOString());
       if (nahradit || udalosti.length || smazane.length) await zapisUdalosti(db, k.id, udalosti, smazane, nahradit);
@@ -266,5 +284,36 @@ export async function hledejChatDb(db: Dotaz, prostory: string[], vyrazy: string
       veVlakne: !m.shoda,
       prilohy: Array.isArray(m.prilohy) ? (m.prilohy as Nalez["prilohy"]) : [],
     };
+  });
+}
+
+// ---------- mřížka kalendáře (zrcadlo Google Kalendáře) ----------
+
+export interface UdalostMrizky {
+  kalendar: string;
+  id: string;
+  summary: string;
+  location: string;
+  description: string;
+  /** „Praha v UTC“ */
+  od: Date;
+  do: Date;
+  barvaId: string | null;
+  kalendarBarva: string | null;
+  odkaz: string | null;
+}
+
+/** Časové události vybraných kalendářů v intervalu (celodenní se do mřížky neberou) */
+export async function udalostiMrizky(db: Dotaz, kalendare: string[], od: Date, do_: Date): Promise<UdalostMrizky[]> {
+  if (!kalendare.length) return [];
+  await pripravSync(db);
+  const { rows } = await db.query<{ kalendar: string; id: string; summary: string; location: string; description: string; cas: Date; konec: Date | null; barva_id: string | null; kalendar_barva: string | null; odkaz: string | null }>(
+    `SELECT kalendar, id, summary, location, description, cas, konec, barva_id, kalendar_barva, odkaz FROM kalendar_udalost
+     WHERE kalendar = ANY($1::text[]) AND cas >= $2 AND cas < $3 AND NOT celodenni ORDER BY cas`,
+    [kalendare, od, do_],
+  );
+  return rows.map((r) => {
+    const o = new Date(r.cas);
+    return { kalendar: r.kalendar, id: r.id, summary: r.summary, location: r.location, description: r.description, od: o, do: r.konec ? new Date(r.konec) : new Date(o.getTime() + 3_600_000), barvaId: r.barva_id, kalendarBarva: r.kalendar_barva, odkaz: r.odkaz };
   });
 }

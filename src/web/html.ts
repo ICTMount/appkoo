@@ -601,7 +601,7 @@ ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </div>
 </div>
 ${plan.jenNahled ? "" : `<div class="konec-detailu"></div>
-<section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
+<section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}${plan.jenNahled ? "" : ` · <a href="/kalendar?z=${encodeURIComponent(z.idAktivity)}">zobrazit v kalendáři techniků</a>`}</small></h2>
 ${sekcePlanovani(d, plan)}</section>`}`;
 
   // Technik v terénu: zákazník, adresa, telefon, patro/byt, předpis – to vše má v události v kalendáři.

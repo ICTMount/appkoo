@@ -291,6 +291,12 @@ describe("web: nabídka a zápis termínu", () => {
     const w = await spust();
     expect((await w.post("/zakazka/P1/slozka", {}, null)).status).toBe(403);
     expect((await w.post("/zakazka/P1/slozka", {})).status).toBe(503);
+    // kalendář techniků (mřížka): stránka se vykreslí i bez synchronizovaných událostí, s kontextem zakázky
+    const kal = await w.get("/kalendar?z=P1&pohled=tyden");
+    expect(kal.status).toBe(200);
+    const kalHtml = await kal.text();
+    expect(kalHtml).toContain("Kalendáře techniků");
+    expect(kalHtml).toContain('name="z" value="P1"');
     // kombinovaná objednávka → kalendář: POST projde (ne 405), cizí původ 403, běžná FTTH zakázka 400
     expect((await w.post("/zakazka/P1/kombinace-kalendar", {}, null)).status).toBe(403);
     expect((await w.post("/zakazka/P1/kombinace-kalendar", {})).status).toBe(400);

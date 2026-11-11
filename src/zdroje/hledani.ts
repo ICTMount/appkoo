@@ -206,6 +206,14 @@ export interface UdalostVPameti {
   odkaz: string | null;
   /** malá písmena bez diakritiky: summary + description + location */
   hledani: string;
+  /** konec události („Praha v UTC“) – pro mřížku kalendáře */
+  konec?: Date | null;
+  /** barva události (colorId 1–11), null = barva kalendáře */
+  barvaId?: string | null;
+  /** barva kalendáře technika (#rrggbb z calendarList) */
+  kalendarBarva?: string | null;
+  /** celodenní událost (start.date) – v mřížce se nezobrazuje */
+  celodenni?: boolean;
 }
 export interface PametKalendaru {
   nacteno: number;
@@ -229,7 +237,7 @@ export function oknoUdalosti(now: Date): { timeMin: string; timeMax: string } {
  */
 export async function nactiUdalostiKalendare(
   cal: calendar_v3.Calendar,
-  k: { id: string; nazev: string },
+  k: { id: string; nazev: string; barva?: string | null },
   okno: { timeMin: string; timeMax: string },
   updatedMin?: string,
 ): Promise<{ udalosti: UdalostVPameti[]; smazane: string[] }> {
@@ -245,7 +253,7 @@ export async function nactiUdalostiKalendare(
       maxResults: 2500,
       pageToken,
       ...(updatedMin ? { updatedMin, showDeleted: true } : {}),
-      fields: "nextPageToken,items(id,status,summary,description,location,start,htmlLink)",
+      fields: "nextPageToken,items(id,status,summary,description,location,start,end,colorId,htmlLink)",
     });
     for (const e of r.data.items ?? []) {
       if (!e.id) continue;
@@ -263,6 +271,10 @@ export async function nactiUdalostiKalendare(
         description,
         cas: zApi(e.start?.dateTime ?? e.start?.date),
         odkaz: e.htmlLink ?? null,
+        konec: zApi(e.end?.dateTime ?? e.end?.date),
+        barvaId: e.colorId ?? null,
+        kalendarBarva: k.barva ?? null,
+        celodenni: !e.start?.dateTime,
         // hledaný text bez instalačního předpisu (popis jen 600 znaků) – tabulka je 3× menší a hledání bez indexu rychlé
         hledani: bezDiakritiky(`${e.summary ?? ""} ${e.location ?? ""} ${description.slice(0, 600)}`),
       });
@@ -272,8 +284,8 @@ export async function nactiUdalostiKalendare(
   return { udalosti, smazane };
 }
 
-export async function seznamKalendaruTechniku(cal: calendar_v3.Calendar): Promise<{ id: string; nazev: string }[]> {
-  return (await seznamKalendaru(cal)).map((k) => ({ id: k.id!, nazev: k.summary ?? k.id! }));
+export async function seznamKalendaruTechniku(cal: calendar_v3.Calendar): Promise<{ id: string; nazev: string; barva: string | null }[]> {
+  return (await seznamKalendaru(cal)).map((k) => ({ id: k.id!, nazev: k.summary ?? k.id!, barva: k.backgroundColor ?? null }));
 }
 
 export async function nactiPamet(cal: calendar_v3.Calendar, now: Date): Promise<PametKalendaru> {
