@@ -601,7 +601,7 @@ ${radek("Upozornění", esc(d.plan.varovani.join("; ")))}
 </div>
 </div>
 ${plan.jenNahled ? "" : `<div class="konec-detailu"></div>
-<section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}${plan.jenNahled ? "" : ` · <a href="/kalendar?z=${encodeURIComponent(z.idAktivity)}">zobrazit v kalendáři techniků</a>`}</small></h2>
+<section class="planovani" id="planovani"><h2>Kam naplánovat <small>${esc(z.idObjednavky || z.idAktivity)} · ${esc(z.zakaznik)}</small></h2>
 ${sekcePlanovani(d, plan)}</section>`}`;
 
   // Technik v terénu: zákazník, adresa, telefon, patro/byt, předpis – to vše má v události v kalendáři.
@@ -755,70 +755,17 @@ function sekcePlanovani(d: Detail, plan: PlanovaniZakazky): string {
     : "";
   const upoz = brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join("<br>")}</div>` : "";
   if (blok) return blok + upoz;
+  const kalendar = `/kalendar?z=${encodeURIComponent(z.idAktivity)}`;
   if (z.termin && brany.blokace.some(jeTermin)) {
-    return `<div class="err termin-box"><div><b>Termín teď nelze naplánovat:</b><ul><li>Zakázka už má dohodnutý termín <b>${esc(slot(z.termin.od, z.termin.do))}</b>${z.technik ? ` · ${esc(z.technik)}` : ""}.</li></ul></div>
-<a class="btn velke" href="${esc(`${zakl0}?preplanovat=1#planovani`)}">Přeplánovat zakázku</a></div>${upoz}`;
+    return `<div class="err termin-box"><div><b>Zakázka už má dohodnutý termín</b> <b>${esc(slot(z.termin.od, z.termin.do))}</b>${z.technik ? ` · ${esc(z.technik)}` : ""}.</div>
+<a class="btn velke" href="${esc(kalendar)}">Přeplánovat zakázku</a></div>${upoz}`;
   }
   if (d.uzavreno) return `<div class="warn">Uzavřená zakázka se neplánuje.</div>`;
-  if (!nabidka) return `${upoz}<div class="warn">${plan.nedostupne ? "Kalendáře techniků nejsou v této instalaci zapnuté." : "Nabídku se nepodařilo spočítat."}</div>`;
-
-  const info = [
-    nabidka.nedostupne.length ? `Kalendář nejde přečíst: ${nabidka.nedostupne.join(", ")}.` : "",
-    nabidka.bezZakladny.length ? `Technik bez adresy výjezdu v číselníku: ${nabidka.bezZakladny.join(", ")}.` : "",
-    nabidka.bezPolohy ? `${nabidka.bezPolohy} zakázek v kalendářích nemá dohledatelnou adresu – v trasách chybí.` : "",
-  ].filter(Boolean);
-  // přeplánování / doplnění termínu: parametry, které jdou s výběrem slotu do zápisu
-  const navic = (q: URLSearchParams) => {
-    if (plan.presun) {
-      q.set("pk", plan.presun.kalendar);
-      q.set("pe", plan.presun.eventId);
-      q.set("pt", plan.presun.technik);
-    } else if (plan.doplnit) q.set("pp", "1");
-    return q;
-  };
-  const radky = nabidka.moznosti.map((m: MoznostSlotu, i) => {
-    const smi = zapis.zapnuty && zapis.smiTechnik(m.technik) && (!plan.presun || zapis.smiTechnik(plan.presun.technik));
-    const q = navic(new URLSearchParams({ k: m.kalendar, e: m.eventId, t: m.technik, od: m.od.toISOString(), do: m.do.toISOString() }));
-    const so = m.sousede;
-    const radekSouseda = (smer: string, x: NonNullable<MoznostSlotu["sousede"]>["pred"]) =>
-      `<div class="soused${x.zakladna ? " zakl" : ""}"><span class="smer">${smer}</span> ${x.cas ? `<b>${esc(x.cas)}</b> ` : ""}${esc(x.popis)}${mc(x.adresa, plan.casti)} <span class="km${x.km > DLOUHY_PREJEZD_KM ? " dlouhy" : ""}">${x.km.toFixed(1)} km</span></div>`;
-    const adresaZ = [z.adresa, bezRovna(z.psc)].filter(Boolean).join(", ");
-    const mapa = so && adresaZ
-      ? `https://www.google.com/maps/dir/${[so.pred.adresa ?? "", adresaZ, so.po.adresa ?? ""].filter(Boolean).map((a) => encodeURIComponent(a)).join("/")}`
-      : "";
-    const trasa = so
-      ? `${radekSouseda("↑ před", so.pred)}<div class="soused tato">● tato zakázka – příjezd cca ${esc(`${String(Math.floor(so.prijezd / 60)).padStart(2, "0")}:${String(Math.round(so.prijezd % 60)).padStart(2, "0")}`)}</div>${radekSouseda("↓ po", so.po)}${
-          mapa ? `<div class="soused"><a href="${esc(mapa)}" target="_blank" rel="noopener">trasa v mapě →</a></div>` : ""
-        }`
-      : "";
-    const odkazZapisu = (x: MoznostSlotu) =>
-      `/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${navic(new URLSearchParams({ k: x.kalendar, e: x.eventId, t: x.technik, od: x.od.toISOString(), do: x.do.toISOString() }))}`;
-    const jinyCas = m.alternativy?.length
-      ? `<div class="jiny-cas">jiný čas téhož dne: ${m.alternativy
-          .map((a) => (smi ? `<a href="${esc(odkazZapisu(a))}">${esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)}</a>` : esc(`${fmtTime(a.od)}–${fmtTime(a.do)}`)))
-          .join(" · ")}</div>`
-      : "";
-    return `<tr${m.naDohodnuty ? ` class="na-dohodnuty"` : ""}><td>${i + 1}</td><td><b>${esc(slot(m.od, m.do))}</b>${m.naDohodnuty ? ` <span class="webcal">= DOHODNUTÝ TERMÍN</span>` : ""}${trasa ? `<div class="trasa">${trasa}</div>` : ""}${jinyCas}</td><td>${esc(m.technik)}${m.vytizeni ? barVytizeni(m.vytizeni, m.eventId) : ""}</td>
-<td class="nowrap">+${m.kmNavic.toFixed(1)} km<br><small>den ${m.kmDne.toFixed(0)} km</small></td>
-<td>${smi ? `<a class="btn" href="/zakazka/${encodeURIComponent(z.idAktivity)}/zapis?${esc(q.toString())}">Vybrat</a>` : `<small class="muted">${zapis.zapnuty ? "zápis pro technika vypnutý" : "zápis vypnutý"}</small>`}</td></tr>`;
-  });
-  // Jiné termíny: zákazník nemůže → posun dopředu (od dne po posledním nabídnutém), nebo od zvoleného data
-  const pp = plan.preplanovat ? "preplanovat=1&" : "";
-  const zakl = `/zakazka/${encodeURIComponent(z.idAktivity)}`;
-  const posledni = nabidka.moznosti.map((m) => isoDate(m.od)).sort().at(-1) ?? nabidka.obdobi?.do;
-  const pozdeji = posledni ? addDays(posledni, 1) : null;
-  const terminy = `<form class="terminy" method="get" action="${esc(zakl)}#planovani">
-${nabidka.obdobi ? `<span>Hledáno <b>${esc(fmtDate(nabidka.obdobi.od))} – ${esc(fmtDate(nabidka.obdobi.do))}</b></span>` : ""}
-${plan.preplanovat ? `<input type="hidden" name="preplanovat" value="1"><span class="webcal">PŘEPLÁNOVÁNÍ</span> <a href="${esc(zakl)}#planovani">zrušit</a>` : ""}
-${plan.odData ? `<a href="${esc(`${zakl}${pp ? `?${pp.slice(0, -1)}` : ""}`)}#planovani">← nejbližší termíny</a>` : ""}
-${pozdeji ? `<a class="btn" href="${esc(`${zakl}?${pp}od=${pozdeji}#planovani`)}">Pozdější termíny →</a>` : ""}
-<label>od data <input type="date" name="od" value="${esc(plan.odData ?? "")}"></label><button>Hledat</button>
-</form>`;
-  return `${upoz}${terminy}${nabidka.chyba ? `<div class="err">${esc(nabidka.chyba)}</div>` : ""}
-${info.length ? `<div class="warn">${info.map(esc).join("<br>")}</div>` : ""}
-<div class="tbl"><table><thead><tr><th>#</th><th>Slot</th><th>Technik</th><th>Km navíc</th><th></th></tr></thead>
-<tbody>${radky.join("") || `<tr><td colspan="5" class="muted">${nabidka.chyba ? "" : "V tomto období žádný volný slot v dosahu – zkuste Pozdější termíny."}</td></tr>`}</tbody></table></div>
-<p class="muted">Prohledáno ${nabidka.technikuCelkem} techniků s dovedností pro tento typ zakázky. Pořadí: zaplnění dne, km navíc oproti trase dne, preferované okno 10–14 h. U každého slotu je vidět, kam technik jede před ní a po ní (km = přejezd, odhad vzdušnou čarou × 1,3).</p>`;
+  if (plan.nedostupne) return `${upoz}<div class="warn">Kalendáře techniků nejsou v této instalaci zapnuté.</div>`;
+  void nabidka;
+  // plánuje se v kalendáři techniků: klik na VOLNY → formulář zápisu; doporučené sloty tlačítkem „Vybrat nejoptimálnější VOLNY“
+  return `${upoz}<div class="termin-box"><div>Termín se vybírá v kalendáři techniků: klik na <b>VOLNY</b> slot otevře formulář zápisu. Doporučené sloty ukáže tlačítko „Vybrat nejoptimálnější VOLNY“.</div>
+<a class="btn velke" href="${esc(kalendar)}">${zapis.zapnuty ? "Naplánovat" : "Zobrazit kalendář techniků"}</a></div>`;
 }
 
 /** přejezd nad tento limit se v nabídce zvýrazní (červeně) – na první pohled vidět nesmyslnou cestu */

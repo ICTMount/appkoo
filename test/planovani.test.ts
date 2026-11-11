@@ -252,13 +252,23 @@ describe("web: nabídka a zápis termínu", () => {
     const n = await w.get("/zakazka/P1");
     expect(n.status).toBe(200);
     const html = await n.text();
-    expect(html).toContain("Hristov");
-    expect(html).toContain("Vybrat");
-    expect(html).toContain("Nekdo");
-    expect(html).toContain("↑ před");
-    expect(html).toContain("tato zakázka – příjezd cca");
-    expect(html).toContain("Pozdější termíny →");
-    expect(await (await w.get("/zakazka/P1?od=2026-10-19")).text()).toContain("Hledáno <b>19.10.2026");
+    // detail: jedno tlačítko „Naplánovat“ do kalendáře techniků, seznam nabídek už v detailu není
+    expect(html).toContain('href="/kalendar?z=P1"');
+    expect(html).toContain("Naplánovat");
+    expect(html).not.toContain("Pozdější termíny →");
+    // kalendář techniků: živá data, horní pruh se zakázkou, klik na VOLNY vede na formulář zápisu
+    const kal = await (await w.get("/kalendar?z=P1&den=2026-10-16")).text();
+    expect(kal).toContain("Kam naplánovat");
+    expect(kal).toContain("živě z Google Kalendáře");
+    expect(kal).toContain('http-equiv="refresh" content="120"');
+    expect(kal).toContain("Hristov - VOLNY");
+    expect(kal).toMatch(/href="\/zakazka\/P1\/zapis\?k=K1&amp;e=v1&amp;t=Hristov&amp;od=/);
+    expect(kal).toContain("Vybrat nejoptimálnější VOLNY");
+    // našeptávač: doporučené sloty vyznačené v mřížce a v seznamu vlevo
+    const navrh = await (await w.get("/kalendar?z=P1&den=2026-10-16&navrh=1")).text();
+    expect(navrh).toContain("nejoptimálnější 1");
+    expect(navrh).toContain('class="k-navrhy"');
+    expect(navrh).toContain("km navíc");
     const f = await w.get(`/zakazka/P1/zapis?${new URLSearchParams(vyber)}`);
     expect(await f.text()).toContain("Uložit do kalendáře");
     const blok = await (await w.get("/zakazka/P2")).text();

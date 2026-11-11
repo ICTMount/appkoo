@@ -41,10 +41,12 @@ import { tedPraha } from "../domain/time.js";
 import { faktaZakazky } from "../domain/priorita.js";
 import { kalendarApi, obsadVolnySlot, SlotObsazen, udalostZakazky, vratitNaVolny } from "../gcal/kalendar.js";
 import { propisKombinaciDoKalendare } from "../gcal/kombinaceKalendar.js";
-import { rozsahMrizky, sestavMrizku, strankaMrizky, type VolbyMrizky } from "./mrizka.js";
-import { stavSynchronizace, udalostiMrizky } from "../zdroje/sync.js";
+import { rozsahMrizky, sestavMrizku, strankaMrizky, type OznaceniMrizky, type VolbyMrizky, type ZakazkaMrizky } from "./mrizka.js";
+import { stavSynchronizace, udalostiMrizky, type UdalostMrizky } from "../zdroje/sync.js";
+import { instalacePredRfs } from "../domain/predRfs.js";
+import { zasuvkaUsed } from "../domain/migrace.js";
 import { skupinaZakazky } from "../plan/planovac.js";
-import { kombinaceZakazky, zkratkaKombinace } from "../domain/kombinace.js";
+import { kombinaceZakazky, popisKombinace, zkratkaKombinace } from "../domain/kombinace.js";
 import { sestavUdalost } from "../gcal/udalost.js";
 import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
@@ -540,7 +542,8 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const brany = kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!presunPlan, doplnit });
         const odP = url.searchParams.get("od") ?? "";
         const odData = /^\d{4}-\d{2}-\d{2}$/.test(odP) && !Number.isNaN(Date.parse(odP)) && odP > isoDate(now) ? odP : undefined;
-        const spocitat = !brany.blokace.length && !detail.uzavreno && planovac && !jenNahled;
+        // nabídka slotů (našeptávač) se v detailu už nepočítá – plánuje se v kalendáři techniků (/kalendar?z=…)
+        const spocitat = false as boolean;
         const adresaZ = [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
         // měření částí detailu – do logu (jsonPayload.casti), ať je vidět, na co se čeká
         const casy: Record<string, number> = {};
@@ -554,7 +557,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             ? (async (): Promise<Nabidka> => {
                 try {
                   const sla = slaKonec(detail.z, stav.posledniExport ?? now);
-                  return await nabidniProZakazku(detail.z, kontext.nastaveni.pouzivatPriority ? detail.priorita : "P3", sla, kontext.technici, await planovac(), now, {
+                  return await nabidniProZakazku(detail.z, kontext.nastaveni.pouzivatPriority ? detail.priorita : "P3", sla, kontext.technici, await planovac!(), now, {
                     adresyZMwf: kontext.adresyZMwf,
                     nastaveni: kontext.nastaveni.plan,
                     dni: kontext.nastaveni.dniNabidky,
@@ -634,20 +637,107 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const technici = kontext.technici.map((t) => ({ jmeno: t.jmeno, nazevVKalendari: t.nazevVKalendari, kalendar: t.kalendar, vyjezd: [t.vyjezd, t.vyjezd2].filter(Boolean).join(" / ") }));
         // výchozí výběr: u zakázky technici s odpovídající dovedností (FTTH / PIV / SAT), jinak všichni
         const vychozi = detail ? kontext.technici.filter((t) => t.skupiny.includes(skupinaZakazky(detail.z.typAktivity))).map((t) => t.jmeno) : [];
+        const vybrani = p.has("t") ? p.getAll("t").filter((j) => technici.some((t) => t.jmeno === j)) : vychozi;
+        // výchozí den u zakázky s termínem: den termínu (ať je současná událost hned vidět)
+        const denVychozi = detail?.z.termin && isoDate(detail.z.termin.od) >= dnes ? isoDate(detail.z.termin.od) : dnes;
+        const planovac = n.planovac ? await Promise.resolve().then(() => n.planovac!()).catch(() => null) : null;
+
+        // zakázka: současný termín v kalendáři (přeplánování), zlatá pravidla, štítky do horního pruhu
+        let puvodni: Awaited<ReturnType<typeof najdiTerminVKalendari>> = null;
+        if (detail?.z.termin && planovac && !detail.uzavreno) puvodni = await najdiTerminVKalendari(planovac.api, kontext.technici, detail.z).catch(() => null);
+        const doplnit = !!detail?.z.termin && !puvodni;
+        const brany = detail ? kontrolaBran(detail.z, faktaZakazky(detail.z, now), kontext.blokovane, { presun: !!puvodni, doplnit }) : null;
+        const blokace = detail ? [...(detail.uzavreno ? ["Uzavřená zakázka se neplánuje."] : []), ...(brany?.blokace ?? [])] : [];
+        const sla = detail ? slaKonec(detail.z, stav.posledniExport ?? now) : null;
+        const zakazkaMrizky: ZakazkaMrizky | null = detail
+          ? {
+              idAktivity: detail.z.idAktivity,
+              oid: detail.z.idObjednavkyZaklad || detail.z.idAktivity,
+              adresa: [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
+              zakaznik: detail.z.zakaznik,
+              telefon: detail.z.telefony[0] ?? "",
+              typ: detail.z.typAktivity,
+              infra: detail.z.infrastruktura,
+              sla,
+              stitky: [
+                ...(() => { const k = kombinaceZakazky(detail.z, detail.notifikace); return k ? [popisKombinace(k)] : []; })(),
+                ...(detail.z.predobjednavka ? ["PŘEDOBJEDNÁVKA"] : []),
+                ...(() => { const r = instalacePredRfs(detail.z, now); return r ? [`PŘED RFS ${r.rfsText}`] : []; })(),
+                ...(zasuvkaUsed(detail.z) ? ["ZÁSUVKA USED"] : []),
+              ],
+              blokace,
+              upozorneni: brany?.upozorneni ?? [],
+              ...(detail.z.termin ? { termin: `${isoDate(detail.z.termin.od).split("-").reverse().join(".")} ${String(detail.z.termin.od.getUTCHours()).padStart(2, "0")}:${String(detail.z.termin.od.getUTCMinutes()).padStart(2, "0")}${detail.z.technik ? ` · ${detail.z.technik}` : ""}` } : {}),
+            }
+          : null;
         const volby: VolbyMrizky = {
           pohled: p.get("pohled") === "tyden" ? "tyden" : "den",
-          den: /^\d{4}-\d{2}-\d{2}$/.test(denP) && !Number.isNaN(Date.parse(denP)) ? denP : dnes,
-          vybrani: p.has("t") ? p.getAll("t").filter((j) => technici.some((t) => t.jmeno === j)) : vychozi,
+          den: /^\d{4}-\d{2}-\d{2}$/.test(denP) && !Number.isNaN(Date.parse(denP)) ? denP : denVychozi,
+          vybrani,
           jenVolny: p.get("volne") === "1",
-          zakazka: detail ? { idAktivity: detail.z.idAktivity, oid: detail.z.idObjednavkyZaklad || detail.z.idAktivity, adresa: detail.z.adresa } : null,
+          zakazka: zakazkaMrizky,
+          navrh: !!detail && p.get("navrh") === "1",
         };
         const rozsah = rozsahMrizky(volby);
-        const [udalosti, synchronizace, barvy] = await Promise.all([
-          udalostiMrizky(db, technici.map((t) => t.kalendar), rozsah.od, rozsah.do),
+        const [synchronizace, barvy] = await Promise.all([
           stavSynchronizace(db, "kalendare"),
           db.query<{ kalendar: string; barva: string }>("SELECT kalendar, max(kalendar_barva) AS barva FROM kalendar_udalost WHERE kalendar_barva IS NOT NULL GROUP BY kalendar").then((r) => new Map(r.rows.map((x) => [x.kalendar, x.barva]))).catch(() => new Map<string, string>()),
         ]);
-        return posli(res, 200, strankaMrizky({ volby, technici, barvy, mrizka: sestavMrizku(udalosti, technici, volby), synchronizace, uzivatel: email }, dnes));
+        // data: živě z Google Kalendáře (paměť 30 s), při výpadku záloha z databáze (bez možnosti plánovat)
+        const zobrazeni = kontext.technici.filter((t) => !vybrani.length || vybrani.includes(t.jmeno));
+        let udalosti: UdalostMrizky[] | null = null;
+        let nedostupne: string[] = [];
+        if (planovac) {
+          try {
+            const ziva = await nactiKalendare(planovac.api, zobrazeni, rozsah.od, rozsah.do);
+            if (ziva.citelni.length || !zobrazeni.length) {
+              nedostupne = ziva.nedostupne;
+              udalosti = ziva.udalosti.map((u) => ({ kalendar: u.kalendar, id: u.id, summary: u.summary, location: u.location, description: u.description, od: u.od, do: u.do, barvaId: u.barva ?? null, kalendarBarva: barvy.get(u.kalendar) ?? null, odkaz: null }));
+            }
+          } catch {
+            udalosti = null;
+          }
+        }
+        const zive = !!udalosti;
+        if (!udalosti) udalosti = await udalostiMrizky(db, zobrazeni.map((t) => t.kalendar), rozsah.od, rozsah.do);
+
+        // našeptávač: nejoptimálnější VOLNY sloty vyznačené v mřížce + seznam vlevo
+        let navrhy: NonNullable<Parameters<typeof strankaMrizky>[0]["navrhy"]> = [];
+        let navrhChyba: string | undefined;
+        const oznaceni: OznaceniMrizky = { tato: puvodni ? { kalendar: puvodni.kalendar, eventId: puvodni.eventId } : null };
+        if (volby.navrh && detail && planovac && !blokace.length) {
+          try {
+            const prvni = rozsah.dny[0]!;
+            const nab = await nabidniProZakazku(detail.z, kontext.nastaveni.pouzivatPriority ? detail.priorita : "P3", sla, kontext.technici, planovac, now, {
+              adresyZMwf: kontext.adresyZMwf,
+              nastaveni: kontext.nastaveni.plan,
+              dni: kontext.nastaveni.dniNabidky,
+              trvaniMin: kontext.nastaveni.delkaPraceMin,
+              ...(prvni > dnes ? { odData: prvni } : {}),
+              ...(doplnit && detail.z.termin ? { dohodnuty: detail.z.termin } : {}),
+            });
+            if (nab.chyba) navrhChyba = nab.chyba;
+            const cas = (t: Date) => `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
+            oznaceni.navrhy = new Map();
+            nab.moznosti.forEach((m, i) => {
+              const so = m.sousede;
+              const duvod = `+${m.kmNavic.toFixed(1)} km navíc${so ? ` · před: ${so.pred.popis} (${so.pred.km.toFixed(1)} km) · po: ${so.po.popis} (${so.po.km.toFixed(1)} km)` : ""}`;
+              oznaceni.navrhy!.set(`${m.kalendar}|${m.eventId}`, { poradi: i + 1, duvod });
+              navrhy.push({ poradi: i + 1, den: isoDate(m.od), cas: `${cas(m.od)} – ${cas(m.do)}`, technik: m.technik, duvod });
+            });
+          } catch (e) {
+            navrhChyba = `Doporučení se nepodařilo spočítat: ${e instanceof Error ? e.message : String(e)}`;
+            navrhy = [];
+          }
+        }
+        const smiPlanovat = !!detail && role !== "cteni" && zapis.zapnuty && zive && !blokace.length;
+        return posli(res, 200, strankaMrizky({
+          volby, technici, barvy, synchronizace, uzivatel: email, zive, nacteno: now, nedostupne, navrhy, ...(navrhChyba ? { navrhChyba } : {}),
+          mrizka: sestavMrizku(udalosti, technici, volby, oznaceni),
+          planovani: smiPlanovat
+            ? { smi: (t) => smiTechnik(t) && (!puvodni || smiTechnik(puvodni.technik)), navic: puvodni ? { pk: puvodni.kalendar, pe: puvodni.eventId, pt: puvodni.technik } : doplnit ? { pp: "1" } : {} }
+            : null,
+        }, dnes));
       }
 
       // ---------- Doplnit technika: jeho dny nahoře, vhodné zakázky do vybraného slotu dole ----------

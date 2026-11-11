@@ -102,4 +102,26 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(mm).toContain("den=2026-12-16"); // šipka na další měsíc
     expect(miniMesic(volby({ pohled: "tyden" }), "2026-11-11")).toContain('<tr class="vyb"><td class="t">47</td>');
   });
+
+  it("plánování: klik na VOLNY vede na formulář zápisu jen s oprávněním, živými daty a bez blokace; doporučené sloty a současný termín jsou označené", () => {
+    const zak = { idAktivity: "P1", oid: "O-8559711037", adresa: "Štefánikova 12, 150 00 Praha 5 Smíchov", zakaznik: "Novák", telefon: "602 123 456", infra: "TMCZ", stitky: ["FTTH + IPTV"], blokace: [] as string[] };
+    const v = volby({ zakazka: zak, navrh: true });
+    const m = sestavMrizku(UD, T, v, { navrhy: new Map([["K1|K1-2026-11-16-10:00", { poradi: 1, duvod: "+2.0 km navíc" }]]), tato: { kalendar: "K1", eventId: "K1-2026-11-16-08:00" } });
+    expect(m.sloupce[0]!.pod[0]!.bloky.map((b) => [b.navrh?.poradi ?? null, !!b.tato])).toEqual([[null, true], [1, false], [null, false]]);
+    const zaklad = { volby: v, technici: T, barvy: new Map<string, string>(), mrizka: m, synchronizace: null, uzivatel: "a@b.cz", nacteno: new Date("2026-11-11T20:31:05Z") };
+    const ano = strankaMrizky({ ...zaklad, zive: true, planovani: { smi: (t) => t === "Tomáš Vajc", navic: { pk: "K9", pe: "e9", pt: "Anton Hristov" } } }, "2026-11-11");
+    expect(ano).toContain('href="/zakazka/P1/zapis?k=K1&amp;e=K1-2026-11-16-10%3A00&amp;t=Tom%C3%A1%C5%A1+Vajc&amp;od=2026-11-16T10%3A00%3A00.000Z&amp;do=2026-11-16T12%3A00%3A00.000Z&amp;pk=K9&amp;pe=e9&amp;pt=Anton+Hristov"');
+    expect(ano).toContain("nejoptimálnější 1");
+    expect(ano).toContain("tato zakázka");
+    expect(ano).toContain("Štefánikova 12, <b>Praha 5 Smíchov</b>");
+    expect(ano).toContain("živě z Google Kalendáře · načteno 20:31:05");
+    expect(ano).toContain('http-equiv="refresh" content="120"');
+    // záloha z databáze, chybějící oprávnění nebo blokace → žádný odkaz na zápis
+    expect(strankaMrizky({ ...zaklad, zive: false, planovani: { smi: () => true, navic: {} } }, "2026-11-11")).not.toContain("/zapis?");
+    expect(strankaMrizky({ ...zaklad, zive: true, planovani: null }, "2026-11-11")).not.toContain("/zapis?");
+    const blok = strankaMrizky({ ...zaklad, volby: volby({ zakazka: { ...zak, blokace: ["Zásuvka USED – čeká se na PEP."] } }), zive: true, planovani: { smi: () => true, navic: {} } }, "2026-11-11");
+    expect(blok).not.toContain("/zapis?");
+    expect(blok).toContain("Termín teď nelze naplánovat: Zásuvka USED");
+    expect(blok).not.toContain("Vybrat nejoptimálnější VOLNY");
+  });
 });

@@ -54,7 +54,37 @@ export interface VolbyMrizky {
   vybrani: string[];
   jenVolny: boolean;
   /** zakázka, pro kterou se hledá termín (kontext stránky) */
-  zakazka?: { idAktivity: string; oid: string; adresa: string; doSplneni?: string } | null;
+  zakazka?: ZakazkaMrizky | null;
+  /** vyznačit nejoptimálnější VOLNY sloty (našeptávač) */
+  navrh?: boolean;
+}
+
+/** Zakázka v horním pruhu kalendáře – vše důležité pro hovor se zákazníkem */
+export interface ZakazkaMrizky {
+  idAktivity: string;
+  oid: string;
+  adresa: string;
+  zakaznik?: string;
+  telefon?: string;
+  typ?: string;
+  /** vlastník sítě (TMCZ / CETIN / VDF) */
+  infra?: string;
+  /** konec SLA („Praha v UTC“) */
+  sla?: Date | null;
+  /** FTTH + IPTV, PŘED RFS, ZÁSUVKA USED, PŘEDOBJEDNÁVKA… */
+  stitky?: string[];
+  /** zlatá pravidla, která plánování blokují */
+  blokace?: string[];
+  upozorneni?: string[];
+  /** současný termín zakázky (přeplánování) */
+  termin?: string;
+}
+
+/** Označení bloků: doporučené sloty našeptávače a současná událost plánované zakázky */
+export interface OznaceniMrizky {
+  /** klíč „kalendář|eventId“ */
+  navrhy?: Map<string, { poradi: number; duvod: string }>;
+  tato?: { kalendar: string; eventId: string } | null;
 }
 
 const hm = (t: Date) => `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
@@ -102,6 +132,16 @@ export interface BlokMrizky {
   /** detail se otevírá vlevo / kotví dole (aby nevyjel z obrazovky) */
   vlevo: boolean;
   dole: boolean;
+  /** identifikace slotu pro zápis: kalendář, událost, technik (jméno z číselníku), časy „Praha v UTC“ */
+  kalendar: string;
+  id: string;
+  technik: string;
+  odIso: string;
+  doIso: string;
+  /** doporučený slot našeptávače */
+  navrh?: { poradi: number; duvod: string };
+  /** současná událost plánované zakázky */
+  tato?: boolean;
 }
 
 export interface SloupecMrizky {
@@ -124,7 +164,7 @@ export function radkyDetailu(popis: string): string[] {
 }
 
 /** Sestaví mřížku z událostí (čistá funkce – testuje se bez databáze) */
-export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[], v: VolbyMrizky): Mrizka {
+export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[], v: VolbyMrizky, oznaceni: OznaceniMrizky = {}): Mrizka {
   const { dny } = rozsahMrizky(v);
   const vyb = v.vybrani.length ? technici.filter((t) => v.vybrani.includes(t.jmeno)) : technici;
   const podle = new Map<string, UdalostMrizky[]>();
@@ -191,6 +231,13 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
             oid: u.summary.match(/O-\d{8,}/)?.[0] ?? null,
             vlevo,
             dole: od - start > delka * 0.45,
+            kalendar: u.kalendar,
+            id: u.id,
+            technik: p.t.jmeno,
+            odIso: u.od.toISOString(),
+            doIso: u.do.toISOString(),
+            ...(oznaceni.navrhy?.has(`${u.kalendar}|${u.id}`) ? { navrh: oznaceni.navrhy.get(`${u.kalendar}|${u.id}`)! } : {}),
+            ...(oznaceni.tato && oznaceni.tato.kalendar === u.kalendar && oznaceni.tato.eventId === u.id ? { tato: true } : {}),
           };
         }),
       };
@@ -268,6 +315,20 @@ button,input{font:inherit}
 .ev:hover,.ev:focus-within{z-index:5}
 .ev:hover .tip,.ev:focus-within .tip{display:block}
 .k-prazdno{padding:2em;color:#444746}
+.k-zakazka{display:flex;flex-wrap:wrap;align-items:center;gap:.25em .8em;padding:.4em 1em;border-bottom:1px solid #dadce0;background:#f8fafd}
+.k-zakazka .oid{font-size:1.2em;font-weight:700}
+.k-chip{display:inline-block;font-size:.8em;font-weight:700;padding:.05em .5em;border-radius:4px;border:1px solid #747775;background:#fff}
+.k-chip.zl{background:#fdd835;border-color:#a88c00;color:#000}
+.k-blok{flex-basis:100%;background:#fce8e6;color:#8c1d18;border:1px solid #f1aeb5;border-radius:6px;padding:.3em .7em;font-weight:500}
+.k-upoz{flex-basis:100%;background:#fef7e0;color:#5f4500;border:1px solid #f0d58a;border-radius:6px;padding:.3em .7em}
+.k-zive{font-size:.85em;color:#444746}
+.k-zive.zaloha{color:#8c1d18;font-weight:700}
+.ev.navrh .ev-b{outline:3px solid #1f1f1f;outline-offset:-3px}
+.ev.tato .ev-b{outline:3px dashed #1f1f1f;outline-offset:-3px}
+.ev-znak{margin-top:auto;align-self:flex-start;background:#fff;color:#0b5a2f;font-weight:700;border-radius:1em;padding:0 .5em}
+.k-navrhy{margin:.4em 0 0;padding:0;list-style:none;font-size:.9em}
+.k-navrhy li{margin:.25em 0}
+.k-panel .k-tl.zel{background:#0b8043;border-color:#0b8043;color:#fff}
 `;
 
 export interface StrankaMrizky {
@@ -279,15 +340,27 @@ export interface StrankaMrizky {
   /** kdy se kalendáře naposledy synchronizovaly */
   synchronizace: Date | null;
   uzivatel: string;
+  /** data načtená teď přímo z Google Kalendáře (false = záloha z databáze, plánovat nejde) */
+  zive?: boolean;
+  /** čas načtení („Praha v UTC“) */
+  nacteno?: Date;
+  /** kalendáře, které se nepodařilo přečíst */
+  nedostupne?: string[];
+  /** plánování klikem na VOLNY: kdo smí do kterého kalendáře a parametry přesunu (pk/pe/pt, pp) */
+  planovani?: { smi: (technik: string) => boolean; navic: Record<string, string> } | null;
+  /** doporučené sloty (seznam vlevo; mohou být i mimo zobrazený den) */
+  navrhy?: { poradi: number; den: IsoDate; cas: string; technik: string; duvod: string }[];
+  navrhChyba?: string;
 }
 
 /** Parametry odkazu se zachováním výběru */
-function odkaz(v: VolbyMrizky, zmena: Partial<Pick<VolbyMrizky, "pohled" | "den" | "jenVolny">>): string {
+function odkaz(v: VolbyMrizky, zmena: Partial<Pick<VolbyMrizky, "pohled" | "den" | "jenVolny" | "navrh">>): string {
   const n = { ...v, ...zmena };
   const q = new URLSearchParams({ pohled: n.pohled, den: n.den });
   for (const t of n.vybrani) q.append("t", t);
   if (n.jenVolny) q.set("volne", "1");
   if (n.zakazka) q.set("z", n.zakazka.idAktivity);
+  if (n.navrh && n.zakazka) q.set("navrh", "1");
   return `/kalendar?${q}`;
 }
 
@@ -325,6 +398,7 @@ export function miniMesic(v: VolbyMrizky, dnes: IsoDate): string {
 
 export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const { volby: v, mrizka: m } = s;
+  const z = v.zakazka;
   const krok = v.pohled === "den" ? 1 : 7;
   const { dny } = rozsahMrizky(v);
   const datum = v.pohled === "den" ? denDlouze(v.den) : `${denKratce(dny[0]!)} – ${denKratce(dny[6]!)} ${fromIso(dny[6]!).getUTCFullYear()}`;
@@ -333,15 +407,20 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const pismo = v.jenVolny && m.podsloupcu > 30 ? 0.72 : m.husta ? 0.78 : 0.9;
   const vaha = (sl: SloupecMrizky) => Math.max(1, sl.pod.length);
   const blok = (b: BlokMrizky) => {
-    const cil = b.oid ? `/o/${encodeURIComponent(b.oid)}` : b.odkaz;
+    // VOLNY + plánovaná zakázka + oprávnění + živá data + žádná blokace → klik otevře formulář zápisu
+    const lzePlanovat = b.volny && !!z && !!s.planovani && s.zive !== false && !(z.blokace ?? []).length && s.planovani.smi(b.technik);
+    const cil = lzePlanovat
+      ? `/zakazka/${encodeURIComponent(z!.idAktivity)}/zapis?${new URLSearchParams({ k: b.kalendar, e: b.id, t: b.technik, od: b.odIso, do: b.doIso, ...s.planovani!.navic })}`
+      : b.oid ? `/o/${encodeURIComponent(b.oid)}` : b.odkaz;
+    const znak = b.navrh ? `<span class="ev-znak">${m.husta ? `${b.navrh.poradi}.` : `nejoptimálnější ${b.navrh.poradi}`}</span>` : b.tato ? `<span class="ev-znak">tato zakázka</span>` : "";
     const misto = [b.ulice ? esc(b.ulice) : "", b.cast ? `<b>${esc(b.cast)}</b>` : ""].filter(Boolean).join(", ");
-    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}`;
+    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}${znak}`;
     const styl = `background:${b.bg};color:${b.fg}`;
     const telo = cil
-      ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
+      ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
       : `<div class="ev-b" tabindex="0" style="${styl}">${obsah}</div>`;
-    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}</div>`;
-    return `<div class="ev" style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
+    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}${lzePlanovat ? `<div class="r"><b>Klik = naplánovat ${esc(z!.oid)} do tohoto slotu.</b></div>` : ""}${b.navrh ? `<div class="r">Nejoptimálnější ${b.navrh.poradi}: ${esc(b.navrh.duvod)}</div>` : ""}</div>`;
+    return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}" style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
@@ -350,22 +429,44 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
         .map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0;background-size:100% ${(100 / m.hodiny.length).toFixed(4)}%">${sl.pod.map((p) => `<div class="k-pod" style="font-size:${pismo}em">${p.bloky.map(blok).join("")}</div>`).join("")}</div>`)
         .join("")}</div></div>`
     : `<div class="k-prazdno">${v.jenVolny ? "V zobrazeném období nemá žádný vybraný technik volný slot." : "Není vybraný žádný technik."}</div>`;
-  const z = v.zakazka;
-  return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kalendář techniků – AppKoo</title><style>${CSS}</style></head><body><div class="k">
+  const slaText = (t: Date) => `${DNY_KR[t.getUTCDay()]!.toLowerCase()} ${t.getUTCDate()}.${t.getUTCMonth() + 1}. ${hm(t)}`;
+  const adrZ = z ? castAdresy(z.adresa) : null;
+  const pruh = z
+    ? `<div class="k-zakazka"><a class="oid" href="/zakazka/${encodeURIComponent(z.idAktivity)}" title="Zpět na detail zakázky">${esc(z.oid)}</a>${z.infra ? `<span class="k-chip">${esc(z.infra)}</span>` : ""}${(z.stitky ?? []).map((x) => `<span class="k-chip zl">${esc(x)}</span>`).join("")}
+<span>${esc(z.zakaznik ?? "")}${z.telefon ? ` · <a href="tel:${esc(z.telefon.replace(/[^+\d]/g, ""))}">${esc(z.telefon)}</a>` : ""}</span>
+<span>${adrZ!.cast ? `${esc(adrZ!.ulice)}, <b>${esc(adrZ!.cast)}</b>` : esc(adrZ!.ulice)}</span>
+${z.typ ? `<span class="k-sedy">${esc(z.typ)}</span>` : ""}${z.sla ? `<span>do splnění <b>${esc(slaText(z.sla))}</b></span>` : ""}${z.termin ? `<span>současný termín <b>${esc(z.termin)}</b> – klik na VOLNY zakázku přeplánuje</span>` : ""}
+${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat: ${z.blokace!.map(esc).join(" · ")}</div>` : ""}${(z.upozorneni ?? []).length ? `<div class="k-upoz">${z.upozorneni!.map(esc).join(" · ")}</div>` : ""}</div>`
+    : "";
+  const zive = s.zive === false
+    ? `<span class="k-zive zaloha">Google Kalendář neodpovídá – záloha z databáze${s.synchronizace ? ` (stav k ${hm(s.synchronizace)})` : ""}, plánovat teď nelze.</span>`
+    : s.nacteno ? `<span class="k-zive">živě z Google Kalendáře · načteno ${hm(s.nacteno)}:${String(s.nacteno.getUTCSeconds()).padStart(2, "0")}</span>` : "";
+  const navrhy = z && !(z.blokace ?? []).length
+    ? `<a class="k-tl${v.navrh ? "" : " zel"}" href="${esc(odkaz(v, { navrh: !v.navrh }))}">${v.navrh ? "Skrýt nejoptimálnější VOLNY" : "Vybrat nejoptimálnější VOLNY"}</a>${
+        v.navrh
+          ? s.navrhChyba ? `<div class="k-pozn">${esc(s.navrhChyba)}</div>`
+            : (s.navrhy ?? []).length ? `<ol class="k-navrhy">${s.navrhy!.map((n) => `<li><a href="${esc(odkaz(v, { pohled: "den", den: n.den }))}"><b>${n.poradi}. ${esc(denKratce(n.den))} ${esc(n.cas)}</b> ${esc(n.technik)}</a><br><span class="k-sedy">${esc(n.duvod)}</span></li>`).join("")}</ol>`
+            : `<div class="k-pozn">V prohledaném období žádný vhodný volný slot.</div>`
+          : ""
+      }`
+    : "";
+  return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="120">
+<title>${z ? `${esc(z.oid)} – ` : ""}Kalendář techniků – AppKoo</title><style>${CSS}</style></head><body><div class="k">
 <div class="k-lista"><a class="k-logo" href="/">AppKoo</a>${
-    z ? `<a class="k-zak" href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.oid)}</a><span class="k-sedy">${esc([z.adresa, z.doSplneni ? `do splnění ${z.doSplneni}` : ""].filter(Boolean).join(" · "))}</span>` : `<span class="k-zak">Kalendář techniků</span>`
-  }
+    z ? `<span class="k-zak">Kam naplánovat</span>` : `<span class="k-zak">Kalendář techniků</span>`
+  }${zive}<a class="k-tl" href="${esc(odkaz(v, {}))}">Obnovit</a>
 <div class="k-nav"><a class="k-tl" href="${esc(odkaz(v, { den: dnes }))}">Dnes</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, -krok) }))}" aria-label="Předchozí">‹</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, krok) }))}" aria-label="Další">›</a><span class="k-datum">${esc(datum)}</span>
 <span class="k-prep"><a class="${v.pohled === "den" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "den" }))}">Den</a><a class="${v.pohled === "tyden" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "tyden" }))}">Týden</a></span></div></div>
+${pruh}
 <div class="k-telo">
-<form class="k-panel" method="get" action="/kalendar"><input type="hidden" name="pohled" value="${v.pohled}"><input type="hidden" name="den" value="${v.den}">${z ? `<input type="hidden" name="z" value="${esc(z.idAktivity)}">` : ""}
+<form class="k-panel" method="get" action="/kalendar"><input type="hidden" name="pohled" value="${v.pohled}"><input type="hidden" name="den" value="${v.den}">${z ? `<input type="hidden" name="z" value="${esc(z.idAktivity)}">` : ""}${v.navrh && z ? `<input type="hidden" name="navrh" value="1">` : ""}
 ${miniMesic(v, dnes)}
 <label style="font-weight:500"><input type="checkbox" name="volne" value="1"${v.jenVolny ? " checked" : ""} style="accent-color:#0b8043">Jen VOLNY</label>
 <b>Kalendáře techniků</b>
 ${s.technici.map((t) => `<label><input type="checkbox" name="t" value="${esc(t.jmeno)}"${vybrano(t) ? " checked" : ""} style="accent-color:${s.barvy.get(t.kalendar) ?? VYCHOZI_BARVA}"><span title="${esc(t.vyjezd ? `výjezd: ${t.vyjezd}` : t.jmeno)}">${esc(t.jmeno)}${t.vyjezd ? `<small>${esc(t.vyjezd)}</small>` : ""}</span></label>`).join("\n")}
 <button class="k-tl" type="submit">Zobrazit výběr</button>
-<div class="k-pozn">Zrcadlo Google Kalendáře: časy a barvy podle zdroje. ${s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}</div>
+${navrhy}
+<div class="k-pozn">Zrcadlo Google Kalendáře: časy a barvy podle zdroje. ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
 <div class="k-pozn">${esc(s.uzivatel)}</div>
 </form>
 <div class="k-mriz">${mrizka}</div>
