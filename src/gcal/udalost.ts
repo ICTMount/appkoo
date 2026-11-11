@@ -4,7 +4,8 @@
 
 import type { Zakazka } from "../import/mwfExport.js";
 import { instalacePredRfs, radekUdalostiPredRfs } from "../domain/predRfs.js";
-import { kombinaceZakazky, popisKombinace, privezeTechnik, zkratkaKombinace, type NotifikaceProKombinaci } from "../domain/kombinace.js";
+import { kombinaceZakazky, zkratkaKombinace, type NotifikaceProKombinaci } from "../domain/kombinace.js";
+import { radekUdalostiKombinace } from "./kombinaceKalendar.js";
 import { fmtDate, fmtTime } from "../domain/time.js";
 
 /** Údaje zjištěné při hovoru (kontrolní seznam call scriptu) */
@@ -90,7 +91,7 @@ export function sestavUdalost(
     ...(h.flex ? [textFlex(h.flex, h.flexPoznamka)] : []),
     `${h.novaInstalace === false ? "Existující" : "Nová instalace"}${h.zasuvka ? ` – zásuvka ${h.zasuvka}` : ""}`,
     `INSTALACE: Optický internet${h.iptv || kombi?.iptv ? " / IPTV" : ""}${kombi?.mesh ? " / MESH" : ""}`,
-    ...(kombi ? [`KOMBINOVANÁ OBJEDNÁVKA: ${popisKombinace(kombi)}${kombi.mesh ? ` – mesh aktivovat jen z MWF app${privezeTechnik(kombi.doruceni.mesh) ? ", jednotky přiveze technik" : ", ověřit doručení"}` : ""}${kombi.iptv ? ` – zapojit a ověřit i set-top box${privezeTechnik(kombi.doruceni.stb) ? " (přiveze technik)" : ""}` : ""}`] : []),
+    ...(kombi ? [radekUdalostiKombinace(kombi)] : []),
     `ČÍSLO PATRA A BYTU: ${h.patro ?? "?"} / ${h.byt ?? "?"}`,
     `PATRA VOLNĚ PŘÍSTUPNÁ: ${ano(h.patraPristupna)}`,
     `STOUPAČKA JE ZAJIŠTĚNA (nebo jen čtyřhran): ${h.stoupacka ?? "NEVÍM"}`,

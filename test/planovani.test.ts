@@ -291,6 +291,9 @@ describe("web: nabídka a zápis termínu", () => {
     const w = await spust();
     expect((await w.post("/zakazka/P1/slozka", {}, null)).status).toBe(403);
     expect((await w.post("/zakazka/P1/slozka", {})).status).toBe(503);
+    // kombinovaná objednávka → kalendář: POST projde (ne 405), cizí původ 403, běžná FTTH zakázka 400
+    expect((await w.post("/zakazka/P1/kombinace-kalendar", {}, null)).status).toBe(403);
+    expect((await w.post("/zakazka/P1/kombinace-kalendar", {})).status).toBe(400);
     // přílohy: neplatný odkaz 400, uložení bez složek 503, cizí původ 403
     expect((await w.get("/priloha?p=nesmysl")).status).toBe(400);
     expect((await w.post("/zakazka/P1/prilohy", { p: "x" }, null)).status).toBe(403);

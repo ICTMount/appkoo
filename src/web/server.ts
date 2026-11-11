@@ -40,6 +40,8 @@ import { pgDb } from "../db/db.js";
 import { tedPraha } from "../domain/time.js";
 import { faktaZakazky } from "../domain/priorita.js";
 import { kalendarApi, obsadVolnySlot, SlotObsazen, udalostZakazky, vratitNaVolny } from "../gcal/kalendar.js";
+import { propisKombinaciDoKalendare } from "../gcal/kombinaceKalendar.js";
+import { kombinaceZakazky, zkratkaKombinace } from "../domain/kombinace.js";
 import { sestavUdalost } from "../gcal/udalost.js";
 import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
@@ -245,7 +247,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         res.end("ok");
         return;
       }
-      const postCesta = /^\/zakazka\/[^/]+\/(zapis|slozka|prilohy)$/.test(url.pathname) || /^\/konfigurace\/[A-Za-z]+\/(nahled|ulozit)$/.test(url.pathname);
+      const postCesta = /^\/zakazka\/[^/]+\/(zapis|slozka|prilohy|kombinace-kalendar)$/.test(url.pathname) || /^\/konfigurace\/[A-Za-z]+\/(nahled|ulozit)$/.test(url.pathname);
       if (req.method !== "GET" && !(req.method === "POST" && postCesta)) return posli(res, 405, strankaChyby(405, "Nepovolená operace."));
 
       const email = await uzivatel(req, n);
@@ -351,6 +353,23 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           return posli(res, 502, strankaChyby(502, `Složku se nepodařilo založit: ${e instanceof Error ? e.message : String(e)}`));
         }
         return presmeruj(`/zakazka/${ms[1]}`);
+      }
+
+      // Kombinovaná objednávka → doplnit do existující události v kalendáři technika (termín z MWF / SHEET2CAL)
+      const mk = url.pathname.match(/^\/zakazka\/([^/]+)\/kombinace-kalendar$/);
+      if (mk) {
+        if (req.method !== "POST") return presmeruj(`/zakazka/${mk[1]}`);
+        if (!zVlastniStranky(req)) return posli(res, 403, strankaChyby(403, "Formulář nepřišel ze stránky aplikace."));
+        if (role === "cteni" || role === "technik") return posli(res, 403, strankaChyby(403, "Do kalendáře může zapisovat jen koordinátorka nebo správce."));
+        if (!n.planovac) return posli(res, 503, strankaChyby(503, "Kalendáře techniků nejsou dostupné."));
+        const detail = await nactiDetail(db, decodeURIComponent(mk[1]!), now);
+        if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
+        const k = kombinaceZakazky(detail.z, detail.notifikace);
+        if (!k) return posli(res, 400, strankaChyby(400, "Zakázka není kombinovaná objednávka."));
+        const v = await propisKombinaciDoKalendare(db, (await n.planovac()).api, detail.z, k, now);
+        const q = new URLSearchParams({ kombinace: `${v.nalezeno}:${v.upraveno}:${v.bezeZmeny}` });
+        if (v.chyby.length) q.set("kombinace_chyba", v.chyby.join("; ").slice(0, 300));
+        return presmeruj(`/zakazka/${mk[1]}?${q}`);
       }
 
       // Příloha zprávy (fotka z Chatu, soubor z e-mailu) – stáhne se jménem tmcz01 a předá prohlížeči
@@ -576,6 +595,23 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           iru: iruLokalita(kontext.iru, [detail.z.adresa, detail.z.psc].filter(Boolean).join(", ")),
           slozka: { zaznam: await nactSlozkuBezpecne(detail.z.idObjednavkyZaklad), zapnuto: !!n.slozky, smiZalozit: role !== "cteni" && role !== "technik" },
           prilohy: n.zdroje ? { idAktivity: detail.z.idAktivity, ulozene: await nactiSoubory(db, detail.z.idObjednavkyZaklad), smiUkladat: !!n.slozky && role !== "cteni" && role !== "technik" } : undefined,
+          kombinace: {
+            smiPropsat: !!planovac && role !== "cteni" && role !== "technik" && !!detail.z.termin && !detail.uzavreno,
+            vKalendari: (() => {
+              const k = kombinaceZakazky(detail.z, detail.notifikace);
+              if (!k) return null;
+              const budouci = zdroje?.find((s) => s.zdroj === "kalendar")?.nalezy.filter((x) => x.cas && x.cas >= now && !/\bvoln[yae]\b/i.test(x.titulek)) ?? [];
+              return budouci.length ? budouci.every((x) => x.titulek.includes(zkratkaKombinace(k))) : null;
+            })(),
+            vysledek: (() => {
+              const m = /^(\d+):(\d+):(\d+)$/.exec(url.searchParams.get("kombinace") ?? "");
+              const chyba = url.searchParams.get("kombinace_chyba");
+              if (!m && !chyba) return null;
+              const [, nal, upr, beze] = m ?? ["", "0", "0", "0"];
+              const text = nal === "0" ? "V kalendářích techniků není budoucí událost této zakázky (termín zapsaný jen v MWF?)." : upr !== "0" ? `Doplněno do ${upr} události v kalendáři technika.` : `Událost v kalendáři už kombinaci má (${beze}).`;
+              return chyba ? `${text} Chyba: ${chyba}` : text;
+            })(),
+          },
           zprava: (() => {
             const k = Number(url.searchParams.get("prilohy"));
             return Number.isInteger(k) && k >= 0 && url.searchParams.has("prilohy") ? (k === 0 ? "Nic nového k uložení – vybrané přílohy už ve složce jsou." : `${k} ${k === 1 ? "soubor uložen" : k < 5 ? "soubory uloženy" : "souborů uloženo"} do složky zakázky.`) : null;

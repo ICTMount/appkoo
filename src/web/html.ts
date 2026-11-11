@@ -21,7 +21,7 @@ import { jeObrazek, type Nalez, type NalezLokality, type VysledekZdroje, type Zd
 import { webcalendar, type Webcalendar } from "../domain/webcalendar.js";
 import { migrace, zasuvkaUsed, type Migrace } from "../domain/migrace.js";
 import { instalacePredRfs, type InstalacePredRfs } from "../domain/predRfs.js";
-import { kombinaceZakazky, popisKombinace, privezeTechnik, type Kombinace, type NotifikaceProKombinaci } from "../domain/kombinace.js";
+import { kombinaceZakazky, popisKombinace, privezeTechnik, zkratkaKombinace, type Kombinace, type NotifikaceProKombinaci } from "../domain/kombinace.js";
 import type { Zaznam } from "../import/notes.js";
 
 export function esc(s: unknown): string {
@@ -84,7 +84,7 @@ tr:last-child td{border-bottom:0}td.oid a{font-weight:600;white-space:nowrap}td 
 .P1{background:var(--p1)}.P2{background:var(--p2)}.P3{background:var(--p3)}.P0{background:var(--p0)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
-.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}.pred-rfs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#283593;color:#fff;vertical-align:middle;margin-top:4px}.pred-rfs-pruh{border-left:4px solid #283593;background:rgba(40,53,147,.08);color:var(--text)}.kombi{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#fdd835;color:#000;border:1px solid #c6a700;vertical-align:middle;margin-top:4px}.kombi-pruh{border-left:4px solid #fdd835;background:rgba(253,216,53,.18);color:var(--text)}.kombi-pruh li{margin:2px 0}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
+.card h2{font-size:14px;margin:0 0 8px}.predobj{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#7b1fa2;color:#fff;vertical-align:middle;margin-top:4px}.predobj-pruh{border-left:4px solid #7b1fa2}.webcal{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#00796b;color:#fff;vertical-align:middle;margin-top:4px}.webcal-pruh{border-left:4px solid #00796b}.migrace{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#c62828;color:#fff;vertical-align:middle;margin-top:4px}.migrace-pruh{border-left:4px solid #c62828}.used{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#ef6c00;color:#fff;vertical-align:middle;margin-top:4px}.used-pruh{border-left:4px solid #ef6c00}.pred-rfs{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#283593;color:#fff;vertical-align:middle;margin-top:4px}.pred-rfs-pruh{border-left:4px solid #283593;background:rgba(40,53,147,.08);color:var(--text)}.kombi{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.03em;padding:1px 6px;border-radius:4px;background:#fdd835;color:#000;border:1px solid #c6a700;vertical-align:middle;margin-top:4px}.kombi-pruh{border-left:4px solid #fdd835;background:rgba(253,216,53,.18);color:var(--text)}.kombi-pruh li{margin:2px 0}.kombi-kal{margin-top:6px;font-size:13px}.kombi-kal form{display:inline}.kombi-kal button.mala{font-size:12px;padding:3px 8px}.ok-text{color:#2e7d32;font-weight:600}form.inline{display:inline;margin:0}dt.oddel,dd.oddel{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}button.btn.maly{padding:2px 10px;font-size:12px}.iru{display:inline-block;padding:2px 8px;border-radius:6px;background:rgba(123,31,162,.10);border-left:3px solid #7b1fa2}.webcal-pruh .btn{margin-left:8px}
 .termin-box{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.termin-box ul{margin:6px 0 0}
 a.btn.velke{font-size:15px;padding:10px 18px;font-weight:700}tr.na-dohodnuty td{background:rgba(0,121,107,.12)}h2.s-ikonou{display:flex;align-items:center;gap:6px}h2.s-ikonou small{margin-left:2px}.ikona{flex:none;display:block}.i-email{color:#d93025}.i-kalendar{color:#1a73e8}.i-chat{color:#188038}.i-drive{color:#f9ab00}dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}dt{color:var(--muted)}dd{margin:0}
 .zaznam{border-top:1px solid var(--line);padding:6px 0}.prilohy{margin-top:4px;font-size:12px;color:var(--muted)}.prilohy input{vertical-align:middle;margin:0 2px 0 0}.prilohy .na-disku{color:#2e7d32;text-decoration:none;font-weight:600}.ulozit-prilohy{margin-top:8px}nav.strankovani{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0 4px;font-size:14px}nav.strankovani a,nav.strankovani b,nav.strankovani span{display:inline-block;min-width:30px;padding:6px 8px;text-align:center;border:1px solid var(--line);border-radius:6px}nav.strankovani b{background:var(--accent);color:#fff;border-color:var(--accent)}nav.strankovani a{text-decoration:none}.prilohy .priloha a{color:inherit;text-decoration:underline}.prilohy .obr a{color:var(--accent)}.zaznam:first-child{border-top:0}
@@ -262,7 +262,7 @@ export const kombiStitek = (z: Parameters<typeof kombinaceZakazky>[0], n?: Notif
   const k = kombinaceZakazky(z, n);
   return k ? ` <span class="kombi" title="Kombinovaná objednávka ${esc(popisKombinace(k))} – víc zařízení k instalaci, delší pracnost (zdroj: ${k.zdroj.map((s) => (s === "pdf" ? "notifikační PDF" : "export MWF")).join(" + ")})">${esc(popisKombinace(k))}</span>` : "";
 };
-function pruhKombinace(k: Kombinace, technik: boolean): string {
+function pruhKombinace(k: Kombinace, technik: boolean, idAktivity?: string, kal?: PlanovaniZakazky["kombinace"]): string {
   const body: string[] = [];
   const dodani = (d: string | undefined, jinak: string) => {
     const t = privezeTechnik(d);
@@ -277,7 +277,14 @@ function pruhKombinace(k: Kombinace, technik: boolean): string {
     body.push(`<li><b>MESH</b> – <b>${k.mesh}× Wi-Fi jednotka</b>: ${dodani(k.doruceni.mesh, "ověřit doručení <b>min. 2 dny před termínem</b>")}; aktivace <b>pouze z MWF app</b> (zlaté pravidlo 9). Umístění jednotek domluvit se zákazníkem.</li>`);
   }
   body.push(`<li>Počítat s <b>delší pracností</b> (víc zařízení) – při plánování nechat delší okno${technik ? "" : "; zákazníkovi říct, že instalace zabere déle"}.</li>`);
-  return `<div class="warn kombi-pruh"><b>Kombinovaná objednávka: ${esc(popisKombinace(k))}</b><ul>${body.join("")}</ul></div>`;
+  const kalendar = !technik && idAktivity && kal
+    ? `<div class="kombi-kal">${kal.vysledek ? `<span class="ok-text">${esc(kal.vysledek)}</span> ` : ""}${
+        kal.vKalendari ? `<span class="muted">✓ v události v kalendáři technika</span>` : kal.smiPropsat
+          ? `<form method="post" action="/zakazka/${encodeURIComponent(idAktivity)}/kombinace-kalendar"><button type="submit" class="mala">Propsat do události v kalendáři technika</button> <span class="muted">doplní „${esc(zkratkaKombinace(k))}“ do názvu a řádek KOMBINOVANÁ OBJEDNÁVKA do popisu; termíny zapsané v AppKoo to mají samy</span></form>`
+          : ""
+      }</div>`
+    : "";
+  return `<div class="warn kombi-pruh"><b>Kombinovaná objednávka: ${esc(popisKombinace(k))}</b><ul>${body.join("")}</ul>${kalendar}</div>`;
 }
 
 /** Obsazená zásuvka (USED) – neplánovat, čeká se na PEP */
@@ -465,6 +472,8 @@ export interface PlanovaniZakazky {
   prilohy?: UkladaniPriloh;
   /** hlášení po uložení příloh („3 soubory uloženy do složky“) */
   zprava?: string | null;
+  /** kombinovaná objednávka: tlačítko „propsat do kalendáře“ (kdo smí) a výsledek po propsání */
+  kombinace?: { smiPropsat: boolean; vysledek?: string | null; vKalendari?: boolean | null };
   /** městské části adres na stránce */
   casti?: Casti;
   /** „jiné termíny“: hledá se od tohoto dne (YYYY-MM-DD) */
@@ -547,7 +556,7 @@ ${plan.webcal ? pruhWebcal(plan.webcal, z.idAktivity, !!plan.jenNahled) : ""}
 ${(() => { const m = migrace(z); return m ? pruhMigrace(m, now) : ""; })()}
 ${(() => { const u = zasuvkaUsed(z); return u ? pruhUsed(u) : ""; })()}
 ${(() => { const p = instalacePredRfs(z, now); return p ? pruhPredRfs(p, false) : ""; })()}
-${(() => { const k = kombinaceZakazky(z, d.notifikace); return k ? pruhKombinace(k, false) : ""; })()}
+${(() => { const k = kombinaceZakazky(z, d.notifikace); return k ? pruhKombinace(k, false, z.idAktivity, plan.kombinace) : ""; })()}
 ${d.uzavreno ? `<div class="warn">Zakázka už v exportu MWF není (uzavřená ${esc(dt(d.uzavreno))}).</div>` : ""}
 ${plan.zprava ? `<div class="ok">${esc(plan.zprava)}</div>` : ""}
 <div class="grid">

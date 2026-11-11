@@ -24,6 +24,8 @@ import { spustImport, type ZaznamBehu } from "./importJob.js";
 import { calendar as calendarApi } from "@googleapis/calendar";
 import { delegace } from "../google/delegace.js";
 import { odemkniSync, synchronizujChat, synchronizujKalendare, zamekSync } from "../zdroje/sync.js";
+import { propisKombinaceVsem } from "../gcal/kombinaceKalendar.js";
+import { kalendarApi } from "../gcal/kalendar.js";
 
 export type Zavaznost = "INFO" | "WARNING" | "ERROR";
 export type Logger = (severity: Zavaznost, message: string, data?: Record<string, unknown>) => void;
@@ -190,6 +192,13 @@ async function main(): Promise<number> {
         const cal = calendarApi({ version: "v3", auth: (await d.klient()) as never });
         const k = await synchronizujKalendare(db, cal);
         jsonLog("INFO", `Kalendáře synchronizovány: ${k.kalendaru} kalendářů, ${k.udalosti} změněných událostí (${k.plne} plně) za ${Math.round(k.ms / 1000)} s`, { sync_kalendare: k });
+        // kombinované objednávky (FTTH + IPTV / MESH) → do událostí techniků, které nevznikly v AppKoo
+        try {
+          const p = await propisKombinaceVsem(db, kalendarApi(), new Date());
+          if (p.zakazek) jsonLog("INFO", `Kombinované objednávky v kalendářích: ${p.zakazek} zakázek, ${p.udalosti} událostí, ${p.upraveno} doplněno, ${p.chyby} chyb`, { kombinace_kalendar: p });
+        } catch (e) {
+          jsonLog("ERROR", `Propsání kombinovaných objednávek do kalendářů selhalo: ${popisChyby(e)}`, { sync_vypadek: "kombinace" });
+        }
       } catch (e) {
         jsonLog("ERROR", `Synchronizace kalendářů selhala: ${popisChyby(e)}`, { sync_vypadek: "kalendare" });
       }
