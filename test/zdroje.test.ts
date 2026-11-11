@@ -155,7 +155,7 @@ describe("zdroje", () => {
     const html = sekceZdroju(v);
     expect(html).toContain("Zdroj nedostupný: unauthorized_client");
     expect(html).toContain("Události v kalendářích techniků");
-    expect(html).toContain("zdroj: Google Kalendář techniků");
+    expect(html).toContain("zdroj: Google Kalendář tmcz01");
     expect(sekceZdroju(null)).toContain("není zapnuté");
   });
 });

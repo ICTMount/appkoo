@@ -343,7 +343,7 @@ export const ZDROJ = {
   mwf: "MWF export",
   poznamka: "MWF poznámka",
   pdf: "notifikační PDF (MWF)",
-  gcal: "Google Kalendář techniků",
+  gcal: "Google Kalendář tmcz01",
   gmail: "Gmail tmcz01",
   chat: "Google Chat",
   disk: "Google Disk",
@@ -949,7 +949,7 @@ function sekceOkoli(o: OkoliZapisu, vyb: { t: string; e: string; od: Date; do: D
   })();
   const legenda = zastavky.map((z, i) => `<div class="${z.tato ? "zast tato" : "zast"}">${cislo(i + 1, z.tato)} <b>${pismeno(i + 1)}</b> · ${fmtTime(z.od)} · ${esc(z.adresa)}</div>`).join("");
   return `<div class="gc-den"><h2>Den technika <small class="muted">${esc(vyb.t)} · ${esc(den)}</small>${zdr(ZDROJ.gcal)}</h2>${udalosti}</div>
-<div class="gc-den"><h2>Trasa technika <small class="muted">${esc(den)}, orientačně podle času zakázek · číslo = pořadí, písmeno = bod na mapě</small>${zdr("Google Kalendář techniků · Google Mapy")}</h2>${mapa}<div class="legenda">${legenda}</div></div>`;
+<div class="gc-den"><h2>Trasa technika <small class="muted">${esc(den)}, orientačně podle času zakázek · číslo = pořadí, písmeno = bod na mapě</small>${zdr("Google Kalendář tmcz01 · Google Mapy")}</h2>${mapa}<div class="legenda">${legenda}</div></div>`;
   void okoli;
 }
 
