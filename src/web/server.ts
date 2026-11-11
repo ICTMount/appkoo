@@ -742,7 +742,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             ])];
             if (adresy.length <= 600) {
               const polohy = await geokodujVse(planovac.geokoder, adresy);
-              oznaceni.prejezdy = { polohy, km: (a, b) => planovac.vzdalenosti.km(a, b), cil: adresaZ ? polohy.get(adresaZ) ?? null : null };
+              oznaceni.prejezdy = { polohy, km: (a, b) => planovac.vzdalenosti.km(a, b), minuty: (a, b) => planovac.vzdalenosti.minuty(a, b), cil: adresaZ ? polohy.get(adresaZ) ?? null : null };
             }
           } catch {
             // bez přejezdů – mřížka se zobrazí i tak

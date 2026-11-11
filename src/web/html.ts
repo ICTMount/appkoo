@@ -114,6 +114,9 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gcal input:hover,.gcal select:hover,.gcal input:focus,.gcal select:focus{border-color:var(--line);background:var(--panel)}
 .gc-predpis{align-items:flex-start;flex-direction:column;margin-top:6px}.gc-predpis textarea{min-height:140px;font-size:13px;line-height:1.5}
 .gc-pata{padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.zapis-sekce>h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}.zapis-sekce>h2 small a{color:inherit}.zapis-zpet{margin-left:auto;display:flex;gap:8px;font-size:13px;font-weight:400}.btn.sekundarni{background:var(--panel);color:var(--text);border:1px solid var(--line);font-weight:500}
+.zapis-info{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:-4px 0 10px;font-size:14px}.zapis-slot{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:12px}
+.zapis-sekce .gc-karta,.zapis-sekce .gc-den{border-radius:8px;box-shadow:none}.zapis-sekce .gc-nadpis{font-size:18px;font-weight:600}.zapis-sekce .gc-den h2{font-size:14px;color:var(--text)}
 .zapis-dva{display:grid;grid-template-columns:minmax(0,860px) minmax(320px,1fr);gap:16px;align-items:start}@media (max-width:1100px){.zapis-dva{grid-template-columns:1fr}}
 .gc-nestd{margin:-4px 0 10px;padding:6px 10px;border:1px dashed var(--line);border-radius:8px}.gc-nestd .gc-nestd-pole{display:none;margin-top:8px}.gc-nestd:has(input[name=nestandard]:checked){border:2px solid #c62828;background:rgba(198,40,40,.06)}.gc-nestd:has(input[name=nestandard]:checked) .gc-nestd-pole{display:block}
 .gc-nestd label{display:block}.gc-nestd .gc-nestd-pole input[name=nadpis]{width:100%;border:1px solid #c62828;background:var(--panel);font-size:14px;padding:6px 8px}.gc-nestd .gc-nestd-pole input[name^=cas]{border:1px solid #c62828;background:var(--panel)}
@@ -870,8 +873,12 @@ ${zapisPovolen ? "" : `<span class="muted"> Zápis do kalendáře je vypnutý (p
 </div>
 </form>`;
 
-  const telo = `${hlavickaZakazky(d)}
-<div class="card" style="margin-bottom:12px"><b>${esc(slot(vyb.od, vyb.do))}</b> · technik <b>${esc(vyb.t)}</b> · slot VOLNY se přepíše na zakázku${
+  // stejný rámeček „Kam naplánovat“ jako v detailu zakázky a v kalendáři techniků – jedna vizuální linka celého plánování
+  const zpetKalendar = `/kalendar?${new URLSearchParams({ z: z.idAktivity, den: isoDate(vyb.od) })}`;
+  const telo = `<section class="planovani zapis-sekce"><h2>Kam naplánovat <small><a href="/zakazka/${encodeURIComponent(z.idAktivity)}">${esc(z.idObjednavky || z.idAktivity)}</a> · ${esc(z.zakaznik)}</small>
+<span class="zapis-zpet"><a class="btn sekundarni" href="${esc(zpetKalendar)}">← Kalendář techniků</a> <a class="btn sekundarni" href="/zakazka/${encodeURIComponent(z.idAktivity)}">← Detail zakázky</a></span></h2>
+<div class="zapis-info">${infraStitek(z.infrastruktura)}${kombiStitek(z, d.notifikace)}${predobjStitek(z)} <span>${esc([z.adresa, bezRovna(z.psc)].filter(Boolean).join(", "))}</span> <span class="muted">${esc(z.typAktivity)}</span></div>
+<div class="zapis-slot"><b>${esc(slot(vyb.od, vyb.do))}</b> · technik <b>${esc(vyb.t)}</b> · slot VOLNY se přepíše na zakázku${
     vyb.presun && z.termin ? `<br><b>Přesun</b> z ${esc(slot(z.termin.od, z.termin.do))} (${esc(vyb.presun.pt)}) – původní událost se vrátí na VOLNY` : ""
   }</div>
 ${chyby.length ? `<div class="err">${chyby.map(esc).join("<br>")}</div>` : ""}
@@ -879,7 +886,7 @@ ${brany.upozorneni.length ? `<div class="warn">${brany.upozorneni.map(esc).join(
 <div class="zapis-dva">
 <div>${form}</div>
 <div>${okoli ? sekceOkoli(okoli, vyb, nadpis) : ""}</div>
-</div>`;
+</div></section>`;
   return stranka("Zápis termínu", uzivatel, stav, telo);
 }
 
@@ -928,8 +935,8 @@ function sekceOkoli(o: OkoliZapisu, vyb: { t: string; e: string; od: Date; do: D
   })();
   const legenda = zastavky.map((z, i) => `<div class="${z.tato ? "zast tato" : "zast"}">${cislo(i + 1, z.tato)} <b>${pismeno(i + 1)}</b> · ${fmtTime(z.od)} · ${esc(z.adresa)}</div>`).join("");
   return `<div class="gc-den"><h2>${esc(vyb.t)} · ${esc(den)}</h2>${udalosti}</div>
-<div class="gc-den"><h2>Trasa technika <small class="muted">${esc(den)}, orientačně podle času zakázek · číslo = pořadí, písmeno = bod na mapě</small></h2>${mapa}<div class="legenda">${legenda}</div></div>
-<div class="gc-den"><h2>Naplánováno v okolí <small class="muted">všichni technici, ±5 dní kolem ${esc(fmtDate(vyb.od))}, do 30 km</small></h2>${okoli}</div>`;
+<div class="gc-den"><h2>Trasa technika <small class="muted">${esc(den)}, orientačně podle času zakázek · číslo = pořadí, písmeno = bod na mapě</small></h2>${mapa}<div class="legenda">${legenda}</div></div>`;
+  void okoli;
 }
 
 const MESICE = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];

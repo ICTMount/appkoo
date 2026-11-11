@@ -89,7 +89,7 @@ export interface OznaceniMrizky {
   navrhy?: Map<string, { poradi: number; duvod: string }>;
   tato?: { kalendar: string; eventId: string } | null;
   /** přejezdy: polohy adres (klíč = adresa události / výjezdu, oříznutá), výpočet km a poloha plánované zakázky */
-  prejezdy?: { polohy: Map<string, Bod | null>; km: (a: Bod, b: Bod) => number; cil?: Bod | null };
+  prejezdy?: { polohy: Map<string, Bod | null>; km: (a: Bod, b: Bod) => number; minuty?: (a: Bod, b: Bod) => number; cil?: Bod | null };
 }
 
 const hm = (t: Date) => `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
@@ -148,7 +148,7 @@ export interface BlokMrizky {
   /** současná událost plánované zakázky */
   tato?: boolean;
   /** přejezd na tuto adresu z předchozí zastávky dne (nebo z výjezdu technika), km */
-  prejezd?: { km: number; zVyjezdu: boolean };
+  prejezd?: { km: number; zVyjezdu: boolean; min?: number };
   /** VOLNY + plánovaná zakázka: přejezd z předchozí zastávky na adresu zakázky a z ní na další zastávku (nebo zpět na výjezd), km */
   vlozeni?: { pred: number; po: number; predVyjezd: boolean; poVyjezd: boolean };
 }
@@ -187,7 +187,7 @@ function prejezdyDne(bloky: BlokMrizky[], t: TechnikMrizky, pr: OznaceniMrizky["
   serazene.forEach((b, i) => {
     const z = zastavky[i];
     if (z) {
-      if (minula) b.prejezd = { km: pr.km(minula, z), zVyjezdu: minulaVyjezd };
+      if (minula) b.prejezd = { km: pr.km(minula, z), zVyjezdu: minulaVyjezd, ...(pr.minuty ? { min: pr.minuty(minula, z) } : {}) };
       minula = z;
       minulaVyjezd = false;
     } else if (b.volny && pr.cil) {
@@ -329,8 +329,12 @@ button,input{font:inherit}
 .mm td a.dnes{background:var(--accent);color:var(--panel)}
 .mm td a.vyb{background:var(--vyb-bg);color:var(--vyb-fg)}
 .mm tr.vyb td{background:var(--vyb2)}.mm tr.vyb td.t{background:var(--vyb-bg)}
-.ev-b b,.tip b{font-weight:700}
-.ev-km{display:inline-block;background:rgba(0,0,0,.28);color:#fff;border-radius:1em;padding:0 .5em;font-weight:500;white-space:nowrap}
+.ev-b b{font-weight:700}.tip b{font-weight:600}.tip div.r{color:var(--muted)}.tip div.r b{color:var(--text)}
+.ev-b{position:relative}
+.ev-dole{position:absolute;left:3px;right:3px;bottom:2px;display:flex;flex-wrap:wrap-reverse;justify-content:space-between;align-items:flex-end;gap:2px .3em;font-weight:400}
+.ev-b .ev-dole,.ev-b span.ev-dole:first-child{font-weight:400}
+.ev-km{background:rgba(0,0,0,.45);color:#fff;border-radius:1em;padding:0 .5em;font-weight:500;white-space:nowrap;font-size:.95em}
+.ev.navrh .ev-dole{left:10px;right:10px;bottom:9px}
 .k-mriz{flex:999 1 560px;min-width:0;min-height:0;overflow-x:auto;display:flex}
 .k-vnitrek{flex:1;display:flex;flex-direction:column;padding-right:.5em}
 .k-hl,.k-grid{display:flex}
@@ -349,8 +353,8 @@ button,input{font:inherit}
 .ev-b{display:flex;flex-direction:column;gap:1px;width:100%;height:100%;border-radius:4px;padding:.15em .4em;overflow:hidden;border:1px solid var(--panel);font-size:.9em;line-height:1.2;text-decoration:none}
 .ev-b:hover{text-decoration:none;filter:brightness(.93)}
 .ev-b span:first-child{font-weight:500}
-.tip{display:none;position:absolute;width:24em;max-width:60vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.7em .9em;font-size:14px;line-height:1.4;text-align:left}
-.tip-n{display:flex;gap:.6em;align-items:flex-start;font-size:1.1em;font-weight:500}
+.tip{display:none;position:absolute;width:24em;max-width:60vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.8em 1em;font-size:13px;font-weight:400;line-height:1.5;text-align:left;letter-spacing:.01em}
+.tip-n{display:flex;gap:.6em;align-items:flex-start;font-size:15px;font-weight:400}
 .tip-n i{flex:none;width:.9em;height:.9em;border-radius:3px;margin-top:.3em}
 .tip-c{color:var(--muted);margin:.2em 0 .4em 1.5em}
 .tip div.r{margin-left:1.5em;overflow-wrap:anywhere}
@@ -379,7 +383,7 @@ button,input{font:inherit}
 .k-dop a b{font-weight:700}
 .k-dop a.jinde{background:#fff}
 .ev.tato .ev-b{outline:3px dashed var(--text);outline-offset:-3px}
-.ev-znak{margin-top:auto;align-self:flex-start;background:#fff;color:#0b5a2f;font-weight:700;border-radius:1em;padding:0 .5em}
+.ev-znak{background:#fff;color:#0b5a2f;font-weight:700;border-radius:1em;padding:0 .5em}
 .k-navrhy{margin:.4em 0 0;padding:0;list-style:none;font-size:.9em}
 .k-navrhy li{margin:.25em 0}
 .k-panel .k-tl.zel{background:#0b8043;border-color:#0b8043;color:#fff}
@@ -471,13 +475,13 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
     const km = (x: number) => `${x.toFixed(1).replace(".", ",")} km`;
     // přejezdy: zakázka = km z předchozí zastávky; VOLNY = km sem z předchozí a odsud na další (s plánovanou zakázkou)
     const prejezd = b.prejezd
-      ? `<span class="ev-km">${m.husta ? "" : b.prejezd.zVyjezdu ? "z výjezdu " : "přejezd "}${km(b.prejezd.km)}</span>`
+      ? `<span class="ev-km">${m.husta ? "" : b.prejezd.zVyjezdu ? "z výjezdu " : "přejezd "}${km(b.prejezd.km)}${b.prejezd.min != null && !m.husta ? ` · ${Math.round(b.prejezd.min)} min` : ""}</span>`
       : b.vlozeni ? `<span class="ev-km">${m.husta ? "" : "sem "}${km(b.vlozeni.pred)} · ${m.husta ? "" : "dál "}${km(b.vlozeni.po)}</span>` : "";
     const prejezdDetail = b.prejezd
-      ? `<div class="r">Přejezd ${b.prejezd.zVyjezdu ? "z výjezdu technika" : "z předchozí zakázky"}: <b>${km(b.prejezd.km)}</b></div>`
+      ? `<div class="r">Přejezd ${b.prejezd.zVyjezdu ? "z výjezdu technika" : "z předchozí zakázky"}: <b>${km(b.prejezd.km)}</b>${b.prejezd.min != null ? `, asi ${Math.round(b.prejezd.min)} min` : ""}</div>`
       : b.vlozeni ? `<div class="r">S touto zakázkou: ${b.vlozeni.predVyjezd ? "z výjezdu" : "z předchozí zakázky"} <b>${km(b.vlozeni.pred)}</b>, ${b.vlozeni.poVyjezd ? "zpět na výjezd" : "na další zakázku"} <b>${km(b.vlozeni.po)}</b></div>` : "";
-    // km je hned u času, aby nezmizelo u krátkých bloků
-    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}${prejezd ? ` ${prejezd}` : ""}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}${znak}`;
+    // přejezd je vždy úplně dole v okně události (vpravo dole, i u krátkých bloků)
+    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}${znak || prejezd ? `<span class="ev-dole">${znak || "<i></i>"}${prejezd}</span>` : ""}`;
     const styl = `background:${b.bg};color:${b.fg}`;
     const telo = cil
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
