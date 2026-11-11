@@ -248,9 +248,9 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
 
 const CSS = `
 *{box-sizing:border-box}
-:root{color-scheme:light dark;--panel:#fff;--text:#1d1d1b;--muted:#5f5f5a;--line:#dadce0;--okraj:#747775;--hover:#f1f3f4;--accent:#1f5fbf;--vyb-bg:#d3e3fd;--vyb-fg:#0b2e6b;--vyb2:#eef3fd}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#3a3935;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}}
-:root[data-theme=dark]{--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#3a3935;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}
+:root{color-scheme:light dark;--panel:#fff;--text:#1d1d1b;--muted:#5f5f5a;--line:#c4c7cc;--line2:#eceef1;--okraj:#747775;--hover:#f1f3f4;--accent:#1f5fbf;--vyb-bg:#d3e3fd;--vyb-fg:#0b2e6b;--vyb2:#eef3fd}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#4a4944;--line2:#2b2a27;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}}
+:root[data-theme=dark]{--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#4a4944;--line2:#2b2a27;--okraj:#77766f;--hover:#2c2c29;--accent:#7fa8ff;--vyb-bg:#2a3b63;--vyb-fg:#dbe7ff;--vyb2:#232b40}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 body{margin:0;font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:clamp(12px,.42vw + 5px,21px);color:var(--text);background:var(--panel)}
 a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
@@ -305,7 +305,8 @@ button,input{font:inherit}
 .k-hl .k-sl>div:first-child{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .k-pods{display:flex}
 .k-pods div{flex:1 1 0;min-width:0;font-size:.8em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:.2em}
-.k-grid .k-sl{display:flex;background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px)}
+/* mřížka po 15 minutách jako v Google Kalendáři: hodina výrazně, čtvrthodiny jemně */
+.k-grid .k-sl{display:flex;background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px),linear-gradient(to bottom,var(--line2) 1px,transparent 1px)}
 .k-pod{flex:1 1 0;min-width:0;position:relative}
 .ev{position:absolute;left:1px;right:2px}
 .ev-b{display:flex;flex-direction:column;gap:1px;width:100%;height:100%;border-radius:4px;padding:.15em .4em;overflow:hidden;border:1px solid var(--panel);font-size:.9em;line-height:1.2;text-decoration:none}
@@ -441,7 +442,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
 <div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0"><div>${esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
 <div class="k-grid"><div class="k-osa">${m.hodiny.map((h) => `<div>${h}:00</div>`).join("")}</div>${m.sloupce
-        .map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0;background-size:100% ${(100 / m.hodiny.length).toFixed(4)}%">${sl.pod.map((p) => `<div class="k-pod" style="font-size:${pismo}em">${p.bloky.map(blok).join("")}</div>`).join("")}</div>`)
+        .map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0;background-size:100% ${(100 / m.hodiny.length).toFixed(4)}%,100% ${(25 / m.hodiny.length).toFixed(4)}%">${sl.pod.map((p) => `<div class="k-pod" style="font-size:${pismo}em">${p.bloky.map(blok).join("")}</div>`).join("")}</div>`)
         .join("")}</div></div>`
     : `<div class="k-prazdno">${v.jenVolny ? "V zobrazeném období nemá žádný vybraný technik volný slot." : "Není vybraný žádný technik."}</div>`;
   const slaText = (t: Date) => `${DNY_KR[t.getUTCDay()]!.toLowerCase()} ${t.getUTCDate()}.${t.getUTCMonth() + 1}. ${hm(t)}`;
