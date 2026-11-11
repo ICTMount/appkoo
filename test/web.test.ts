@@ -129,6 +129,9 @@ describe("webový server", () => {
     expect(vysledky).toContain("O-8550000001");
     expect(vysledky).toContain("O-8550000002");
     expect(vysledky).toContain('class="infra i-CETIN"');
+    // počet výsledků v nadpisu; víc než 30 → „N z M · zobrazit vše“ (?vse=1 ukáže až 500)
+    expect(vysledky).toMatch(/<small>\d+ zakázek<\/small>/);
+    expect(vysledky).not.toContain("zobrazit vše");
   });
 
   it("escapuje data z MWF (žádné HTML z poznámek a jmen)", async () => {

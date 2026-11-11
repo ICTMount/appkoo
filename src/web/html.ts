@@ -348,13 +348,19 @@ export function strankaVysledku(
   stav: StavImportu,
   uzivatel: string,
   casti?: Casti,
+  rozsah?: { celkem: number; vse: boolean },
 ): string {
   const radky = polozky.map(
     ({ z, priorita, uzavreno }) => `<tr${uzavreno ? ` class="muted"` : ""}><td class="oid">${idBunka(z)}</td>
 <td>${p17Bunka(z)}</td><td>${esc(z.zakaznik)}<br><small>${esc(adresaZakazky(z))}</small>${mc(adresaZakazky(z), casti)}</td>
 <td>${esc(z.typAktivity)}</td><td>${uzavreno ? `<b>uzavřená</b> ${esc(dt(uzavreno))}<br>` : ""}${esc(z.stavMwf)}${z.termin ? `<br><small>termín ${esc(dt(z.termin.od))}</small>` : ""}</td>${prioTd(priorita)}</tr>`,
   );
-  const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${polozky.length} zakázek</small></h1>
+  const celkem = rozsah?.celkem ?? polozky.length;
+  const pocet =
+    celkem > polozky.length
+      ? `${polozky.length} z ${celkem} zakázek · <a href="/?q=${encodeURIComponent(dotaz)}&vse=1">zobrazit vše</a>`
+      : `${celkem} zakázek${rozsah?.vse && celkem > 30 ? ` · <a href="/?q=${encodeURIComponent(dotaz)}">jen prvních 30</a>` : ""}`;
+  const telo = `<h1>Hledání „${esc(dotaz)}“ <small>${pocet}</small></h1>
 <div class="tbl"><table><thead><tr><th>ID obj. v ext. systému / ID S7 obj.</th><th>P17: Vlastník sítě</th><th>Zákazník / Adresa</th><th>Typ aktivity</th><th>Stav</th>${prioTh()}</tr></thead>
 <tbody>${radky.join("") || `<tr><td colspan="6" class="muted">V zakázkách MWF (otevřených i uzavřených) nic. Zkuste celé O-ID (O-8553361721), S7, telefon nebo příjmení.</td></tr>`}</tbody></table></div>
 ${sekceZdroju(zdroje)}`;

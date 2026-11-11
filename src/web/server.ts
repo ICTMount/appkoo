@@ -182,6 +182,10 @@ async function uzivatel(req: IncomingMessage, n: NastaveniWebu): Promise<string 
 }
 
 /** Vzhled zvolený přepínačem (cookie „tema“): light / dark; bez cookie podle systému */
+/** Výsledky hledání: výchozí počet a strop pro „zobrazit vše“ (každý výsledek = detail zakázky z DB) */
+const LIMIT_HLEDANI = 30;
+const LIMIT_HLEDANI_VSE = 500;
+
 /** prohlížeč přijme gzip (Accept-Encoding) – nastaví se na začátku požadavku */
 const gzipOdpovedi = new WeakMap<ServerResponse, boolean>();
 const temaOdpovedi = new WeakMap<ServerResponse, "light" | "dark">();
@@ -312,13 +316,17 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const presne = await najdiAktivitu(db, q);
         if (presne.length === 1) return presmeruj(`/zakazka/${encodeURIComponent(presne[0]!)}`);
         // telefon, jméno, adresa: otevřené zakázky (bez ohledu na diakritiku) + všechny zakázky v DB (i uzavřené)
-        const volne = presne.length || q.length < 3 ? [] : (await nactiFrontu(db, now, { hledat: q })).polozky.slice(0, 30).map((p) => p.z.idAktivity);
-        const ids = presne.length ? presne : [...new Set([...volne, ...(await hledejZakazky(db, q))])].slice(0, 30);
+        // výchozích 30 výsledků (otevřené první); „zobrazit vše“ (?vse=1) až 500 – např. „Lutín“ má desítky zakázek
+        const vse = url.searchParams.get("vse") === "1";
+        const limit = vse ? LIMIT_HLEDANI_VSE : LIMIT_HLEDANI;
+        const volne = presne.length || q.length < 3 ? [] : (await nactiFrontu(db, now, { hledat: q })).polozky.map((p) => p.z.idAktivity);
+        const vsechny = presne.length ? presne : [...new Set([...volne, ...(await hledejZakazky(db, q, LIMIT_HLEDANI_VSE))])];
+        const ids = vsechny.slice(0, limit);
         if (!presne.length && ids.length === 1) return presmeruj(`/zakazka/${encodeURIComponent(ids[0]!)}`);
         const polozky = (await Promise.all(ids.map((id) => nactiDetail(db, id, now)))).flatMap((d) => (d ? [{ z: d.z, priorita: d.priorita, uzavreno: d.uzavreno }] : []));
         const zdroje = n.zdroje && q.length >= 5 ? await hledejVsude(n.zdroje(), [q], now) : null;
         const casti = await mestskeCasti(await geokoderWebu(), polozky.map((p) => [p.z.adresa, p.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ")));
-        return posli(res, 200, strankaVysledku(q, polozky, zdroje, stav, email, casti));
+        return posli(res, 200, strankaVysledku(q, polozky, zdroje, stav, email, casti, { celkem: vsechny.length, vse }));
       }
       if (url.pathname === "/hledat") return presmeruj(`/?q=${encodeURIComponent(url.searchParams.get("q") ?? "")}`);
       // Krátký stabilní odkaz na zakázku pro události v kalendáři a zprávy: /o/O-8551475759 → detail (nebo výsledky, když je víc aktivit)
