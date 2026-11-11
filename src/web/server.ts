@@ -756,7 +756,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         }
         const smiPlanovat = !!detail && role !== "cteni" && zapis.zapnuty && zive && !blokace.length;
         return posli(res, 200, strankaMrizky({
-          volby, technici, barvy, synchronizace, uzivatel: email, zive, nacteno: now, nedostupne, navrhy, ...(navrhChyba ? { navrhChyba } : {}),
+          volby, technici, barvy, synchronizace, uzivatel: email, zive, nacteno: now, nedostupne, navrhy, rychleDny: pracovniDny(dnes, 6), ...(navrhChyba ? { navrhChyba } : {}),
           mrizka: sestavMrizku(udalosti, technici, volby, oznaceni),
           planovani: smiPlanovat
             ? { smi: (t) => smiTechnik(t) && (!puvodni || smiTechnik(puvodni.technik)), navic: puvodni ? { pk: puvodni.kalendar, pe: puvodni.eventId, pt: puvodni.technik } : doplnit ? { pp: "1" } : {} }
@@ -790,6 +790,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           technik,
           den,
           predchozi,
+          dnes: pracovniDny(dnes, 1)[0]!,
           dalsi: pracovniDny(den, krok + 1).at(-1)!,
           rychleDny: pracovniDny(dnes, 6),
           adresy: kontext.adresyZMwf,

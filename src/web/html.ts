@@ -17,6 +17,7 @@ const slozkaTyden = (d: Date) => {
   const { rok, tyden } = isoTyden(d);
   return `${rok} / ${nazevTydne(rok, tyden)}`;
 };
+import { CSS_NAV, navDne, rychleDny } from "./navigace.js";
 import { jeObrazek, type Nalez, type NalezLokality, type VysledekZdroje, type Zdroj } from "../zdroje/hledani.js";
 import { webcalendar, type Webcalendar } from "../domain/webcalendar.js";
 import { migrace, zasuvkaUsed, type Migrace } from "../domain/migrace.js";
@@ -197,8 +198,7 @@ form.vyber-tech .pole{display:flex;flex-direction:column;gap:6px}
 form.vyber-tech .pole label{display:flex;flex-direction:row;align-items:center;gap:4px;white-space:nowrap;font-size:12px;color:var(--muted);height:18px;line-height:18px}form.vyber-tech label b{color:var(--text)}
 form.vyber-tech select,form.vyber-tech input,form.vyber-tech button{height:38px;box-sizing:border-box}form.vyber-tech select{min-width:320px}
 form.vyber-tech label.chk{display:flex;align-items:center;gap:8px;height:38px;font-size:14px;color:var(--text);line-height:normal}form.vyber-tech .pole small{max-width:260px}form.vyber-tech .radek{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.rychle{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text)}
-.rychle a.on{border-color:var(--accent);background:var(--accent);color:#fff}.rychle a:hover{text-decoration:none}
+${CSS_NAV}
 form.filtr label b{color:var(--text);margin-left:4px}
 .uvod{max-width:720px;margin:40px auto;text-align:center}.uvod p{color:var(--muted)}
 /* tmavý režim: podle systému, nebo ručně přepínačem (atribut data-theme na <html>, cookie „tema“) */
@@ -987,6 +987,8 @@ ${presun ? `<div class="${presun.ok ? "ok" : "err"}">${esc(presun.zprava)}</div>
 const hm = (d: Date) => fmtTime(d);
 const DNY_DLOUHE = (iso: string) => DNY[new Date(`${iso}T00:00:00Z`).getUTCDay()]!;
 const DNY_CELE = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
+const MESICE_2P = ["ledna", "února", "března", "dubna", "května", "června", "července", "srpna", "září", "října", "listopadu", "prosince"];
+const datumSlovy = (iso: string) => { const t = new Date(`${iso}T00:00:00Z`); return `${DNY_CELE[t.getUTCDay()]} ${t.getUTCDate()}. ${MESICE_2P[t.getUTCMonth()]} ${t.getUTCFullYear()}`; };
 
 const odkazSlotu = (u: UdalostTechnika, den: string) =>
   `/technik?${new URLSearchParams({ t: u.technik, den, k: u.kalendar, e: u.id, od: u.od.toISOString(), do: u.do.toISOString() })}`;
@@ -1005,6 +1007,8 @@ export interface StrankaTechnika {
   den: string;
   predchozi: string | null;
   dalsi: string;
+  /** dnešní (nejbližší pracovní) den pro tlačítko „Dnes“ */
+  dnes?: string;
   /** dny vybraného technika (nahoře) */
   dny: { datum: string; udalosti: UdalostTechnika[] }[];
   /** O-číslo → úplná adresa z MWF (jinak se bere místo z kalendáře) */
@@ -1036,12 +1040,10 @@ export function strankaTechnika(s: StrankaTechnika, stav: StavImportu, uzivatel:
   // Technik vlevo, Den vpravo: popisky na stejné výšce, pod Dnem posun a rychlá volba dnů
   const formular = `<form class="vyber-tech" method="get" action="/technik">
 <div class="pole"><label for="vt">Technik</label><select id="vt" name="t"><option value="">– všichni (přehled dne) –</option>${volby}</select></div>
-<div class="pole"><label for="vd">${s.technik ? "Od dne" : "Den"} · <b>${esc(DNY_CELE[new Date(`${s.den}T00:00:00Z`).getUTCDay()]!)}</b></label>
-<div class="radek"><input id="vd" type="date" name="den" value="${esc(s.den)}"><button>Zobrazit</button>
-${s.predchozi ? `<a href="/technik?den=${esc(s.predchozi)}${esc(navT)}">← ${krok} zpět</a>` : ""}<a href="/technik?den=${esc(s.dalsi)}${esc(navT)}">${krok} dál →</a></div>
-<div class="rychle">${s.rychleDny
-    .map((d) => `<a class="${d === s.den ? "on" : ""}" href="/technik?den=${esc(d)}${esc(navT)}">${esc(DNY_DLOUHE(d))} ${esc(fmtDate(d).slice(0, 6))}</a>`)
-    .join("")}</div>
+<div class="pole"><label for="vd">${s.technik ? "Týden od dne" : "Den"}</label>
+${navDne({ dnes: `/technik?den=${s.dnes ?? s.rychleDny[0] ?? s.den}${navT}`, zpet: s.predchozi ? `/technik?den=${s.predchozi}${navT}` : null, dal: `/technik?den=${s.dalsi}${navT}`, datum: datumSlovy(s.den), krok: s.technik ? "týden" : "den" })}
+${rychleDny(s.rychleDny, s.den, (d) => `/technik?den=${d}${navT}`)}
+<div class="radek"><input id="vd" type="date" name="den" value="${esc(s.den)}"><button>Zobrazit</button></div>
 </div>
 <div class="pole"><label>Doplnění slotu</label><label class="chk"><input type="checkbox" name="tol" value="1"${s.tolerance ? " checked" : ""}> Zvýšit toleranci o ${s.tolerancePct ?? 25} %</label>
 <small class="muted">víc zakázek do slotu – pozdější příjezd na další zakázku o ${s.tolerancePct ?? 25} % slotu (2h slot = ${Math.round(120 * (s.tolerancePct ?? 25) / 100)} min) a delší zajížďka; potvrďte Zobrazit</small></div>${skryteSlotu}

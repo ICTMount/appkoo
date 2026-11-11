@@ -8,6 +8,7 @@ import { jeVolneOkno } from "../gcal/kontrola.js";
 import { zHtml } from "../gcal/kalendar.js";
 import type { UdalostMrizky } from "../zdroje/sync.js";
 import type { Bod } from "../plan/geo.js";
+import { CSS_NAV, navDne, rychleDny } from "./navigace.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -282,7 +283,7 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
   return { sloupce, hodiny: Array.from({ length: delka }, (_, i) => start + i), podsloupcu, husta };
 }
 
-const CSS = `
+const CSS = `${CSS_NAV}
 *{box-sizing:border-box}
 /* barvy, písmo, tlačítka a štítky jsou stejné jako ve zbytku aplikace (web/html.ts) */
 :root{color-scheme:light dark;--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#e3e2dd;--line2:#f1f0ec;--okraj:#e3e2dd;--hover:#f1f0ec;--accent:#1f5fbf;--vyb-bg:#dfe9f9;--vyb-fg:#123c7c;--vyb2:#eef3fb}
@@ -423,6 +424,8 @@ export interface StrankaMrizky {
   /** doporučené sloty (seznam vlevo; mohou být i mimo zobrazený den) */
   navrhy?: { poradi: number; den: IsoDate; cas: string; technik: string; duvod: string }[];
   navrhChyba?: string;
+  /** rychlá volba dnů v horní liště (nejbližší pracovní dny) – stejná jako v Doplnit technika */
+  rychleDny?: IsoDate[];
 }
 
 /** Parametry odkazu se zachováním výběru */
@@ -538,7 +541,7 @@ ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat
 <div class="k-lista"><a class="k-logo" href="/">AppKoo</a>${
     `<nav class="k-zal"><a href="/">Plánovat zakázku</a><a href="/technik">Doplnit technika</a><a class="on" href="/kalendar">Kalendář techniků</a></nav>`
   }${zive}<a class="k-tl" href="${esc(odkaz(v, {}))}">Obnovit</a>
-<div class="k-nav"><a class="k-tl" href="${esc(odkaz(v, { den: dnes }))}">Dnes</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, -krok) }))}" aria-label="Předchozí">‹</a><a class="k-sipka" href="${esc(odkaz(v, { den: addDays(v.den, krok) }))}" aria-label="Další">›</a><span class="k-datum">${esc(datum)}</span>
+<div class="k-nav">${(s.rychleDny ?? []).length ? rychleDny(s.rychleDny!, v.pohled === "den" ? v.den : "", (d) => odkaz(v, { pohled: "den", den: d })) : ""}${navDne({ dnes: odkaz(v, { den: dnes }), zpet: odkaz(v, { den: addDays(v.den, -krok) }), dal: odkaz(v, { den: addDays(v.den, krok) }), datum, krok: krok === 1 ? "den" : "týden" })}
 <span class="k-prep"><a class="${v.pohled === "den" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "den" }))}">Den</a><a class="${v.pohled === "tyden" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "tyden" }))}">Týden</a></span></div></div>
 ${pruh}
 <div class="k-telo">
