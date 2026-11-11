@@ -341,7 +341,7 @@ export const infraStitek = (i: string) => `<span class="infra i-${esc(/^(TMCZ|CE
 export const zdr = (zdroj: string) => `<span class="zdr" title="Zdroj informace">zdroj: ${esc(zdroj)}</span>`;
 export const ZDROJ = {
   mwf: "MWF export",
-  poznamka: "MWF poznámka",
+  poznamka: "MWF export",
   pdf: "notifikační PDF (MWF)",
   gcal: "Google Kalendář tmcz01",
   gmail: "Gmail tmcz01",
@@ -605,7 +605,7 @@ ${sekceZdroju(zdroje, plan.prilohy)}
 ${sekceNotifikace(d.notifikace)}
 <div class="card kompakt"><h2 class="s-ikonou"><span class="i-kalendar">${IKONA.kalendar}</span>Instalovali jsme v lokalitě${zdr(ZDROJ.gcal)}</h2><div class="posun">${sekceLokality(plan.lokalita)}</div></div>
 <div class="sloupec">
-<div class="card kompakt"><h2>Kontaktování${zdr("MWF poznámka · vyhodnocení AppKoo")}</h2><div class="posun maly"><dl>
+<div class="card kompakt"><h2>Kontaktování${zdr("MWF export · vyhodnocení AppKoo")}</h2><div class="posun maly"><dl>
 ${radek("Stav kontaktování", esc(stavKontaktu(d, now)))}
 ${radek("Další kontakt", esc(denIso(d.dalsiKontakt)))}
 ${radek("Navolané dny", esc(`${d.plan.navolaneDny} (cíl ${d.plan.pokusuDenne} pokus/y denně)`))}

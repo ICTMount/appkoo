@@ -414,7 +414,7 @@ describe("uživatelé a Konfigurace", () => {
     expect(t).not.toContain("<h2>Zákazník");
     expect(t).not.toContain("Kontaktování");
     expect(t).toContain("Poznámka MWF");
-    expect(t).toContain("zdroj: MWF poznámka");
+    expect(t).toContain("zdroj: MWF export");
     expect((await w.get("/technik", "hristov@ictmount.com")).status).toBe(403);
     expect((await w.get("/zakazka/P1/zapis?k=K1&e=v1&t=Hristov&od=2026-10-16T10:00:00.000Z&do=2026-10-16T12:00:00.000Z", "hristov@ictmount.com")).status).toBe(403);
     expect(await (await w.get("/zakazka/P1", "jana@ictmount.com")).text()).toContain("Kam naplánovat");
