@@ -354,6 +354,9 @@ button,input{font:inherit}
 .k-mriz{flex:999 1 560px;min-width:0;min-height:0;overflow-x:auto;display:flex;background:var(--panel);border-left:1px solid var(--line);font-size:clamp(12px,.42vw + 5px,19px)}
 .k-vnitrek{flex:1;display:flex;flex-direction:column;padding-right:.5em}
 .k-hl,.k-grid{display:flex}
+.k-mriz.tyden .k-hl,.k-mriz.tyden .k-grid{background:var(--bg)}
+.k-mriz.tyden .k-sl,.k-mriz.tyden .k-osa{background-color:var(--panel)}
+.k-mriz.tyden .k-sl+.k-sl{margin-left:16px;border-left:2px solid var(--muted)}
 .k-grid{flex:1;min-height:0;border-top:1px solid var(--line)}
 .k-osa{width:3.4em;flex:none;display:flex;flex-direction:column}
 .k-osa div{flex:1 1 0;font-size:.8em;color:var(--muted);text-align:right;padding-right:.5em}
@@ -570,6 +573,6 @@ ${navrhy}
 <div class="k-pozn">Zdroj: Google Kalendář tmcz01; km přejezdů = odhad AppKoo. ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
 <div class="k-pozn">${esc(s.uzivatel)}</div>
 </form>
-<div class="k-mriz${v.navrh && m.sloupce.some((sl) => sl.pod.some((p) => p.bloky.some((b) => b.navrh))) ? " s-navrhem" : ""}">${mrizka}</div>
+<div class="k-mriz${v.pohled === "tyden" ? " tyden" : ""}${v.navrh && m.sloupce.some((sl) => sl.pod.some((p) => p.bloky.some((b) => b.navrh))) ? " s-navrhem" : ""}">${mrizka}</div>
 </div></div></body></html>`;
 }
