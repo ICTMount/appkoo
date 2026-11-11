@@ -162,7 +162,7 @@ export interface BlokMrizky {
 
 export interface SloupecMrizky {
   nadpis: string;
-  /** zkrácený nadpis pro úzký sloupec (týden: „Út 10.11.“ místo „úterý 10. 11. 2026“) */
+  /** krátký tvar dne („Út 10.11.“) – jen značí sloupec dne v týdenním pohledu; v záhlaví je vždy celý název, úzký sloupec ho ořízne */
   kratky?: string;
   pod: { stitek: string; napoveda: string; bloky: BlokMrizky[] }[];
 }
@@ -360,10 +360,7 @@ button,input{font:inherit}
 .k-sl{min-width:0;border-left:1px solid var(--line)}
 .k-hl .k-sl{text-align:center;padding:.25em .2em 0}
 .k-hl .k-sl>div:first-child{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.k-hl .k-sl{container-type:inline-size}
 .k-hl .k-den{font-size:1.15em;font-weight:600;letter-spacing:.06em;padding-bottom:.15em}
-.k-den .d-kr{display:none}
-@container (max-width:190px){.k-den{letter-spacing:0}.k-den .d-dl{display:none}.k-den .d-kr{display:inline}}
 .k-pods{display:flex}
 .k-pods div{flex:1 1 0;min-width:0;font-size:.8em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:.2em}
 /* mřížka po 15 minutách jako v Google Kalendáři: hodina výrazně, čtvrthodiny jemně */
@@ -526,7 +523,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
-<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0"><div${sl.kratky ? ` class="k-den"` : ""}>${sl.kratky ? `<span class="d-dl">${esc(sl.nadpis)}</span><span class="d-kr">${esc(sl.kratky)}</span>` : esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
+<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0"><div${sl.kratky ? ` class="k-den" title="${esc(sl.nadpis)}"` : ""}>${esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
 <div class="k-grid"><div class="k-osa">${m.hodiny.map((h) => `<div>${h}:00</div>`).join("")}</div>${m.sloupce
         .map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0;background-size:100% ${(100 / m.hodiny.length).toFixed(4)}%,100% ${(25 / m.hodiny.length).toFixed(4)}%">${sl.pod.map((p) => `<div class="k-pod" style="font-size:${pismo}em">${p.bloky.map(blok).join("")}</div>`).join("")}</div>`)
         .join("")}</div></div>`
