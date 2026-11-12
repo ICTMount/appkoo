@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { barvaTextu, barvaUdalosti, castAdresy, miniMesic, pondeli, radkyDetailu, rozsahMrizky, sestavMrizku, strankaMrizky, type TechnikMrizky, type VolbyMrizky } from "../src/web/mrizka.js";
+import { typUdalosti, describe, expect, it } from "vitest";
+import { barvaTextu, barvaUdalosti, castAdresy, miniMesic, pondeli, radkyDetailu, rozsahMrizky, sestavMrizku, strankaMrizky, typUdalosti, type TechnikMrizky, type VolbyMrizky } from "../src/web/mrizka.js";
 import type { UdalostMrizky } from "../src/zdroje/sync.js";
 
 const T: TechnikMrizky[] = [
@@ -155,5 +155,13 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     const m = sestavMrizku(UD, T, volby(), { dohodnuty: { od: new Date("2026-11-16T10:00:00Z"), do: new Date("2026-11-16T12:00:00Z") } });
     const bloky = m.sloupce.flatMap((s) => s.pod.flatMap((p) => p.bloky));
     expect(bloky.filter((b) => b.dohod).map((b) => b.cas)).toEqual(["10:00 – 12:00"]);
+  });
+
+  it("typ instalace z názvu události – bez jména technika, zbytek od O-čísla", () => {
+    expect(typUdalosti("RFS Kostal - FTTH O-8553059398_25468915087000 Jirásek RFS 5.11.2026 0:00:00 (JC)")).toEqual({ typ: "RFS FTTH", zbytek: "O-8553059398_25468915087000 Jirásek" });
+    expect(typUdalosti("FTTH CETIN O-8559760869 Smejkal")).toEqual({ typ: "FTTH CETIN", zbytek: "O-8559760869 Smejkal" });
+    expect(typUdalosti("Hristov - FTTH O-8553401092 Bažantová SLA 17.10.2026 17:42 (AP)")).toEqual({ typ: "FTTH", zbytek: "O-8553401092 Bažantová" });
+    expect(typUdalosti("mesh Koval - Instal_PIV O-8559223745 SEKTOROVÝ NÁBYTEK CZ s.r.o.")?.typ).toBe("mesh Instal_PIV");
+    expect(typUdalosti("NEPLANOVAT")).toBeNull();
   });
 });

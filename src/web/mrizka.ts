@@ -42,6 +42,22 @@ export interface TechnikMrizky {
 }
 
 /** Adresa události rozdělená na ulici a městskou část / obec („Bellušova 1827/53“ + „Praha 13 Stodůlky“) – část se v mřížce zvýrazňuje */
+/**
+ * Typ instalace z názvu události: text před O-číslem bez jména technika.
+ * „RFS Kostal - FTTH O-855…“ → „RFS FTTH“, „FTTH CETIN O-855…“ → „FTTH CETIN“, „mesh Koval - Instal_PIV O-…“ → „mesh Instal_PIV“.
+ * Vrací i zbytek názvu od O-čísla (bez SLA/RFS na konci); událost bez O-čísla typ nemá.
+ */
+export function typUdalosti(summary: string): { typ: string; zbytek: string } | null {
+  const m = /^(.*?)\b((?:O-|CIN-)\d{6,}.*)$/s.exec(summary);
+  if (!m) return null;
+  const hlava = m[1]!.trim().replace(/[-–:,\s]+$/, "");
+  const i = hlava.lastIndexOf(" - ");
+  // „<něco> Technik - <typ>“: jméno technika (poslední slovo před pomlčkou) do typu nepatří
+  const typ = (i < 0 ? hlava : `${hlava.slice(0, i).trim().split(/\s+/).slice(0, -1).join(" ")} ${hlava.slice(i + 3)}`).replace(/\s+/g, " ").trim();
+  if (!typ || typ.length > 40) return null;
+  return { typ, zbytek: m[2]!.replace(/\s+(SLA|RFS)\b.*$/is, "").replace(/[,\s]+$/, "") };
+}
+
 export function castAdresy(location: string): { ulice: string; cast: string } {
   const casti = location.split(",").map((s) => s.trim()).filter(Boolean);
   if (casti.length > 1 && /^(česko|czechia|česká republika|cz)$/i.test(casti.at(-1)!)) casti.pop();
@@ -152,6 +168,9 @@ export interface BlokMrizky {
   navrh?: { poradi: number; duvod: string };
   /** současná událost plánované zakázky */
   tato?: boolean;
+  /** typ instalace z názvu události („FTTH CETIN“, „RFS FTTH“, „Instal_PIV“) – zvýrazněný štítek; bezTypu = zbytek názvu od O-čísla */
+  typ?: string;
+  bezTypu?: string;
   /** VOLNY slot, který se kryje s dohodnutým termínem zákazníka (webcalendar) */
   dohod?: boolean;
   /** přejezd na tuto adresu z předchozí zastávky dne (nebo z výjezdu technika), km */
@@ -166,7 +185,7 @@ export interface SloupecMrizky {
   kratky?: string;
   /** týden: den sloupce (kotva „den-RRRR-MM-DD“ pro odrolování na vybraný den) */
   datum?: IsoDate;
-  pod: { stitek: string; napoveda: string; bloky: BlokMrizky[] }[];
+  pod: { stitek: string; napoveda: string; kalendar: string; bloky: BlokMrizky[] }[];
 }
 
 export interface Mrizka {
@@ -256,6 +275,7 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
         // den: pod jménem technika místo výjezdu; týden: jméno, výjezd v nápovědě
         stitek: v.pohled === "den" ? (p.t.vyjezd ? `výjezd: ${p.t.vyjezd}` : "") : p.t.nazevVKalendari,
         napoveda: p.t.vyjezd ? `${p.t.jmeno} – výjezd: ${p.t.vyjezd}` : p.t.jmeno,
+        kalendar: p.t.kalendar,
         bloky: prejezdyDne(p.seznam.map((u): BlokMrizky => {
           const od = Math.max(start, hodina(u.od));
           const doH = isoDate(u.do) > isoDate(u.od) ? konec : Math.min(konec, Math.max(od + 0.25, hodina(u.do)));
@@ -271,6 +291,7 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
             fg: barvaTextu(bg),
             // VOLNY má v hlavičce vždy celý název ze zdroje („Kostal - VOLNY“), zkracují se jen zakázky v hustém režimu
             nazev: volny || !husta ? u.summary : kratky,
+            ...(volny ? {} : (() => { const t = typUdalosti(u.summary); return t ? { typ: t.typ, bezTypu: t.zbytek } : {}; })()),
             cas: `${hm(u.od)} – ${hm(u.do)}`,
             ulice: husta && adr.cast ? "" : adr.ulice,
             cast: adr.cast,
@@ -368,9 +389,9 @@ button,input{font:inherit}
 .k-osa div{flex:1 1 0;font-size:.8em;color:var(--muted);text-align:right;padding-right:.5em}
 .k-sl{min-width:0;border-left:1px solid var(--line)}
 .k-hl .k-sl{text-align:center;padding:.25em .2em 0}
-.k-hl .k-sl>div:first-child{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-hl .k-sl>div:first-of-type{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .k-hl .k-den{font-size:1.15em;font-weight:600;letter-spacing:.06em;padding-bottom:.15em}
-.k-pods{display:flex}
+.k-pods{display:flex;gap:1px}.k-tech{border-radius:4px 4px 0 0;margin:0 0 0 1px}.k-pods div{padding:0 .3em .2em}
 .k-pods div{flex:1 1 0;min-width:0;font-size:.8em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:.2em}
 /* mřížka po 15 minutách jako v Google Kalendáři: hodina výrazně, čtvrthodiny jemně */
 .k-grid .k-sl{display:flex;background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px),linear-gradient(to bottom,var(--line2) 1px,transparent 1px)}
@@ -378,7 +399,9 @@ button,input{font:inherit}
 .ev{position:absolute;left:1px;right:2px}
 .ev-b{display:flex;flex-direction:column;gap:1px;width:100%;height:100%;border-radius:4px;padding:.15em .4em;overflow:hidden;border:1px solid var(--panel);font-size:.9em;line-height:1.2;text-decoration:none}
 .ev-b:hover{text-decoration:none;filter:brightness(.93)}
-.ev-b span:first-child{font-weight:500}
+.ev-b span.ev-n{font-weight:500}
+.ev-st{align-self:flex-start;max-width:100%;flex:none;background:rgba(0,0,0,.45);color:#fff;border-radius:1em;padding:0 .5em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.95em}
+.ev-mesto{background:rgba(255,255,255,.9);color:#111}
 .tip{display:none;position:absolute;width:24em;max-width:60vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.8em 1em;font-size:13px;font-weight:400;line-height:1.5;text-align:left;letter-spacing:.01em}
 .tip-n{display:flex;gap:.6em;align-items:flex-start;font-size:15px;font-weight:400}
 .tip-n i{flex:none;width:.9em;height:.9em;border-radius:3px;margin-top:.3em}
@@ -506,6 +529,8 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const sirka = v.jenVolny ? 34 : m.husta ? 58 : 96;
   const pismo = v.jenVolny && m.podsloupcu > 30 ? 0.72 : m.husta ? 0.78 : 0.9;
   const vaha = (sl: SloupecMrizky) => Math.max(1, sl.pod.length);
+  // hlavička sloupce (jméno technika, výjezd) v barvě jeho kalendáře – stejná barva jako jeho zakázky
+  const barvaHl = (kalendar: string | undefined) => { const bg = (kalendar && s.barvy.get(kalendar)) || VYCHOZI_BARVA; return `background:${bg};color:${barvaTextu(bg)}`; };
   const blok = (b: BlokMrizky) => {
     // VOLNY + plánovaná zakázka + oprávnění + živá data + žádná blokace → klik otevře formulář zápisu
     const lzePlanovat = b.volny && !!z && !!s.planovani && s.zive !== false && !(z.blokace ?? []).length && s.planovani.smi(b.technik);
@@ -513,7 +538,9 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       ? `/zakazka/${encodeURIComponent(z!.idAktivity)}/zapis?${new URLSearchParams({ k: b.kalendar, e: b.id, t: b.technik, od: b.odIso, do: b.doIso, ...s.planovani!.navic })}`
       : b.oid ? `/o/${encodeURIComponent(b.oid)}` : b.odkaz;
     const znak = b.navrh ? `<span class="ev-znak">${m.husta ? `${b.navrh.poradi}.` : `nejoptimálnější ${b.navrh.poradi}`}</span>` : b.tato ? `<span class="ev-znak">tato zakázka</span>` : b.dohod ? `<span class="ev-znak">${m.husta ? "termín" : "termín zákazníka"}</span>` : "";
-    const misto = [b.ulice ? esc(b.ulice) : "", b.cast ? `<b>${esc(b.cast)}</b>` : ""].filter(Boolean).join(", ");
+    // typ instalace a město + městská část jsou zvýrazněné štítky (stejný vzhled jako přejezd), ať jsou vidět na první pohled
+    const typ = b.typ ? `<span class="ev-st ev-typ">${esc(b.typ)}</span>` : "";
+    const mesto = b.cast && !b.volny ? `<span class="ev-st ev-mesto">${esc(b.cast)}</span>` : "";
     const km = (x: number) => `${x.toFixed(1).replace(".", ",")} km`;
     // přejezdy: zakázka = km z předchozí zastávky; VOLNY = km sem z předchozí a odsud na další (s plánovanou zakázkou)
     const prejezd = b.prejezd
@@ -523,7 +550,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       ? `<div class="r">Přejezd ${b.prejezd.zVyjezdu ? "z výjezdu technika" : "z předchozí zakázky"}: <b>${km(b.prejezd.km)}</b>${b.prejezd.min != null ? `, asi ${Math.round(b.prejezd.min)} min` : ""}</div>`
       : b.vlozeni ? `<div class="r">S touto zakázkou: ${b.vlozeni.predVyjezd ? "z výjezdu" : "z předchozí zakázky"} <b>${km(b.vlozeni.pred)}</b>, ${b.vlozeni.poVyjezd ? "zpět na výjezd" : "na další zakázku"} <b>${km(b.vlozeni.po)}</b></div>` : "";
     // přejezd je vždy úplně dole v okně události (vpravo dole, i u krátkých bloků)
-    const obsah = `<span>${esc(b.nazev)}</span><span>${esc(b.cas)}</span>${misto && !b.volny ? `<span>${misto}</span>` : ""}${znak || prejezd ? `<span class="ev-dole">${znak || "<i></i>"}${prejezd}</span>` : ""}`;
+    const obsah = `${typ}<span class="ev-n">${esc(b.typ && b.bezTypu ? b.bezTypu : b.nazev)}</span><span>${esc(b.cas)}</span>${mesto}${b.ulice && !b.volny ? `<span>${esc(b.ulice)}</span>` : ""}${znak || prejezd ? `<span class="ev-dole">${znak || "<i></i>"}${prejezd}</span>` : ""}`;
     const styl = `background:${b.bg};color:${b.fg}`;
     const telo = cil
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
@@ -533,7 +560,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
-<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0">${sl.datum ? `<span class="k-kotva" id="den-${sl.datum}"></span>` : ""}<div${sl.kratky ? ` class="k-den" title="${esc(sl.nadpis)}"` : ""}>${esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
+<div class="k-hl"><div class="k-osa"></div>${m.sloupce.map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0">${sl.datum ? `<span class="k-kotva" id="den-${sl.datum}"></span>` : ""}<div${sl.kratky ? ` class="k-den" title="${esc(sl.nadpis)}"` : ` class="k-tech" style="${barvaHl(sl.pod[0]?.kalendar)}"`}>${esc(sl.nadpis)}</div><div class="k-pods">${sl.pod.map((p) => `<div title="${esc(p.napoveda)}" style="${barvaHl(p.kalendar)}">${esc(p.stitek)}</div>`).join("")}</div></div>`).join("")}</div>
 <div class="k-grid"><div class="k-osa">${m.hodiny.map((h) => `<div>${h}:00</div>`).join("")}</div>${m.sloupce
         .map((sl) => `<div class="k-sl" style="flex:${vaha(sl)} 1 0;background-size:100% ${(100 / m.hodiny.length).toFixed(4)}%,100% ${(25 / m.hodiny.length).toFixed(4)}%">${sl.pod.map((p) => `<div class="k-pod" style="font-size:${pismo}em">${p.bloky.map(blok).join("")}</div>`).join("")}</div>`)
         .join("")}</div></div>`
