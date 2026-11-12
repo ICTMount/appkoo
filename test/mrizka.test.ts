@@ -1,4 +1,4 @@
-import { typUdalosti, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { barvaTextu, barvaUdalosti, castAdresy, miniMesic, pondeli, radkyDetailu, rozsahMrizky, sestavMrizku, strankaMrizky, typUdalosti, type TechnikMrizky, type VolbyMrizky } from "../src/web/mrizka.js";
 import type { UdalostMrizky } from "../src/zdroje/sync.js";
 
