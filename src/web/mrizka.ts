@@ -391,7 +391,9 @@ button,input{font:inherit}
 .k-hl .k-sl{text-align:center;padding:.25em .2em 0}
 .k-hl .k-sl>div:first-of-type{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .k-hl .k-den{font-size:1.15em;font-weight:600;letter-spacing:.06em;padding-bottom:.15em}
-.k-pods{display:flex;gap:1px}.k-tech{border-radius:4px 4px 0 0;margin:0 0 0 1px}.k-pods div{padding:0 .3em .2em}
+.k-pods{display:flex;gap:1px}.k-pods div{padding:0 .3em .2em}
+.k-tech,.k-pods div{background:color-mix(in srgb,var(--tb,transparent) 14%,transparent)}
+.k-tech,.k-mriz.tyden .k-pods div{border-top:3px solid var(--tb,transparent);border-radius:3px 3px 0 0}
 .k-pods div{flex:1 1 0;min-width:0;font-size:.8em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:.2em}
 /* mřížka po 15 minutách jako v Google Kalendáři: hodina výrazně, čtvrthodiny jemně */
 .k-grid .k-sl{display:flex;background-image:linear-gradient(to bottom,var(--line) 1px,transparent 1px),linear-gradient(to bottom,var(--line2) 1px,transparent 1px)}
@@ -529,8 +531,8 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const sirka = v.jenVolny ? 34 : m.husta ? 58 : 96;
   const pismo = v.jenVolny && m.podsloupcu > 30 ? 0.72 : m.husta ? 0.78 : 0.9;
   const vaha = (sl: SloupecMrizky) => Math.max(1, sl.pod.length);
-  // hlavička sloupce (jméno technika, výjezd) v barvě jeho kalendáře – stejná barva jako jeho zakázky
-  const barvaHl = (kalendar: string | undefined) => { const bg = (kalendar && s.barvy.get(kalendar)) || VYCHOZI_BARVA; return `background:${bg};color:${barvaTextu(bg)}`; };
+  // hlavička sloupce (jméno technika, výjezd) decentně v barvě jeho kalendáře: proužek nahoře + jemný nádech pozadí
+  const barvaHl = (kalendar: string | undefined) => { const bg = (kalendar && s.barvy.get(kalendar)) || VYCHOZI_BARVA; return `--tb:${bg}`; };
   const blok = (b: BlokMrizky) => {
     // VOLNY + plánovaná zakázka + oprávnění + živá data + žádná blokace → klik otevře formulář zápisu
     const lzePlanovat = b.volny && !!z && !!s.planovani && s.zive !== false && !(z.blokace ?? []).length && s.planovani.smi(b.technik);
