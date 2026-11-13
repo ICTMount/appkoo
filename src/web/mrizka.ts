@@ -359,6 +359,13 @@ button,input{font:inherit}
 .k-panel .k-tl{justify-content:center;margin-top:8px;cursor:pointer;font-size:13px}
 .k-pozn{color:var(--muted);font-size:12px;margin-top:8px}.zdr{display:inline-block;font-size:10.5px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 7px;white-space:nowrap;line-height:1.5}
 .k-panel label small{display:block;color:var(--muted);font-size:11px;line-height:1.15}
+.k-tn{display:flex;justify-content:space-between;align-items:baseline}.k-tn a{font-weight:500;text-transform:none;letter-spacing:0;font-size:12px}
+.k-potvrdit{position:sticky;top:0;z-index:2;margin:2px 0 6px;min-height:36px;border:0;border-radius:6px;background:var(--accent);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 0 0 6px var(--bg)}
+.k-potvrdit:hover{filter:brightness(1.1)}
+.k-panel label>span{flex:1 1 auto}
+.k-jen{flex:none;font-size:11px;padding:1px 7px;border:1px solid var(--line);border-radius:999px;color:var(--muted);opacity:.75}
+.k-panel label:hover .k-jen,.k-jen:focus,.k-jen.on{opacity:1}.k-jen:hover,.k-jen.on{border-color:var(--accent);color:var(--accent);text-decoration:none}
+@media (hover:none){.k-jen{opacity:1}}
 .k-panel label>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mm{margin:2px 0 8px;font-size:12px}
 .mm-h{display:flex;align-items:center;justify-content:space-between;white-space:nowrap;font-weight:600;font-size:13px;padding:0 2px 4px}
@@ -487,7 +494,7 @@ export interface StrankaMrizky {
 }
 
 /** Parametry odkazu se zachováním výběru */
-function odkaz(v: VolbyMrizky, zmena: Partial<Pick<VolbyMrizky, "pohled" | "den" | "jenVolny" | "navrh">>): string {
+function odkaz(v: VolbyMrizky, zmena: Partial<Pick<VolbyMrizky, "pohled" | "den" | "jenVolny" | "navrh" | "vybrani">>): string {
   const n = { ...v, ...zmena };
   const q = new URLSearchParams({ pohled: n.pohled, den: n.den });
   for (const t of n.vybrani) q.append("t", t);
@@ -611,9 +618,9 @@ ${pruh}
 <form class="k-panel" method="get" action="/kalendar"><input type="hidden" name="pohled" value="${v.pohled}"><input type="hidden" name="den" value="${v.den}">${z ? `<input type="hidden" name="z" value="${esc(z.idAktivity)}">` : ""}${v.navrh && z ? `<input type="hidden" name="navrh" value="1">` : ""}
 ${miniMesic(v, dnes)}
 <label style="font-weight:500"><input type="checkbox" name="volne" value="1"${v.jenVolny ? " checked" : ""} style="accent-color:#0b8043">Jen VOLNY</label>
-<b>Technici</b>
-${s.technici.map((t) => `<label><input type="checkbox" name="t" value="${esc(t.jmeno)}"${vybrano(t) ? " checked" : ""} style="accent-color:${s.barvy.get(t.kalendar) ?? VYCHOZI_BARVA}"><span title="${esc(t.vyjezd ? `výjezd: ${t.vyjezd}` : t.jmeno)}">${esc(t.jmeno)}${t.vyjezd ? `<small>${esc(t.vyjezd)}</small>` : ""}</span></label>`).join("\n")}
-<button class="k-tl" type="submit">Zobrazit výběr</button>
+<b class="k-tn">Technici${v.vybrani.length ? `<a href="${esc(odkaz(v, { vybrani: [] }))}" title="Zobrazit všechny techniky">všichni</a>` : ""}</b>
+<button class="k-potvrdit" type="submit" title="Zobrazí zaškrtnuté techniky">✓ Potvrdit výběr</button>
+${s.technici.map((t) => `<label><input type="checkbox" name="t" value="${esc(t.jmeno)}"${vybrano(t) ? " checked" : ""} style="accent-color:${s.barvy.get(t.kalendar) ?? VYCHOZI_BARVA}"><span title="${esc(t.vyjezd ? `výjezd: ${t.vyjezd}` : t.jmeno)}">${esc(t.jmeno)}${t.vyjezd ? `<small>${esc(t.vyjezd)}</small>` : ""}</span><a class="k-jen${v.vybrani.length === 1 && v.vybrani[0] === t.jmeno ? " on" : ""}" href="${esc(odkaz(v, { vybrani: [t.jmeno] }))}" title="Zobrazit jen technika ${esc(t.jmeno)}">jen</a></label>`).join("\n")}
 ${navrhy}
 <div class="k-pozn">Zdroj: Google Kalendář tmcz01; km přejezdů = odhad AppKoo. ${s.nacteno && s.zive !== false ? "Stránka se sama obnovuje po 2 minutách." : s.synchronizace ? `Stav k ${hm(s.synchronizace)} (${denKratce(isoDate(s.synchronizace))}).` : "Kalendáře se zatím nesynchronizovaly."}${(s.nedostupne ?? []).length ? ` Kalendář nejde přečíst: ${esc(s.nedostupne!.join(", "))}.` : ""}</div>
 <div class="k-pozn">${esc(s.uzivatel)}</div>
