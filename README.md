@@ -6,7 +6,7 @@ a události do kalendáře techniků a pomocí Claude vytěžuje poznámky.
 
 Fáze 1 (tři pilíře): [`docs/faze1.md`](docs/faze1.md).
 Proces, ze kterého aplikace vychází: [`docs/proces-koordinace.md`](docs/proces-koordinace.md).
-Architektura systému: [`docs/architektura.md`](docs/architektura.md) · provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
+Architektura systému (aktualizováno 13.11.2026): [`docs/architektura.md`](docs/architektura.md) · provoz v Google Cloudu: [`docs/architektura-gcp.md`](docs/architektura-gcp.md).
 
 ## Stav
 
