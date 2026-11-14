@@ -13,7 +13,7 @@ export const CSS_NAV = `
 .dn-sipka.off{opacity:.35;pointer-events:none}
 .dn-datum{font-size:18px;font-weight:600;white-space:nowrap}
 .rychle{display:flex;gap:6px;flex-wrap:wrap}.rychle a{padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--text);white-space:nowrap}
-.rychle a.on{border-color:var(--accent);background:var(--accent);color:#fff}.rychle a:hover{text-decoration:none}
+.rychle a.on{border-color:transparent;background:var(--sel-bg,var(--vyb-bg));color:var(--sel-fg,var(--vyb-fg));font-weight:600}.rychle a:hover{text-decoration:none}
 `;
 
 export interface NavDne {

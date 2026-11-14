@@ -208,6 +208,36 @@ form.filtr label b{color:var(--text);margin-left:4px}
 :root[data-theme=dark]{--bg:#161615;--panel:#1f1f1d;--text:#ecebe6;--muted:#a3a29c;--line:#34332f;
 --accent:#7fa8ff;--p1:#ff6b6b;--p2:#ffab40;--p3:#9ccc65;--p0:#9a9993;--warn-bg:#3a2c12;--warn:#ffcc80}:root[data-theme=dark] .ok{background:#173322;color:#a5d6a7}:root[data-theme=dark] .err{background:#3b1717;color:#ff9e9e}:root[data-theme=dark] .i-TMCZ{color:#ff5fb0}:root[data-theme=dark] .i-CETIN{color:#6fb0ff}:root[data-theme=dark] .i-VDF{color:#ff6b6b}:root[data-theme=dark] a.volny{background:#173322;color:#a5d6a7}
 .tema{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}.tema a{padding:3px 9px;color:var(--muted);font-size:12px}.tema a:hover{text-decoration:none;background:var(--line)}:root:not([data-theme]) .tema .t-auto,:root[data-theme=light] .tema .t-light,:root[data-theme=dark] .tema .t-dark{background:var(--accent);color:#fff}
+
+/* ── Jednotný vzhled (11/2026) ─────────────────────────────────────────────────────────────────
+   Pult dispečinku: klidná plocha, co nejvíc místa na data. Plná modrá patří jediné hlavní akci na
+   stránce; „vybráno“ (záložka, den, vzhled) je jen podbarvené. Čísla mají stejnou šířku, aby se
+   O-ID, časy a km daly číst ve sloupci pod sebou. */
+:root{--sel-bg:#dfe9f9;--sel-fg:#123c7c;--r:6px}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--sel-bg:#2a3b63;--sel-fg:#dbe7ff}}
+:root[data-theme=dark]{--sel-bg:#2a3b63;--sel-fg:#dbe7ff}
+body{font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1{font-size:20px;line-height:1.25;letter-spacing:-.01em}h1 small{font-size:14px;font-weight:400;letter-spacing:0;color:var(--muted)}
+nav.zalozky a.on,nav.zalozky a.on:hover{background:var(--sel-bg);color:var(--sel-fg)}
+.rychle a.on{background:var(--sel-bg);color:var(--sel-fg);border-color:transparent;font-weight:600}
+:root:not([data-theme]) .tema .t-auto,:root[data-theme=light] .tema .t-light,:root[data-theme=dark] .tema .t-dark{background:var(--sel-bg);color:var(--sel-fg)}
+/* vedlejší tlačítka (filtry, „Zobrazit“) jsou obrysová – plná zůstává hlavní akce */
+form.vyber-tech button,form.filtr button{background:var(--panel);color:var(--text);border-color:var(--line);font-weight:600}
+form.vyber-tech button:hover,form.filtr button:hover{background:var(--line)}
+form.hledani>button{font-weight:600}
+th{letter-spacing:0}.card.kompakt h2,.notif h3{text-transform:none;letter-spacing:0}
+@media (min-width:761px){
+header .lista{display:flex;align-items:center;gap:20px;padding:6px 20px}
+header .vlevo{display:flex;align-items:center;gap:16px;flex:1 1 auto;min-width:0}
+header .logo{font-size:18px;letter-spacing:-.01em}
+header nav.zalozky{padding:0;gap:4px;flex-wrap:nowrap}header nav.zalozky a{padding:7px 12px;font-size:14px;white-space:nowrap}
+header .stred{flex:0 1 auto;min-width:0}header .stred .export{min-width:0;gap:4px;white-space:nowrap}
+header .export .soubor{display:none}header .bar{height:4px;margin-top:0}header .bar span{top:-3px;height:10px}
+header .vpravo{flex:none;flex-direction:row;align-items:center;gap:12px}
+form.hledani{padding:6px 20px}
+}
+@media (max-width:760px){header .vlevo{display:contents}header nav.zalozky{grid-column:1 / -1;order:2;padding:0;flex-wrap:nowrap;overflow-x:auto}header nav.zalozky a{white-space:nowrap;padding:7px 10px}}
 `;
 
 export type Zalozka = "zakazka" | "technik" | "konfigurace";
@@ -223,7 +253,7 @@ export function cerstvost(stav: StavImportu): string {
   const popis = h === null ? "zatím žádný export" : `před ${String(h).replace(".", ",")} h`;
   const zdroj = stav.zdroj ? `${ZDROJ_EXPORTU[stav.zdroj] ?? stav.zdroj}${stav.odesilatel ? ` (${stav.odesilatel})` : ""}` : "";
   const nazev = stav.soubor?.replace(/^.*[\\/]/, "") ?? "";
-  return `<div class="export"><div>Export MWF <b>${esc(dt(stav.posledniExport) || "–")}</b> · <span class="c-${trida}">${esc(popis)}</span></div>${
+  return `<div class="export"${nazev || zdroj ? ` title="${esc([nazev, zdroj ? `zdroj: ${zdroj}` : ""].filter(Boolean).join(" · "))}"` : ""}><div>Export MWF <b>${esc(dt(stav.posledniExport) || "–")}</b> · <span class="c-${trida}">${esc(popis)}</span></div>${
     nazev || zdroj ? `<div class="soubor" title="${esc(nazev)}">${esc(nazev)}${nazev && zdroj ? " · " : ""}${zdroj ? `zdroj: ${esc(zdroj)}` : ""}</div>` : ""
   }<div class="bar" title="do 1 h zelená, do 2 h oranžová, přes 2 h červená"><span class="b-${trida}" style="left:${sirka.toFixed(0)}%"></span></div></div>`;
 }
@@ -355,11 +385,10 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulek)} – AppKoo</title><style>${CSS}</style></head><body>
 <header><div class="lista">
-<div class="vlevo"><a class="logo" href="/">AppKoo</a></div>
+<div class="vlevo"><a class="logo" href="/">AppKoo</a><nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><!--doplnit:${zal === "technik" ? "on" : "off"}--></nav></div>
 <div class="stred">${cerstvost(stav)}</div>
 <div class="vpravo"><nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav>
 <div class="kdo">${esc(uzivatel)}<!--role--></div><!--konfigurace:${zal === "konfigurace" ? "on" : "off"}--></div></div>
-<nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><!--doplnit:${zal === "technik" ? "on" : "off"}--></nav>
 <form class="hledani" action="/" method="get"><span class="pole-hledani"><input type="search" name="q" value="${esc(o.dotaz ?? "")}" placeholder="O-ID, S7, telefon, příjmení nebo adresa zakázky" aria-label="Najít zakázku" autocomplete="off">${
     o.dotaz
       ? `<a class="zrusit" href="/" title="Zrušit hledání" aria-label="Zrušit hledání">×</a>`
