@@ -76,7 +76,7 @@ describe("import číselníku z CSV", () => {
 describe("IRU lokality", async () => {
   const { iruLokalita } = await import("../src/web/planovani.js");
   it("město z číselníku se najde v adrese bez ohledu na diakritiku, jen jako celé slovo", () => {
-    const iru = [
+    const iru: Polozka[] = [
       { mesto: "Žamberk", popis: "IRU nej.cz – čekat na výpověď JP, portace přes PEP", odkaz: "https://drive.google.com/file/d/abc/view" },
       { mesto: "Ústí", popis: "x", aktivni: false },
     ];

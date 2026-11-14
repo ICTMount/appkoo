@@ -236,3 +236,21 @@ CREATE TABLE IF NOT EXISTS sync_stav (
   nazev  text
 );
 -- bez trigramového indexu: jeho údržba při zápisu byla na db-f1-micro dražší než hledání bez něj
+
+-- Kontrola MWF ↔ kalendář (zlaté pravidlo č. 1): výsledek posledního běhu, přepisuje se celý (src/gcal/kontrolaDb.ts)
+CREATE TABLE IF NOT EXISTS kontrola_kalendare (
+  id            bigserial PRIMARY KEY,
+  zkontrolovano timestamp NOT NULL,
+  id_aktivity   text,
+  objednavka    text NOT NULL,
+  zakaznik      text,
+  technik       text,
+  zavaznost     text NOT NULL CHECK (zavaznost IN ('shoda', 'admin', 'rozpor', 'jen_kalendar')),
+  problemy      text[] NOT NULL DEFAULT '{}',
+  termin_mwf    timestamp,
+  kalendar      text,
+  event_id      text,
+  termin_kal    timestamp,
+  odkaz         text
+);
+CREATE INDEX IF NOT EXISTS kontrola_kalendare_zavaznost ON kontrola_kalendare (zavaznost);

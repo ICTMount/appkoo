@@ -69,6 +69,8 @@ import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, str
 import { chybejiciPole, chybejiciPotvrzeni, inicialy, iruLokalita, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, potvrzeniZakazky, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 import type { OkoliZapisu } from "./html.js";
 import { jeBlok, jeVolneOkno } from "../gcal/kontrola.js";
+import { nactiNesoulady } from "../gcal/kontrolaDb.js";
+import { strankaKontroly } from "./kontrola.js";
 import type { TechnikPlanu } from "../plan/planovac.js";
 import type { Zakazka } from "../import/mwfExport.js";
 
@@ -210,7 +212,8 @@ function posli(res: ServerResponse, kod: number, html: string) {
   html = html
     .replace(/<!--konfigurace:(on|off)-->/, (_, on) => (role === "spravce" ? `<a href="/konfigurace" class="konfig${on === "on" ? " on" : ""}">⚙ Konfigurace</a>` : ""))
     .replace("<!--role-->", role ? ` · ${POPIS_ROLE[role]}` : "")
-    .replace(/<!--doplnit:(on|off)-->/, (_, on) => (role === "technik" ? "" : `<a href="/technik" class="${on === "on" ? "on" : ""}">Doplnit technika</a><a href="/kalendar">Kalendář techniků</a>`));
+    .replace(/<!--doplnit:(on|off|kontrola)-->/, (_, on) =>
+      role === "technik" ? "" : `<a href="/technik" class="${on === "on" ? "on" : ""}">Doplnit technika</a><a href="/kalendar">Kalendář techniků</a><a href="/kontrola" class="${on === "kontrola" ? "on" : ""}">Kontrola MWF ↔ kalendář</a>`);
   const hlavicky: Record<string, string> = {
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
@@ -623,6 +626,14 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
             return Number.isInteger(k) && k >= 0 && url.searchParams.has("prilohy") ? (k === 0 ? "Nic nového k uložení – vybrané přílohy už ve složce jsou." : `${k} ${k === 1 ? "soubor uložen" : k < 5 ? "soubory uloženy" : "souborů uloženo"} do složky zakázky.`) : null;
           })(),
         }));
+      }
+
+      // ---------- Kontrola MWF ↔ kalendář: nesoulady z posledního běhu importu ----------
+      if (url.pathname === "/kontrola") {
+        if (role === "technik") return posli(res, 403, strankaChyby(403, "Kontrola kalendářů je jen pro koordinaci."));
+        const z = url.searchParams.get("z") ?? "";
+        const filtr = (["rozpor", "jen_kalendar", "admin"] as const).find((x) => x === z) ?? "";
+        return posli(res, 200, strankaKontroly(await nactiNesoulady(db), filtr, stav, email));
       }
 
       // ---------- Kalendář techniků: zrcadlo Google Kalendáře (den / týden), zatím jen pro čtení ----------

@@ -57,7 +57,7 @@ flowchart LR
 | Komponenta | Služba | Co dělá | Kód | Stav |
 |---|---|---|---|---|
 | Import | Cloud Run job, každých 15 min | vezme nové exporty z Drive a Gmailu, posoudí (formát, sloupce, duplicita, starší export), uloží zakázky, historii, uzavřené zakázky | `src/jobs/importJob.ts`, `src/ingest/`, `src/import/`, `src/db/` | KÓD |
-| Kontrola kalendářů | Cloud Run job, po importu | porovná termíny MWF s kalendáři (technik, den, čas, telefon, adresa), uloží rozpory | `src/gcal/kontrola.ts`, `src/gcal/kalendar.ts` | KÓD (logika), PLÁN (job + tabulka rozporů) |
+| Kontrola kalendářů | krok importního jobu po synchronizaci kalendářů | porovná termíny MWF (dnes + 14 dní) se zrcadlem kalendářů: rozpor = technik, den, čas začátku; zápis = konec okna, zákazník, telefon, adresa; jen v kalendáři = událost otevřené zakázky bez termínu v MWF. Uloží do `kontrola_kalendare`, web `/kontrola` | `src/gcal/kontrola.ts`, `src/gcal/kontrolaDb.ts`, `src/web/kontrola.ts` | KÓD |
 | Vytěžení poznámek | Cloud Run job, po importu | jen změněné poznámky → Claude (bez jmen a telefonů) → návrh stavu, blokací, dalšího kroku | `src/ai/` | KÓD (logika), PLÁN (job) |
 | Webová aplikace | Cloud Run služba za IAP | fronta, výsledek hovoru, nabídka termínů, zápis do kalendáře, Konfigurace, nahrání exportu | – | NÁVRH (prototyp), PLÁN |
 | Plánovač | součást webu | dny techniků z kalendáře, trasa s časovými okny, nabídka termínů podle km, SLA a priority, KPI | `src/plan/` | KÓD |

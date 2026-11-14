@@ -118,6 +118,19 @@ describe("kontrola MWF ↔ kalendář", () => {
     expect(r.jenVKalendari).toEqual([]);
   });
 
+  it("zákazník a konec okna: jiné jméno nebo konec jsou administrativní, příjmení stačí", async () => {
+    const { stejnyZakaznik } = await import("../src/gcal/kontrola.js");
+    expect(stejnyZakaznik("Patera, Michal", "Hristov - FTTH O-8532577900 PATERA SLA")).toBe(true);
+    expect(stejnyZakaznik("Šťastná, Eva", "… O-1 Stastna")).toBe(true);
+    expect(stejnyZakaznik("Patera, Michal", "Hristov - FTTH O-8532577900 Paterová")).toBe(false);
+    expect(stejnyZakaznik("Ing. Novák, Jan", "Novák")).toBe(true);
+    const jinyZak = zkontroluj([zak()], [ud({ summary: "Hristov - FTTH O-8532577900 Novák" })]).vysledky[0]!;
+    expect(jinyZak).toMatchObject({ zavaznost: "admin", problemy: [expect.stringMatching(/Zákazník.*Patera, Michal/)] });
+    const konec = zkontroluj([zak()], [ud({ do: local(2026, 10, 16, 14, 0) })]).vysledky[0]!;
+    expect(konec).toMatchObject({ zavaznost: "admin", problemy: ["Jiný konec okna: MWF 11:59, kalendář 14:00."] });
+    expect(zkontroluj([zak()], [ud({ od: local(2026, 10, 16, 12, 0) })]).vysledky[0]!.problemy).toEqual(["Jiný čas začátku: MWF 10:00, kalendář 12:00."]);
+  });
+
   it("podobnost adres", () => {
     expect(podobnostAdres("Na Strži 1702/65, Praha 4", "Na Strzi 1702/65 Praha")).toBe(1);
     expect(podobnostAdres("Praha, Podolská 348/88", "Podolská 348/88")).toBe(1); // skutečný případ z kalendáře
