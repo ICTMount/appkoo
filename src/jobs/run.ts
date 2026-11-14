@@ -26,6 +26,7 @@ import { delegace } from "../google/delegace.js";
 import { odemkniSync, synchronizujChat, synchronizujKalendare, zamekSync } from "../zdroje/sync.js";
 import { propisKombinaceVsem } from "../gcal/kombinaceKalendar.js";
 import { kalendarApi } from "../gcal/kalendar.js";
+import { kontrolaKalendaru } from "../gcal/kontrolaDb.js";
 
 export type Zavaznost = "INFO" | "WARNING" | "ERROR";
 export type Logger = (severity: Zavaznost, message: string, data?: Record<string, unknown>) => void;
@@ -198,6 +199,15 @@ async function main(): Promise<number> {
           if (p.zakazek) jsonLog("INFO", `Kombinované objednávky v kalendářích: ${p.zakazek} zakázek, ${p.udalosti} událostí, ${p.upraveno} doplněno, ${p.chyby} chyb`, { kombinace_kalendar: p });
         } catch (e) {
           jsonLog("ERROR", `Propsání kombinovaných objednávek do kalendářů selhalo: ${popisChyby(e)}`, { sync_vypadek: "kombinace" });
+        }
+        // zlaté pravidlo č. 1: termíny v MWF a v kalendářích techniků musí být shodné
+        try {
+          const s = await kontrolaKalendaru(db, tedPraha());
+          jsonLog(s.rozpor ? "WARNING" : "INFO", `Kontrola MWF ↔ kalendář (${s.od} až ${s.do}): ${s.zkontrolovano} termínů, shoda ${s.shoda}, rozpor ${s.rozpor}, zápis ${s.admin}, jen v kalendáři ${s.jenVKalendari}, technik bez kalendáře ${s.bezKalendare}`, {
+            kontrola_kalendare: { zkontrolovano: s.zkontrolovano, shoda: s.shoda, rozpor: s.rozpor, admin: s.admin, jen_v_kalendari: s.jenVKalendari, bez_kalendare: s.bezKalendare },
+          });
+        } catch (e) {
+          jsonLog("ERROR", `Kontrola MWF ↔ kalendář selhala: ${popisChyby(e)}`, { sync_vypadek: "kontrola" });
         }
       } catch (e) {
         jsonLog("ERROR", `Synchronizace kalendářů selhala: ${popisChyby(e)}`, { sync_vypadek: "kalendare" });

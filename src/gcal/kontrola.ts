@@ -1,11 +1,12 @@
 // Kontrola MWF ↔ Google Kalendář (zlaté pravidlo č. 1: musí být 100% shodné).
 // Každý dohodnutý termín z MWF se páruje s událostí v kalendáři technika – nejdřív podle
 // skrytého ID zakázky (události vytvořené aplikací), jinak podle čísla O- nebo S7 v textu.
-// Kontroluje se technik, den a čas (tolerance 30 min), adresa (shoda ≥ 80 %) a telefon.
+// Kontroluje se technik, den a čas začátku (tolerance 30 min) jako rozpor; konec okna, zákazník,
+// adresa (shoda ≥ 80 %) a telefon jako administrativní nesoulad (událost je spárovaná podle čísla zakázky).
 // Události „VOLNY“ nejsou zakázky – jsou to volná okna pro plánovač.
 
 import type { Zakazka } from "../import/mwfExport.js";
-import { isoDate, minutesOfDay } from "../domain/time.js";
+import { fmtTime, isoDate, minutesOfDay } from "../domain/time.js";
 import { zakladniCisloObjednavky } from "../domain/slovnik.js";
 import type { Okno } from "../plan/sloty.js";
 
@@ -71,6 +72,19 @@ export function stejnyTechnik(mwf: string, technik: string): boolean {
   return !!t && norm(mwf).includes(t);
 }
 
+const SLOVA_MIMO_JMENO = new Set(["ing", "mgr", "mudr", "judr", "phdr", "rndr", "spol"]);
+
+/**
+ * Je zákazník z MWF v události? MWF píše „Příjmení, Jméno“, kalendář často jen příjmení
+ * („… O-8532577900 Patera SLA …“) – stačí shoda jednoho slova jména (bez diakritiky).
+ */
+export function stejnyZakaznik(mwf: string, text: string): boolean {
+  const slova = (norm(mwf).match(/\p{L}{3,}/gu) ?? []).filter((w) => !SLOVA_MIMO_JMENO.has(w));
+  if (!slova.length) return true; // v MWF jméno není – není s čím porovnat
+  const t = norm(text);
+  return slova.some((w) => new RegExp(`(^|[^\\p{L}])${w}($|[^\\p{L}])`, "u").test(t));
+}
+
 function obsahujeId(u: UdalostTechnika, z: Zakazka): boolean {
   if (u.appkoo) return u.appkoo === z.idAktivity;
   const text = `${u.summary}\n${u.description}`;
@@ -97,7 +111,9 @@ export function zkontroluj(zakazky: Zakazka[], udalosti: UdalostTechnika[]): { v
       sparovane.add(u);
       if (z.technik && !stejnyTechnik(z.technik, u.technik)) rozpor(`Jiný technik: MWF ${z.technik}, kalendář ${u.technik}.`);
       if (isoDate(u.od) !== isoDate(z.termin!.od)) rozpor(`Jiný den: MWF ${isoDate(z.termin!.od)}, kalendář ${isoDate(u.od)}.`);
-      else if (Math.abs(minutesOfDay(u.od) - minutesOfDay(z.termin!.od)) > 30) rozpor("Jiný čas začátku (rozdíl víc než 30 min).");
+      else if (Math.abs(minutesOfDay(u.od) - minutesOfDay(z.termin!.od)) > 30) rozpor(`Jiný čas začátku: MWF ${fmtTime(z.termin!.od)}, kalendář ${fmtTime(u.od)}.`);
+      else if (Math.abs(u.do.getTime() - z.termin!.do.getTime()) > 30 * 60_000) admin(`Jiný konec okna: MWF ${fmtTime(z.termin!.do)}, kalendář ${fmtTime(u.do)}.`);
+      if (z.zakaznik && !stejnyZakaznik(z.zakaznik, `${u.summary}\n${u.description}`)) admin(`Zákazník v události chybí nebo se liší (MWF: ${z.zakaznik}).`);
       const tel = (u.description.match(/TEL:([^\n]*)/i)?.[1] ?? "").replace(/\s/g, "");
       if (!tel) admin("V události chybí telefon (TEL:).");
       // jiné číslo bývá kontaktní osoba (rodina, správce) – upozornit, ne blokovat

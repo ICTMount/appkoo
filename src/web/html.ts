@@ -240,7 +240,7 @@ form.hledani{padding:6px 20px}
 @media (max-width:760px){header .vlevo{display:contents}header nav.zalozky{grid-column:1 / -1;order:2;padding:0;flex-wrap:nowrap;overflow-x:auto}header nav.zalozky a{white-space:nowrap;padding:7px 10px}}
 `;
 
-export type Zalozka = "zakazka" | "technik" | "konfigurace";
+export type Zalozka = "zakazka" | "technik" | "kontrola" | "konfigurace";
 
 /** Stáří posledního exportu MWF: do 1 h zelená, do 2 h oranžová, déle červená */
 const ZDROJ_EXPORTU: Record<string, string> = { email: "e-mail", drive: "Google Drive", upload: "nahráno v aplikaci", cli: "ruční import" };
@@ -385,7 +385,7 @@ export function stranka(titulek: string, uzivatel: string, stav: StavImportu, te
   return `<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulek)} – AppKoo</title><style>${CSS}</style></head><body>
 <header><div class="lista">
-<div class="vlevo"><a class="logo" href="/">AppKoo</a><nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><!--doplnit:${zal === "technik" ? "on" : "off"}--></nav></div>
+<div class="vlevo"><a class="logo" href="/">AppKoo</a><nav class="zalozky"><a href="/" class="${zal === "zakazka" ? "on" : ""}">Plánovat zakázku</a><!--doplnit:${zal === "technik" ? "on" : zal === "kontrola" ? "kontrola" : "off"}--></nav></div>
 <div class="stred">${cerstvost(stav)}</div>
 <div class="vpravo"><nav class="tema" aria-label="Vzhled"><a class="t-light" href="/tema?t=light" title="Světlý">☀ Světlý</a><a class="t-auto" href="/tema?t=auto" title="Podle systému">Auto</a><a class="t-dark" href="/tema?t=dark" title="Tmavý">☾ Tmavý</a></nav>
 <div class="kdo">${esc(uzivatel)}<!--role--></div><!--konfigurace:${zal === "konfigurace" ? "on" : "off"}--></div></div>
