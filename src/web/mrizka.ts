@@ -420,7 +420,7 @@ body{font-variant-numeric:tabular-nums}:focus-visible{outline:2px solid var(--ac
 .ev-b:hover{text-decoration:none;filter:brightness(.93)}
 .ev-b span.ev-n{font-weight:500}
 .ev-st{align-self:flex-start;max-width:100%;flex:none;background:rgba(0,0,0,.45);color:#fff;border-radius:1em;padding:0 .5em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.95em}
-.ev-mesto{background:rgba(255,255,255,.9);color:#111}
+.ev-mesto{background:rgba(255,255,255,.9);color:#111;white-space:normal;overflow-wrap:anywhere;line-height:1.2;padding:.1em .5em;border-radius:.6em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .tip{display:none;position:absolute;width:24em;max-width:60vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.8em 1em;font-size:13px;font-weight:400;line-height:1.5;text-align:left;letter-spacing:.01em}
 .tip-n{display:flex;gap:.6em;align-items:flex-start;font-size:15px;font-weight:400}
 .tip-n i{flex:none;width:.9em;height:.9em;border-radius:3px;margin-top:.3em}
@@ -569,7 +569,7 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       ? `<div class="r">Přejezd ${b.prejezd.zVyjezdu ? "z výjezdu technika" : "z předchozí zakázky"}: <b>${km(b.prejezd.km)}</b>${b.prejezd.min != null ? `, asi ${Math.round(b.prejezd.min)} min` : ""}</div>`
       : b.vlozeni ? `<div class="r">S touto zakázkou: ${b.vlozeni.predVyjezd ? "z výjezdu" : "z předchozí zakázky"} <b>${km(b.vlozeni.pred)}</b>, ${b.vlozeni.poVyjezd ? "zpět na výjezd" : "na další zakázku"} <b>${km(b.vlozeni.po)}</b></div>` : "";
     // přejezd je vždy úplně dole v okně události (vpravo dole, i u krátkých bloků)
-    const obsah = `${typ}<span class="ev-n">${esc(b.typ && b.bezTypu ? b.bezTypu : b.nazev)}</span><span>${esc(b.cas)}</span>${mesto}${b.ulice && !b.volny ? `<span>${esc(b.ulice)}</span>` : ""}${znak || prejezd ? `<span class="ev-dole">${znak || "<i></i>"}${prejezd}</span>` : ""}`;
+    const obsah = `${typ}${mesto}<span class="ev-n">${esc(b.typ && b.bezTypu ? b.bezTypu : b.nazev)}</span><span>${esc(b.cas)}</span>${b.ulice && !b.volny ? `<span>${esc(b.ulice)}</span>` : ""}${znak || prejezd ? `<span class="ev-dole">${znak || "<i></i>"}${prejezd}</span>` : ""}`;
     const styl = `background:${b.bg};color:${b.fg}`;
     const telo = cil
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
