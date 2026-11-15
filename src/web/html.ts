@@ -228,15 +228,17 @@ form.vyber-tech button:hover,form.filtr button:hover{background:var(--line)}
 form.hledani>button{font-weight:600}
 th{letter-spacing:0}.card.kompakt h2,.notif h3{text-transform:none;letter-spacing:0}
 @media (min-width:761px){
-header .lista{display:flex;align-items:center;gap:20px;padding:6px 20px}
+header .lista{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:20px;padding:6px 20px}
 header .vlevo{display:flex;align-items:center;gap:16px;flex:1 1 auto;min-width:0}
 header .logo{font-size:18px;letter-spacing:-.01em}
 header nav.zalozky{padding:0;gap:4px;flex-wrap:nowrap}header nav.zalozky a{padding:7px 12px;font-size:14px;white-space:nowrap}
 header .stred{flex:0 1 auto;min-width:0}header .stred .export{min-width:0;gap:4px;white-space:nowrap}
 header .export .soubor{display:none}header .bar{height:4px;margin-top:0}header .bar span{top:-3px;height:10px}
-header .vpravo{flex:none;flex-direction:row;align-items:center;gap:12px}
+header .vpravo{flex-direction:row;align-items:center;justify-content:flex-end;justify-self:end;gap:12px;min-width:0}header .stred{justify-self:center}header .vpravo>*{white-space:nowrap}header .tema a{white-space:nowrap}
 form.hledani{padding:6px 20px}
 }
+/* užší okno: stav exportu má vlastní řádek, pořád uprostřed */
+@media (min-width:761px) and (max-width:1400px){header .lista{grid-template-columns:1fr auto;row-gap:4px}header .stred{grid-column:1 / -1;grid-row:2}}
 /* ── Formulář zápisu a Konfigurace: klidná plocha, jednotná pole, popisky v jednom sloupci ──────────
    Povinné pole značí tečka u popisku; oranžový rámeček má jen dokud je prázdné (po vyplnění zmizí). */
 section.planovani{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:12px;box-shadow:none}
