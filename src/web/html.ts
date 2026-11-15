@@ -237,6 +237,53 @@ header .export .soubor{display:none}header .bar{height:4px;margin-top:0}header .
 header .vpravo{flex:none;flex-direction:row;align-items:center;gap:12px}
 form.hledani{padding:6px 20px}
 }
+/* ── Formulář zápisu a Konfigurace: klidná plocha, jednotná pole, popisky v jednom sloupci ──────────
+   Povinné pole značí tečka u popisku; oranžový rámeček má jen dokud je prázdné (po vyplnění zmizí). */
+section.planovani{border:1px solid color-mix(in srgb,var(--accent) 40%,var(--line));border-radius:12px;box-shadow:none}
+section.planovani>h2{font-size:18px;letter-spacing:-.01em}
+.zapis-slot{border-radius:10px;padding:10px 14px}
+.zapis-sekce .gc-karta,.zapis-sekce .gc-den,.gc-karta,.gc-den{border-radius:12px;box-shadow:none}
+.gc-karta{padding:20px 24px 18px}.zapis-sekce .gc-nadpis{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.gc-barva{margin-top:4px;border-radius:5px}.gc-blok{padding:14px 0}
+.gc-popis{line-height:1.45}
+.gc-radek{position:relative;padding:5px 0 5px 300px;margin:0;border:0;border-radius:0;border-bottom:1px solid var(--line);min-height:42px;gap:6px 8px;background:none}
+.gc-popis>.gc-radek:last-child,.gc-nestd .gc-radek{border-bottom:0}
+.gc-radek>.gc-stitek{position:absolute;left:0;top:0;width:288px;min-height:41px;display:flex;align-items:center;font-weight:500;letter-spacing:0;color:var(--muted)}
+.gc-povinne{background:none}.gc-povinne>.gc-stitek{color:var(--text);font-weight:600;padding-left:14px}
+.gc-povinne>.gc-stitek::before{content:"";position:absolute;left:0;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:#e65100}
+.gc-volitelne{color:var(--text)}.gc-volitelne>.gc-stitek{color:var(--muted);font-weight:400}
+.gcal input:not([type=checkbox]):not([type=radio]):not([type=hidden]),.gcal select,.gcal input.gc-ram,.gc-povinne input,.gc-povinne select,.gc-volitelne input,.gc-volitelne select{height:32px;box-sizing:border-box;padding:0 10px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text)}
+.gcal select{padding-right:6px}
+.gcal input:hover,.gcal select:hover{border-color:var(--muted)}
+.gcal input:focus,.gcal select:focus,.gcal textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.gcal .gc-popis input[name=patro]:placeholder-shown:not(:focus),.gcal .gc-popis input[name=byt]:placeholder-shown:not(:focus),.gcal .gc-popis input[name=umisteni]:placeholder-shown:not(:focus),.gcal .gc-popis input.gc-ram:placeholder-shown:not(:focus),.gcal .gc-popis .gc-povinne select:has(option[value=""]:checked):not(:focus){border-color:#e65100}
+.gcal input,.gcal select{max-width:100%}
+.gc-flex label.volba{position:relative;height:32px;box-sizing:border-box;padding:0 12px;border-radius:8px;gap:6px}
+.gc-flex label.volba input{position:absolute;opacity:0;pointer-events:none}
+.gc-flex label.volba:has(input:checked){background:var(--sel-bg);border-color:transparent;color:var(--sel-fg);font-weight:600}
+.gc-flex label.volba:has(input:checked) small{color:inherit;opacity:.75;font-weight:400}
+.gc-flex label.volba:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:1px}
+.gc-predpis{padding-left:0;min-height:0;padding-top:12px}.gc-predpis>.gc-stitek{position:static;width:auto;min-height:0;color:var(--text);font-weight:600;margin-bottom:6px}
+.gc-predpis textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel);color:var(--text)}
+.gc-nestd{border:0;padding:0;margin:0 0 12px}.gc-nestd>label{color:var(--muted);font-size:13px}
+.gc-nestd:has(input[name=nestandard]:checked){border:1px solid #c62828;border-radius:10px;padding:10px 12px}
+.gc-nestd .gc-radek{padding-left:0;min-height:0}.gc-nestd .gc-radek>.gc-stitek{position:static;width:auto;min-height:0}
+.gcal label.check{display:flex;align-items:flex-start;gap:8px;padding:5px 0;line-height:1.4}.gcal label.check input{margin-top:3px;flex:none}
+.gc-pata{padding-top:16px}.gc-pata .btn{min-height:40px;padding:0 20px;font-size:14px;font-weight:700;border-radius:8px}
+.gc-legenda{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0 0 4px}.gc-legenda i{width:7px;height:7px;border-radius:50%;background:#e65100}
+@media (max-width:900px){.gc-radek{padding-left:0;min-height:0;padding-top:8px;padding-bottom:8px}.gc-radek>.gc-stitek{position:static;width:100%;min-height:0}}
+/* Konfigurace */
+.uzky{max-width:1180px}
+.btn.maly{padding:4px 10px;font-size:12.5px}
+td.akce{text-align:right;white-space:nowrap;vertical-align:middle}td.akce .btn{margin-left:6px}
+.odkazy{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:16px 0}
+.odkazy a{display:block;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text)}
+.odkazy a:hover{border-color:var(--accent);text-decoration:none}.odkazy b{display:block;color:var(--accent);margin-bottom:2px}.odkazy span{color:var(--muted);font-size:13px}
+ol.postup{margin:0;padding-left:20px;color:var(--muted);font-size:13px;line-height:1.7}
+input[type=file]{font:inherit;font-size:13px;color:var(--muted);max-width:100%;border:0;padding:0;background:none}
+input[type=file]::file-selector-button{font:inherit;font-weight:600;margin-right:10px;padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);cursor:pointer}
+input[type=file]::file-selector-button:hover{background:var(--line)}
+.radek-akci{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0}
 @media (max-width:760px){header .vlevo{display:contents}header nav.zalozky{grid-column:1 / -1;order:2;padding:0;flex-wrap:nowrap;overflow-x:auto}header nav.zalozky a{white-space:nowrap;padding:7px 10px}}
 `;
 
@@ -886,7 +933,8 @@ export function strankaZapisu(
 </div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.misto}</span><div class="gc-misto">${esc(misto)}</div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.popis}</span><div class="gc-popis">
-${r("ZAKÁZKA:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>${z.predobjednavka ? `${predobjStitek(z)} <span class="gc-mezi muted">– v kalendáři s předponou RFS${z.rfs ? `, RFS ${esc(den(z.rfs))}` : ""}</span>` : ""}`)}
+<div class="gc-legenda"><i></i> povinný údaj – oranžový rámeček zmizí po vyplnění</div>
+${r("Zakázka:", `<span>${esc(z.idObjednavkyZaklad)}${z.idS7 ? ` · S7 ${esc(z.idS7)}` : ""}</span>${z.predobjednavka ? `${predobjStitek(z)} <span class="gc-mezi muted">– v kalendáři s předponou RFS${z.rfs ? `, RFS ${esc(den(z.rfs))}` : ""}</span>` : ""}`)}
 ${z.predobjednavka ? r("", `<input name="popisZakaznika" class="gc-ram" placeholder="Popis od zákazníka" value="${h("popisZakaznika")}" size="70">`, "povinne") : ""}
 ${r("Tel:", `<span>${esc(z.telefony.join(", ")) || "–"}</span> <input name="kontakt" placeholder="Pokud bude u instalace jiná osoba – telefon, vztah, jméno" value="${h("kontakt")}" size="54">`)}
 <div class="gc-radek gc-povinne gc-flex"><span class="gc-stitek">Flex:</span>
@@ -906,7 +954,7 @@ ${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <s
 ${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`, "volitelne")}
 ${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`, "volitelne")}
 ${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`, "volitelne")}
-<div class="gc-radek gc-predpis"><span class="gc-stitek">INSTALAČNÍ PŘEDPIS:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${zPdf && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
+<div class="gc-radek gc-predpis"><span class="gc-stitek">Instalační předpis:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${zPdf && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
 </div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.potvrzeni}</span><div>
 ${[...POVINNA_POTVRZENI, ...potvrzeniZakazky(z, vyb.od)].map((p) => `<label class="check"><input type="checkbox" name="${p.pole}" value="ano"${hodnoty.get(p.pole) === "ano" ? " checked" : ""}> ${esc(p.text)}</label>`).join("")}

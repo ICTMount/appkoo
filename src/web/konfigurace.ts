@@ -90,13 +90,15 @@ export function strankaKonfigurace(prehled: PrehledCiselniku[], stav: StavImport
     return `<tr><td><a href="/konfigurace/${p.id}"><b>${esc(def.nazev)}</b></a><br><small class="muted">${esc(POPIS[p.id] ?? "")}</small></td>
 <td class="nowrap">${p.aktivnich}${p.celkem !== p.aktivnich ? ` <small class="muted">(+${p.celkem - p.aktivnich} neaktivních)</small>` : ""}</td>
 <td class="nowrap">${p.posledni ? `${esc(praha(p.posledni.kdy))}<br><small class="muted">${esc(p.posledni.zmenil)}</small>` : `<span class="muted">–</span>`}</td>
-<td class="nowrap"><a href="/konfigurace/${p.id}">upravit</a> · <a href="/konfigurace/${p.id}/csv">stáhnout CSV</a></td></tr>`;
+<td class="nowrap akce"><a class="btn sekundarni maly" href="/konfigurace/${p.id}">Upravit</a><a class="btn sekundarni maly" href="/konfigurace/${p.id}/csv">Stáhnout CSV</a></td></tr>`;
   });
-  const telo = `<h1>Konfigurace <small>číselníky a uživatelé – změny přes CSV s náhledem, každá změna se zapisuje do historie</small></h1>
+  const telo = `<div class="uzky"><h1>Konfigurace <small>číselníky a uživatelé – změny přes CSV s náhledem, každá změna se zapisuje do historie</small></h1>
 <div class="tbl"><table><thead><tr><th>Číselník</th><th>Položek</th><th>Poslední změna</th><th></th></tr></thead><tbody>${radky.join("")}</tbody></table></div>
-<p><a href="/konfigurace/notifikace"><b>Notifikační PDF →</b></a> <span class="muted">co se načetlo ze složky na Drive, chyby, spárování se zakázkami</span></p>
-<p><a href="/konfigurace/log"><b>Historie uživatelů →</b></a> <span class="muted">kdo co v aplikaci dělal (hledání, zakázky, zápisy do kalendáře, Konfigurace)</span></p>
-<p class="muted">Postup: stáhněte CSV → upravte v Excelu (uložit jako „CSV UTF-8 (oddělený středníkem)“) → nahrajte → zkontrolujte náhled → Uložit.</p>`;
+<div class="odkazy">
+<a href="/konfigurace/notifikace"><b>Notifikační PDF</b><span>co se načetlo ze složky na Drive, chyby, spárování se zakázkami</span></a>
+<a href="/konfigurace/log"><b>Historie uživatelů</b><span>kdo co v aplikaci dělal (hledání, zakázky, zápisy do kalendáře, Konfigurace)</span></a>
+</div>
+<div class="card"><h2>Jak změnit číselník</h2><ol class="postup"><li>Stáhněte CSV.</li><li>Upravte ho v Excelu a uložte jako „CSV UTF-8 (oddělený středníkem)“.</li><li>Nahrajte soubor a zkontrolujte náhled změn.</li><li>Potvrďte tlačítkem Uložit.</li></ol></div></div>`;
   return stranka("Konfigurace", uzivatel, stav, telo, { zalozka: "konfigurace" });
 }
 
@@ -134,7 +136,7 @@ ${zprava ? `<div class="ok">${esc(zprava)}</div>` : ""}
 <form method="post" action="/konfigurace/${id}/nahled" enctype="multipart/form-data">
 <p><input type="file" name="soubor" accept=".csv,text/csv" required></p>
 <label class="check"><input type="checkbox" name="nahradit" value="ano"> Položky, které v CSV chybí, deaktivovat (jinak zůstanou beze změny)</label>
-<p><button class="btn">Zobrazit náhled změn</button> · <a href="/konfigurace/${id}/csv">stáhnout aktuální CSV</a></p>
+<div class="radek-akci"><button class="btn">Zobrazit náhled změn</button><a class="btn sekundarni" href="/konfigurace/${id}/csv">Stáhnout aktuální CSV</a></div>
 </form>
 <p class="muted">Nic se neuloží, dokud náhled nepotvrdíte. Na pořadí sloupců nezáleží; chybějící sloupec u existujících řádků zůstane beze změny.</p></div>
 <div class="card"><h2>Sloupce</h2><table class="male"><tbody>${napovedaSloupcu(def)}</tbody></table><p class="muted">* povinné</p></div>
