@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parsujKz, parsujNotifikaci, parsujOddily, parsujZariadenia } from "../src/ingest/notifikace.js";
 import { kVytvoreni, parsujPriebeh, radekPriebehu, textBunky } from "../src/ingest/priebeh.js";
+import { textNotifikace } from "../src/web/html.js";
 
 // Výřez textu notifikačního PDF (pdftotext -layout) pro O-8555864483_22243701#1-DDWX4YA
 const TEXT = `                                                  CZ_CETIN_Instalace přístupu FTTH
@@ -174,5 +175,27 @@ Zoznam KZ:
     const w = (text: string, y: number) => ({ text, x: 10, y, yMin: y - 4, yMax: y + 4, xMin: 5, xMax: 15 });
     expect(textBunky([w("SPP:00", 10), w("0221:P", 20), w("H:Stein", 30), w("erova", 40), w("1", 50)])).toBe("SPP:000221:PH:Steinerova 1");
     expect(textBunky([w("Ponech", 10), w("ať", 20)])).toBe("Ponechať");
+  });
+});
+
+describe("text pro Instalační předpis ve formuláři zápisu", () => {
+  it("nese stejné údaje jako karta Notifikační PDF – předpisy po službách, zařízení, CPE Mode", () => {
+    const t = textNotifikace({
+      nazev: "x.pdf", souborId: "1", vznik: new Date("2026-11-10T00:00:00Z"), priebeh: [], predpis: [], cpeMode: "ROUTE", zoznam: "ZTE F6600",
+      oddily: [
+        { sluzba: "IPTV", pozadavek: "1-CR59112", predpis: ["1. Typ: tvoi"], tv: { ucet: "tv123456", balicek: "Magenta TV M" } },
+        { sluzba: "FTTH", pozadavek: "1-CR59111", predpis: ["1. Typ instalace: optic"] },
+      ],
+      zariadenia: [
+        { typ: "ONT", subtyp: "", aktivita: "Add", doruceni: "", model: "ZTE F6600", druh: "ont" },
+        { typ: "AP", subtyp: "Mesh", aktivita: "Add", doruceni: "technik", model: "Sercomm", druh: "mesh" },
+        { typ: "AP", subtyp: "Mesh", aktivita: "Add", doruceni: "technik", model: "Sercomm", druh: "mesh" },
+      ],
+    } as never);
+    expect(t.indexOf("Inštalačný predpis k – FTTH")).toBeLessThan(t.indexOf("Inštalačný predpis k – IPTV")); // FTTH je nadřazená služba
+    expect(t).toContain("IPTV účet tv123456, balíček Magenta TV M (heslo je v PDF)");
+    expect(t).toContain("2× AP (Mesh) · Sercomm");
+    expect(t).toContain("CPE Mode: ROUTE");
+    expect(t).not.toContain("Zoznam kompatibilných zariadení"); // jen když chybí rozpis zařízení
   });
 });

@@ -113,7 +113,7 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin
 .gc-flex label.volba{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-size:13px;cursor:pointer}.gc-flex label.volba small{color:var(--muted)}.gc-flex label.volba:has(input:checked){border-color:#e65100;background:#e65100;color:#fff}.gc-flex label.volba:has(input:checked) small{color:#ffe0c2}.gc-flex input[type=radio]{margin:0;accent-color:#e65100}.gc-vedlejsi .gc-stitek{font-weight:500;color:var(--muted)}
 .gcal input,.gcal select{padding:2px 6px;font-size:13px;border-radius:4px;background:transparent;border:1px solid transparent;border-bottom:1px solid var(--line)}
 .gcal input:hover,.gcal select:hover,.gcal input:focus,.gcal select:focus{border-color:var(--line);background:var(--panel)}
-.gc-predpis{align-items:flex-start;flex-direction:column;margin-top:6px}.gc-predpis textarea{min-height:140px;font-size:13px;line-height:1.5}
+.gc-predpis{align-items:flex-start;flex-direction:column;margin-top:6px}.gc-predpis textarea{min-height:220px;font-size:13px;line-height:1.5}
 .gc-pata{padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
 .zapis-sekce>h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px}.zapis-sekce>h2 small a{color:inherit}.zapis-zpet{margin-left:auto;display:flex;gap:8px;font-size:13px;font-weight:400}.btn.sekundarni{background:var(--panel);color:var(--text);border:1px solid var(--line);font-weight:500}
 .zapis-info{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:-4px 0 10px;font-size:14px}.zapis-slot{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:12px}
@@ -520,6 +520,43 @@ function zarizeniNotifikace(z: NonNullable<Detail["notifikace"]>["zariadenia"]):
   return `<ul class="predpis">${[...skupiny.values()].map(({ n, x }) => `<li>${n > 1 ? `<b>${n}×</b> ` : ""}${x.druh === "mesh" || x.druh === "stb" ? `<b>${esc(x.typ)}</b>` : esc(x.typ)}${x.subtyp ? ` (${esc(x.subtyp)})` : ""}${x.model ? ` · ${esc(x.model)}` : ""}${x.aktivita && !/^add$/i.test(x.aktivita) ? ` · ${esc(x.aktivita)}` : ""}${x.doruceni ? ` · ${privezeTechnik(x.doruceni) ? "přiveze technik" : `doručení: ${esc(x.doruceni)}`}` : ""}</li>`).join("")}</ul>`;
 }
 
+/**
+ * Tytéž údaje jako karta Notifikační PDF, jen jako prostý text – předvyplní „Instalační předpis“ ve formuláři zápisu
+ * (a odtud jde do popisu události v kalendáři). Heslo k IPTV účtu se nepřenáší, zůstává jen v PDF.
+ */
+export function textNotifikace(n: NonNullable<Detail["notifikace"]>): string {
+  const casti: string[] = [];
+  if (n.priebeh?.length) {
+    const v = kVytvoreni(n.priebeh);
+    casti.push(`Priebeh optický – akce technika:\n${v.length ? v.map(radekPriebehu).join("\n") : `vše Ponechať (${n.priebeh.length} linek, žádná akce NEW / Vytvoriť)`}`);
+  }
+  const oddily = n.oddily ?? [];
+  if (oddily.length < 2) {
+    if (n.predpis.length) casti.push(`Inštalačný predpis k:\n${n.predpis.join("\n")}`);
+  } else {
+    for (const o of [...oddily].sort((a, b) => (a.sluzba === "FTTH" ? 0 : 1) - (b.sluzba === "FTTH" ? 0 : 1))) {
+      const tv = o.tv ? `IPTV účet ${o.tv.ucet}${o.tv.balicek ? `, balíček ${o.tv.balicek}` : ""} (heslo je v PDF)\n` : "";
+      casti.push(`Inštalačný predpis k – ${o.sluzba}${o.sluzba !== "FTTH" ? " (část kombinované objednávky)" : ""}, prac. požadavek ${o.pozadavek}:\n${tv}${o.predpis.length ? o.predpis.join("\n") : "v PDF chybí"}`);
+    }
+  }
+  const kz: string[] = [];
+  if (n.zariadenia?.length) {
+    const skupiny = new Map<string, { n: number; x: NonNullable<typeof n.zariadenia>[number] }>();
+    for (const x of n.zariadenia) {
+      const k = [x.aktivita, x.typ, x.subtyp, x.model, x.doruceni].join("|");
+      const g = skupiny.get(k);
+      if (g) g.n++;
+      else skupiny.set(k, { n: 1, x });
+    }
+    for (const { n: pocet, x } of skupiny.values())
+      kz.push(`${pocet > 1 ? `${pocet}× ` : ""}${x.typ}${x.subtyp ? ` (${x.subtyp})` : ""}${x.model ? ` · ${x.model}` : ""}${x.aktivita && !/^add$/i.test(x.aktivita) ? ` · ${x.aktivita}` : ""}${x.doruceni ? ` · ${privezeTechnik(x.doruceni) ? "přiveze technik" : `doručení: ${x.doruceni}`}` : ""}`);
+  }
+  if (n.cpeMode) kz.push(`CPE Mode: ${n.cpeMode}`);
+  if (!n.zariadenia?.length && n.zoznam) kz.push(`Zoznam kompatibilných zariadení: ${n.zoznam}`);
+  if (kz.length) casti.push(`Zoznam KZ:\n${kz.join("\n")}`);
+  return casti.join("\n\n");
+}
+
 /** Výpis z notifikačního PDF z MWF: „Inštalačný predpis k“ celý, ze „Zoznam KZ“ jen CPE Mode a kompatibilní zařízení */
 export function sekceNotifikace(n: Detail["notifikace"]): string {
   const odkaz = n ? `<a href="https://drive.google.com/file/d/${encodeURIComponent(n.souborId)}/view" target="_blank" rel="noopener">PDF</a>` : "";
@@ -896,18 +933,11 @@ export function strankaZapisu(
   const z = d.z;
   const h = (n: string) => esc(hodnoty.get(n) ?? "");
   const v = (n: string, moznosti: [string, string][], vychozi = "") => vyber(n, moznosti, hodnoty.get(n) ?? vychozi);
-  // instalační předpis: předvyplnit vším z notifikačního PDF (předpis, KZ, akce technika z Priebeh optický)
+  // instalační předpis: předvyplnit stejnými údaji, jaké ukazuje karta Notifikační PDF v detailu zakázky
   const n = d.notifikace;
-  const zPdf = n
-    ? [
-        n.priebeh?.length ? `Priebeh optický:\n${kVytvoreni(n.priebeh).length ? kVytvoreni(n.priebeh).map(radekPriebehu).join("\n") : "vše Ponechať"}` : "",
-        n.predpis.length ? `Inštalačný predpis:\n${n.predpis.join("\n")}` : "",
-        n.cpeMode || n.zoznam ? `Zoznam KZ:\nCPE Mode ${n.cpeMode ?? "?"}${n.zoznam ? ` · ${n.zoznam}` : ""}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n")
-    : "";
-  const predpis = hodnoty.get("predpis") ?? zPdf;
+  const zPdf = n ? textNotifikace(n) : "";
+  // prázdné pole se vždy doplní z PDF (i po návratu formuláře s chybou); ruční úpravy koordinátorky zůstávají
+  const predpis = (hodnoty.get("predpis") ?? "").trim() ? hodnoty.get("predpis")! : zPdf;
   const flex = hodnoty.get("flex") ?? "ne";
   // předpojen: když v Priebeh optický není žádná akce technika (vše Ponechať), je přípojka předpojená
   const predpojenZPdf = n?.priebeh?.length ? (kVytvoreni(n.priebeh).length ? "ne" : "ano") : "";
@@ -956,7 +986,7 @@ ${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <s
 ${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`, "volitelne")}
 ${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`, "volitelne")}
 ${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`, "volitelne")}
-<div class="gc-radek gc-predpis"><span class="gc-stitek">Instalační předpis:</span><textarea name="predpis" placeholder="zkopírovat z ticketu">${esc(predpis)}</textarea>${zPdf && !hodnoty.get("predpis") ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
+<div class="gc-radek gc-predpis"><span class="gc-stitek">Instalační předpis:</span><textarea name="predpis" placeholder="${n ? "v notifikačním PDF nejsou žádné údaje – zkopírovat z ticketu" : "notifikační PDF k této aktivitě zatím nedorazilo – zkopírovat z ticketu"}">${esc(predpis)}</textarea>${zPdf && predpis === zPdf ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
 </div></div>
 <div class="gc-blok"><span class="gc-ikona">${IKONA_GC.potvrzeni}</span><div>
 ${[...POVINNA_POTVRZENI, ...potvrzeniZakazky(z, vyb.od)].map((p) => `<label class="check"><input type="checkbox" name="${p.pole}" value="ano"${hodnoty.get(p.pole) === "ano" ? " checked" : ""}> ${esc(p.text)}</label>`).join("")}
