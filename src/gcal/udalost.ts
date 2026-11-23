@@ -32,7 +32,11 @@ export interface UdajeHovoru {
   souhlasSVrtanim?: boolean | null;
   umisteniKz?: string;
   elZasuvka?: boolean | null;
-  kz?: string; // ROUTE / BRIDGE + STB
+  kz?: string; // mode ROUTE / BRIDGE · typ KZ + STB
+  /** záfuk: ZB (adresa nebo GPS), odhad vzdálenosti chůzí ZB → adresa instalace v metrech a způsob výpočtu */
+  zb?: string;
+  zafukM?: number | null;
+  zafukZpusob?: string;
   predpojen?: boolean | null;
   podb?: string;
   instalacniPredpis?: string;
@@ -101,6 +105,7 @@ export function sestavUdalost(
     `KONCOVÉ ZAŘÍZENÍ UMÍSTÍME V: ${h.umisteniKz ?? "dle konzultace s technikem"} – EL. ZÁSUVKA: ${ano(h.elZasuvka)}`,
     `KZ: ${h.kz ?? (z.balik || "?")}`,
     `PŘEDPOJEN: ${ano(h.predpojen)}`,
+    ...(h.zb || h.zafukM != null ? [`ZÁFUK – ODHAD VZDÁLENOSTI: ${h.zafukM != null ? `cca ${h.zafukM} m` : "?"}${h.zb ? ` (ZB ${h.zb} → adresa instalace${h.zafukZpusob ? `; ${h.zafukZpusob}` : ""})` : ""}`] : []),
     ...(z.infrastruktura === "TMCZ" ? [`PODB (adresa): ${h.podb ?? ""}`] : []),
     ...(h.caseid ? [`CASEID: ${h.caseid}`] : []),
     ...((p) => (p ? [radekUdalostiPredRfs(p)] : []))(instalacePredRfs(z, od)),

@@ -77,7 +77,9 @@ export function udajeZFormulare(f: URLSearchParams): UdajeHovoru {
   const stoupacka = f.get("stoupacka");
   const listy = f.get("listy");
   const vzd = f.get("vzdalenost");
-  const kz = [f.get("kz"), text(f.get("stb")) ? `+ STB ${text(f.get("stb"))}` : ""].filter(Boolean).join(" ");
+  // KZ: mode (ROUTE / BRIDGE) · typ zařízení + STB
+  const kz = [f.get("kz"), text(f.get("kzTyp")) ? `· typ ${text(f.get("kzTyp"))}` : "", text(f.get("stb")) ? `+ STB ${text(f.get("stb"))}` : ""].filter(Boolean).join(" ");
+  const zafukM = text(f.get("zafukM"));
   return {
     novaInstalace: f.get("instalace") === "existujici" ? false : f.get("instalace") === "nova" ? true : undefined,
     zasuvka: text(f.get("zasuvka")),
@@ -97,6 +99,9 @@ export function udajeZFormulare(f: URLSearchParams): UdajeHovoru {
     elZasuvka: anoNe(f.get("elZasuvka")),
     kz: kz || undefined,
     predpojen: anoNe(f.get("predpojen")),
+    zb: text(f.get("zb")),
+    zafukM: zafukM && Number.isFinite(Number(zafukM)) ? Number(zafukM) : null,
+    zafukZpusob: text(f.get("zafukInfo")),
     podb: text(f.get("podb")),
     instalacniPredpis: text(f.get("predpis")),
     caseid: text(f.get("caseid")),

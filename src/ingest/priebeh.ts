@@ -179,6 +179,16 @@ export const kVytvoreni = (radky: RadekPriebehu[]) =>
     return a ? /^(new|vytvor)/i.test(a) : /vytvor/i.test(r.zAkcia.replace(/\s+/g, ""));
   });
 
+/**
+ * Předpojeno / nepředpojeno z tabulky Priebeh optický: poslední řádek (socket – zásuvka u zákazníka) se nepočítá,
+ * rozhodují všechny řádky před ním. Žádná akce technika (NEW / Vytvoriť) v nich = předpojeno.
+ * Tabulka s jediným řádkem nemá co posoudit → null (neví se).
+ */
+export function predpojenoZPriebehu(radky: RadekPriebehu[] | null | undefined): boolean | null {
+  if (!radky || radky.length < 2) return null;
+  return kVytvoreni(radky.slice(0, -1)).length === 0;
+}
+
 /** XHTML s pozicemi slov (`pdftotext -bbox-layout`) */
 export function bboxZPdf(pdf: Buffer): Promise<string> {
   return new Promise((resolve, reject) => {

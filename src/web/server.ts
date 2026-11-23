@@ -50,6 +50,7 @@ import { kombinaceZakazky, popisKombinace, zkratkaKombinace } from "../domain/ko
 import { sestavUdalost } from "../gcal/udalost.js";
 import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
+import { googleChuze, type Chuze } from "../plan/chuze.js";
 import { slaKonec } from "../plan/kpi.js";
 import { webcalendar } from "../domain/webcalendar.js";
 import { geokodujVse, kontrolaBran, nabidniProZakazku, nejdrivePodleRfs, nactiKalendare, najdiTerminVKalendari, zapomenKalendar, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
@@ -81,6 +82,8 @@ export interface NastaveniWebu {
   /** kalendáře, geokódování a vzdálenosti pro nabídku termínů (vytvoří se při prvním použití) */
   planovac?: () => ZavislostiPlanovace | Promise<ZavislostiPlanovace>;
   zapis?: { zapnuty: boolean; technici: string[] | "vsichni" };
+  /** vzdálenost chůzí ZB → adresa instalace (záfuk) */
+  chuze?: Chuze;
   /** e-mail, kalendáře a chat (pilíř 1 – hledání ve všech zdrojích) */
   zdroje?: () => ZavislostiZdroju;
   /** správci (e-maily) – vždy role správce, i když nejsou v číselníku Uživatelé */
@@ -450,6 +453,20 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
 
         // zapis: GET = formulář, POST = zápis do kalendáře
         const formular = req.method === "POST" ? await ctiFormular(req) : url.searchParams;
+        // záfuk: tlačítko „Spočítat vzdálenost“ vrátí formulář (GET) a doplní metry chůzí ZB → adresa instalace
+        const zbText = (formular.get("zb") ?? "").trim();
+        if (req.method === "GET" && formular.get("spocitat") === "1" && /zafuk/i.test(detail.z.typAktivity)) {
+          formular.delete("spocitat");
+          if (zbText && n.chuze) {
+            const cil = [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
+            const v = await n.chuze(zbText, cil).catch(() => null);
+            if (v) {
+              formular.set("zafukM", String(v.metry));
+              formular.set("zafukInfo", v.zpusob === "chuze" ? "trasa chůzí, Google" : "odhad vzdušnou čarou × 1,3 – trasu chůzí se nepodařilo spočítat");
+              if (v.poznamka) console.log(JSON.stringify({ severity: "WARNING", message: `Záfuk: trasa chůzí nedostupná, použit odhad (${v.poznamka})`, objednavka: detail.z.idObjednavky }));
+            } else formular.set("zafukInfo", "vzdálenost se nepodařilo spočítat – zkontrolujte ZB, nebo zadejte metry ručně");
+          } else formular.set("zafukInfo", zbText ? "výpočet vzdálenosti není v této instalaci zapnutý" : "nejdřív vyplňte ZB");
+        }
         const vyb0 = vybranySlot(formular);
         const presun = presunZParametru(formular);
         // pp = doplnit / přeplánovat bez původní události v kalendáři (např. webcalendar: termín je jen v MWF)
@@ -973,6 +990,7 @@ function main() {
           return (idAktivity, klice) => dohledejNotifikaci(db, drive, env.NOTIFIKACE_SLOZKA!, idAktivity, klice);
         })()
       : undefined,
+    chuze: googleChuze(sCache(db, googleGeokoder())),
     planovac: (() => {
       // Kalendáře techniků jménem tmcz01 (delegace) – odpadá sdílení každého kalendáře servisnímu účtu.
       // Bez delegace čte a zapisuje servisní účet sám (kalendáře mu musí být nasdílené).

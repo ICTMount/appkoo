@@ -2,7 +2,7 @@
 // Zakázka se vždy označuje ID O- (ID obj. v ext. systému); S7 je doplňkové.
 
 import { addDays, fmtDate, fmtTime, isoDate } from "../domain/time.js";
-import { kVytvoreni, radekPriebehu } from "../ingest/priebeh.js";
+import { predpojenoZPriebehu, kVytvoreni, radekPriebehu } from "../ingest/priebeh.js";
 import type { Priorita } from "../domain/priorita.js";
 import type { Detail, PolozkaFronty, StavImportu } from "./data.js";
 import { pokusyZakazky } from "./data.js";
@@ -939,8 +939,15 @@ export function strankaZapisu(
   // prázdné pole se vždy doplní z PDF (i po návratu formuláře s chybou); ruční úpravy koordinátorky zůstávají
   const predpis = (hodnoty.get("predpis") ?? "").trim() ? hodnoty.get("predpis")! : zPdf;
   const flex = hodnoty.get("flex") ?? "ne";
-  // předpojen: když v Priebeh optický není žádná akce technika (vše Ponechať), je přípojka předpojená
-  const predpojenZPdf = n?.priebeh?.length ? (kVytvoreni(n.priebeh).length ? "ne" : "ano") : "";
+  // předpojen: poslední řádek Priebeh optický (socket) se nepočítá; bez akce technika v řádcích před ním = předpojeno
+  const predpojenZPdf = ((p) => (p === null ? "" : p ? "ano" : "ne"))(predpojenoZPriebehu(n?.priebeh));
+  // KZ z notifikačního PDF: mode (ROUTE / BRIDGE), typ = modely zařízení mimo mesh a set-top boxy, STB = set-top boxy
+  const zar = n?.zariadenia ?? [];
+  const modely = (druh: (d: string) => boolean) => [...new Set(zar.filter((x) => druh(x.druh ?? "")).map((x) => x.model || x.typ).filter(Boolean))].join(", ");
+  const kzModeZPdf = /bridge/i.test(n?.cpeMode ?? "") ? "BRIDGE" : /rout/i.test(n?.cpeMode ?? "") ? "ROUTE" : "";
+  const kzTypZPdf = modely((d) => d !== "mesh" && d !== "stb") || (zar.length ? "" : (n?.zoznam ?? ""));
+  const stbZPdf = ((s) => (s.length ? `${s.length}× ${[...new Set(s.map((x) => x.model || x.typ))].join(", ")}` : ""))(zar.filter((x) => x.druh === "stb"));
+  const zafuk = /zafuk/i.test(z.typAktivity);
   const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
   const nadpis = nahled?.summary ?? `${vyb.t} - ${z.typAktivity.includes("PIV") ? "PIV" : "FTTH"}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}`;
   const misto = nahled?.location ?? z.adresa;
@@ -982,8 +989,10 @@ ${r("Vzdálenost od stoupačky (řádově):", `<input name="vzdalenost" inputmod
 ${r("Stávající lišty / omezení v lištování od SVJ:", v("listy", ANO_NE_NEVIM, "NEVÍM"), "volitelne")}
 ${r("Souhlas s vrtáním:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">(NE = vrátit na PEP, nebo STORNO)</span>`, "povinne")}
 ${r("Koncové zařízení umístíme v:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– el. zásuvka:</span> ${v("elZasuvka", ANO_NE)}`, "povinne")}
-${r("KZ:", `${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]])} <span class="gc-mezi">STB:</span> <input name="stb" value="${h("stb")}" size="10">${d.notifikace?.cpeMode ? ` <span class="gc-mezi muted">(z PDF: ${esc(d.notifikace.cpeMode)}${d.notifikace.zoznam ? ` · ${esc(d.notifikace.zoznam)}` : ""})</span>` : ""}`, "povinne")}
-${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`, "volitelne")}
+${r("KZ:", `<span class="gc-mezi">mode</span> ${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]], kzModeZPdf)} <span class="gc-mezi">typ</span> <input name="kzTyp" placeholder="typ KZ" value="${esc(hodnoty.get("kzTyp") ?? kzTypZPdf)}" size="13"> <span class="gc-mezi">STB</span> <input name="stb" placeholder="STB" value="${esc(hodnoty.get("stb") ?? stbZPdf)}" size="13">${kzModeZPdf || kzTypZPdf || stbZPdf ? ` <span class="gc-mezi muted">(předvyplněno z PDF)</span>` : ""}`, "povinne")}
+${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický bez posledního řádku: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`, "volitelne")}
+${zafuk ? r("ZB (adresa nebo GPS):", `<input name="zb" placeholder="adresa ZB nebo souřadnice 50.0755, 14.4378" value="${h("zb")}" size="34"> <button class="btn sekundarni maly" type="submit" formmethod="get" formnovalidate name="spocitat" value="1">Spočítat vzdálenost</button>`, "volitelne") : ""}
+${zafuk ? r("Odhad vzdálenosti záfuku:", `<input name="zafukM" inputmode="numeric" value="${h("zafukM")}" size="6"> <span class="gc-mezi">metrů</span>${hodnoty.get("zafukInfo") && hodnoty.get("zafukM") ? `<input type="hidden" name="zafukInfo" value="${h("zafukInfo")}">` : ""}${hodnoty.get("zafukInfo") ? ` <span class="gc-mezi muted">(${esc(hodnoty.get("zafukInfo")!)})</span>` : ` <span class="gc-mezi muted">(chůze ZB → adresa instalace; vyplňte ZB a Spočítat vzdálenost)</span>`}`, "volitelne") : ""}
 ${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`, "volitelne")}
 ${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`, "volitelne")}
 <div class="gc-radek gc-predpis"><span class="gc-stitek">Instalační předpis:</span><textarea name="predpis" placeholder="${n ? "v notifikačním PDF nejsou žádné údaje – zkopírovat z ticketu" : "notifikační PDF k této aktivitě zatím nedorazilo – zkopírovat z ticketu"}">${esc(predpis)}</textarea>${zPdf && predpis === zPdf ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>

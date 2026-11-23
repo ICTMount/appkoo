@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parsujKz, parsujNotifikaci, parsujOddily, parsujZariadenia } from "../src/ingest/notifikace.js";
-import { kVytvoreni, parsujPriebeh, radekPriebehu, textBunky } from "../src/ingest/priebeh.js";
+import { kVytvoreni, parsujPriebeh, predpojenoZPriebehu, radekPriebehu, textBunky } from "../src/ingest/priebeh.js";
+import { googleChuze, gpsZTextu } from "../src/plan/chuze.js";
+import { udajeZFormulare } from "../src/web/planovani.js";
 import { textNotifikace } from "../src/web/html.js";
 
 // Výřez textu notifikačního PDF (pdftotext -layout) pro O-8555864483_22243701#1-DDWX4YA
@@ -197,5 +199,42 @@ describe("text pro Instalační předpis ve formuláři zápisu", () => {
     expect(t).toContain("2× AP (Mesh) · Sercomm");
     expect(t).toContain("CPE Mode: ROUTE");
     expect(t).not.toContain("Zoznam kompatibilných zariadení"); // jen když chybí rozpis zařízení
+  });
+});
+
+describe("předpojeno z Priebeh optický", () => {
+  const r = (akcia: string) => ({ nazovLinky: "L", aUzol: "U", akciaNaLinke: akcia, zAkcia: akcia, typLinky: "Cable" });
+  it("poslední řádek (socket) se nepočítá, rozhodují řádky před ním", () => {
+    expect(predpojenoZPriebehu([r("Ponechať"), r("Ponechať"), r("Vytvoriť")])).toBe(true); // akce jen na socketu → předpojeno
+    expect(predpojenoZPriebehu([r("Ponechať"), r("NEW"), r("Ponechať")])).toBe(false);
+    expect(predpojenoZPriebehu([r("Vytvoriť")])).toBeNull(); // jediný řádek – není co posoudit
+    expect(predpojenoZPriebehu(null)).toBeNull();
+  });
+});
+
+describe("formulář zápisu – KZ a záfuk", () => {
+  it("KZ nese mode, typ i STB", () => {
+    expect(udajeZFormulare(new URLSearchParams({ kz: "ROUTE", kzTyp: "ZTE F6600", stb: "1× Sagemcom" })).kz).toBe("ROUTE · typ ZTE F6600 + STB 1× Sagemcom");
+    expect(udajeZFormulare(new URLSearchParams({ kz: "BRIDGE" })).kz).toBe("BRIDGE");
+  });
+  it("záfuk: ZB a metry jdou do údajů události", () => {
+    expect(udajeZFormulare(new URLSearchParams({ zb: "Nádražní 1, Přerov", zafukM: "184", zafukInfo: "trasa chůzí, Google" }))).toMatchObject({ zb: "Nádražní 1, Přerov", zafukM: 184, zafukZpusob: "trasa chůzí, Google" });
+  });
+  it("souřadnice ZB se poznají, adresa ne", () => {
+    expect(gpsZTextu("50.0755, 14.4378")).toEqual({ lat: 50.0755, lon: 14.4378 });
+    expect(gpsZTextu("Nádražní 340/3, Přerov")).toBeNull();
+  });
+  it("vzdálenost chůzí z Routes API; při chybě odhad vzdušnou čarou × 1,3", async () => {
+    const ok = googleChuze(null, "k", (async (_u: unknown, init: { body: string }) => {
+      expect(JSON.parse(init.body)).toMatchObject({ travelMode: "WALK", origin: { location: { latLng: { latitude: 50.1 } } }, destination: { address: "Nádražní 340/3, Přerov, Česko" } });
+      return { ok: true, status: 200, json: async () => ({ routes: [{ distanceMeters: 184 }] }) };
+    }) as never);
+    expect(await ok("50.1000, 14.5000", "Nádražní 340/3, Přerov")).toEqual({ metry: 184, zpusob: "chuze" });
+    const geokoder = { najdi: async () => ({ bod: { lat: 50.101, lon: 14.5 }, presnost: "adresa", zdroj: "google" }) };
+    const chyba = googleChuze(geokoder as never, "k", (async () => ({ ok: false, status: 403, json: async () => ({ error: { status: "PERMISSION_DENIED", message: "Routes API has not been used" } }) })) as never);
+    const v = await chyba("50.1000, 14.5000", "Nádražní 340/3, Přerov");
+    expect(v?.zpusob).toBe("odhad");
+    expect(v!.metry).toBeGreaterThan(120);
+    expect(v!.metry).toBeLessThan(170); // ~111 m vzduchem × 1,3
   });
 });
