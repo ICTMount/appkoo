@@ -274,6 +274,9 @@ section.planovani>h2{font-size:18px;letter-spacing:-.01em}
 .gc-pata{padding-top:16px}.gc-pata .btn{min-height:40px;padding:0 20px;font-size:14px;font-weight:700;border-radius:8px}
 .gc-legenda{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:0 0 4px}.gc-legenda i{width:7px;height:7px;border-radius:50%;background:#e65100}
 @media (max-width:900px){.gc-radek{padding-left:0;min-height:0;padding-top:8px;padding-bottom:8px}.gc-radek>.gc-stitek{position:static;width:100%;min-height:0}}
+/* karty detailu: hodnota se smí zalomit (dlouhé P9, cesta ke složce), doplňující údaj jde na druhý řádek */
+dl{grid-template-columns:max-content minmax(0,1fr)}dd{min-width:0;overflow-wrap:anywhere}
+dd .pod{display:block;font-size:12px;line-height:1.35;color:var(--muted);font-weight:400}
 /* Konfigurace */
 .uzky{max-width:1180px}
 .btn.maly{padding:4px 10px;font-size:12.5px}
@@ -696,8 +699,8 @@ ${radek("Důvod parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniN
 ${radek("P17: Vlastník sítě", infraStitek(z.infrastruktura))}
 ${plan.iru ? radek("IRU lokalita", `<span class="iru"><small class="muted">číselník AppKoo ·</small> <b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
 ${radek("Typ aktivity", `${esc(z.typAktivity)}${predobjStitek(z)}`)}
-${d.zafuk ? radek("ZB", `${esc(d.zafuk.adresa)} <small class="muted">· ZB ${esc(d.zafuk.kod)} · notifikační PDF</small>`) : ""}
-${d.zafuk ? radek("Orientační vzdálenost záfuku", d.zafuk.metry === null ? `<span class="muted">nepodařilo se spočítat</span>` : `<b>cca ${d.zafuk.metry} m</b> <small class="muted">· ${d.zafuk.zpusob === "chuze" ? "chůze ZB → adresa instalace, Google" : "odhad vzdušnou čarou × 1,3"}</small>`) : /zafuk/i.test(z.typAktivity) ? radek("ZB", `<span class="muted">v notifikačním PDF není</span>`) : ""}
+${d.zafuk ? radek("ZB", `${esc(d.zafuk.adresa)}<span class="pod">ZB ${esc(d.zafuk.kod)}, z notifikačního PDF</span>`) : ""}
+${d.zafuk ? radek("Vzdálenost záfuku", d.zafuk.metry === null ? `<span class="muted">nepodařilo se spočítat</span>` : `<b>cca ${d.zafuk.metry} m</b><span class="pod">${d.zafuk.zpusob === "chuze" ? "orientačně, chůzí ze ZB na adresu instalace (Google)" : "orientačně, odhad vzdušnou čarou × 1,3"}</span>`) : /zafuk/i.test(z.typAktivity) ? radek("ZB", `<span class="muted">v notifikačním PDF není</span>`) : ""}
 ${radek("P3: Typ balíčku", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
 ${radek("P8: Základní produkt", esc(z.zakladniProdukt) || `<span class="muted">neuvedeno</span>`)}
 ${z.kategorieTt ? radek("P9: Kategorie TT", `<small>${esc(z.kategorieTt)}</small>`) : ""}
