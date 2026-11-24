@@ -696,6 +696,8 @@ ${radek("Důvod parkování", esc([z.parkovani, z.parkovaniSkupina, z.parkovaniN
 ${radek("P17: Vlastník sítě", infraStitek(z.infrastruktura))}
 ${plan.iru ? radek("IRU lokalita", `<span class="iru"><small class="muted">číselník AppKoo ·</small> <b>${esc(plan.iru.mesto)}</b> – ${esc(plan.iru.popis)}${plan.iru.odkaz && /^https?:\/\//.test(plan.iru.odkaz) ? ` · <a href="${esc(plan.iru.odkaz)}" target="_blank" rel="noopener">dokument</a>` : ""}</span>`) : ""}
 ${radek("Typ aktivity", `${esc(z.typAktivity)}${predobjStitek(z)}`)}
+${d.zafuk ? radek("ZB", `${esc(d.zafuk.adresa)} <small class="muted">· ZB ${esc(d.zafuk.kod)} · notifikační PDF</small>`) : ""}
+${d.zafuk ? radek("Orientační vzdálenost záfuku", d.zafuk.metry === null ? `<span class="muted">nepodařilo se spočítat</span>` : `<b>cca ${d.zafuk.metry} m</b> <small class="muted">· ${d.zafuk.zpusob === "chuze" ? "chůze ZB → adresa instalace, Google" : "odhad vzdušnou čarou × 1,3"}</small>`) : /zafuk/i.test(z.typAktivity) ? radek("ZB", `<span class="muted">v notifikačním PDF není</span>`) : ""}
 ${radek("P3: Typ balíčku", esc(z.balik) || `<span class="muted">neuvedeno</span>`)}
 ${radek("P8: Základní produkt", esc(z.zakladniProdukt) || `<span class="muted">neuvedeno</span>`)}
 ${z.kategorieTt ? radek("P9: Kategorie TT", `<small>${esc(z.kategorieTt)}</small>`) : ""}
@@ -948,6 +950,9 @@ export function strankaZapisu(
   const kzTypZPdf = modely((d) => d !== "mesh" && d !== "stb") || (zar.length ? "" : (n?.zoznam ?? ""));
   const stbZPdf = ((s) => (s.length ? `${s.length}× ${[...new Set(s.map((x) => x.model || x.typ))].join(", ")}` : ""))(zar.filter((x) => x.druh === "stb"));
   const zafuk = /zafuk/i.test(z.typAktivity);
+  // záfuk: ZB a vzdálenost předvyplněné z notifikačního PDF (dokud je koordinátorka nepřepíše)
+  const zafukZPdf = hodnoty.get("zafukM") === null && d.zafuk?.metry != null;
+  const zafukInfo = hodnoty.get("zafukInfo") ?? (zafukZPdf ? (d.zafuk!.zpusob === "chuze" ? "trasa chůzí, Google" : "odhad vzdušnou čarou × 1,3") : "");
   const infra = z.infrastruktura === "TMCZ" ? "" : ` ${z.infrastruktura}`;
   const nadpis = nahled?.summary ?? `${vyb.t} - ${z.typAktivity.includes("PIV") ? "PIV" : "FTTH"}${infra} ${z.idObjednavkyZaklad} ${z.zakaznik}`;
   const misto = nahled?.location ?? z.adresa;
@@ -991,9 +996,9 @@ ${r("Souhlas s vrtáním:", `${v("vrtani", ANO_NE)} <span class="gc-mezi muted">
 ${r("Koncové zařízení umístíme v:", `<input name="umisteni" placeholder="předsíň / obývací pokoj / dle konzultace" value="${h("umisteni")}" size="30"> <span class="gc-mezi">– el. zásuvka:</span> ${v("elZasuvka", ANO_NE)}`, "povinne")}
 ${r("KZ:", `<span class="gc-mezi">mode</span> ${v("kz", [["", "?"], ["ROUTE", "ROUTE"], ["BRIDGE", "BRIDGE"]], kzModeZPdf)} <span class="gc-mezi">typ</span> <input name="kzTyp" placeholder="typ KZ" value="${esc(hodnoty.get("kzTyp") ?? kzTypZPdf)}" size="13"> <span class="gc-mezi">STB</span> <input name="stb" placeholder="STB" value="${esc(hodnoty.get("stb") ?? stbZPdf)}" size="13">${kzModeZPdf || kzTypZPdf || stbZPdf ? ` <span class="gc-mezi muted">(předvyplněno z PDF)</span>` : ""}`, "povinne")}
 ${r("Předpojen:", `${v("predpojen", ANO_NE, predpojenZPdf)}${predpojenZPdf ? ` <span class="gc-mezi muted">(z PDF – Priebeh optický bez posledního řádku: ${predpojenZPdf === "ano" ? "vše Ponechať" : "technik má akci NEW / Vytvoriť"})</span>` : ""}`, "volitelne")}
-${zafuk ? r("ZB (adresa nebo GPS):", `<input name="zb" placeholder="adresa ZB nebo souřadnice 50.0755, 14.4378" value="${h("zb")}" size="34"> <button class="btn sekundarni maly" type="submit" formmethod="get" formnovalidate name="spocitat" value="1">Spočítat vzdálenost</button>`, "volitelne") : ""}
-${zafuk ? r("Odhad vzdálenosti záfuku:", `<input name="zafukM" inputmode="numeric" value="${h("zafukM")}" size="6"> <span class="gc-mezi">metrů</span>${hodnoty.get("zafukInfo") && hodnoty.get("zafukM") ? `<input type="hidden" name="zafukInfo" value="${h("zafukInfo")}">` : ""}${hodnoty.get("zafukInfo") ? ` <span class="gc-mezi muted">(${esc(hodnoty.get("zafukInfo")!)})</span>` : ` <span class="gc-mezi muted">(chůze ZB → adresa instalace; vyplňte ZB a Spočítat vzdálenost)</span>`}`, "volitelne") : ""}
-${r("PODB (adresa):", `<input name="podb" value="${h("podb")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`, "volitelne")}
+${zafuk ? r("ZB (adresa nebo GPS):", `<input name="zb" placeholder="adresa ZB nebo souřadnice 50.0755, 14.4378" value="${esc(hodnoty.get("zb") ?? d.zafuk?.adresa ?? "")}" size="34"> <button class="btn sekundarni maly" type="submit" formmethod="get" formnovalidate name="spocitat" value="1">Spočítat vzdálenost</button>`, "volitelne") : ""}
+${zafuk ? r("Odhad vzdálenosti záfuku:", `<input name="zafukM" inputmode="numeric" value="${esc(hodnoty.get("zafukM") ?? (zafukZPdf ? String(d.zafuk!.metry) : ""))}" size="6"> <span class="gc-mezi">metrů</span>${zafukInfo && (hodnoty.get("zafukM") || zafukZPdf) ? `<input type="hidden" name="zafukInfo" value="${esc(zafukInfo)}">` : ""}${zafukInfo ? ` <span class="gc-mezi muted">(${esc(zafukInfo)})</span>` : ` <span class="gc-mezi muted">(chůze ZB → adresa instalace; vyplňte ZB a Spočítat vzdálenost)</span>`}`, "volitelne") : ""}
+${r("PODB (adresa):", `<input name="podb" value="${esc(hodnoty.get("podb") ?? n?.uzly?.podb?.adresa ?? "")}" size="30"> <span class="gc-mezi muted">(T-Mobile)</span>`, "volitelne")}
 ${r("CASEID:", `<input name="caseid" value="${h("caseid")}" size="16"> <span class="gc-mezi muted">(SWAP / FIS MOP)</span>`, "volitelne")}
 <div class="gc-radek gc-predpis"><span class="gc-stitek">Instalační předpis:</span><textarea name="predpis" placeholder="${n ? "v notifikačním PDF nejsou žádné údaje – zkopírovat z ticketu" : "notifikační PDF k této aktivitě zatím nedorazilo – zkopírovat z ticketu"}">${esc(predpis)}</textarea>${zPdf && predpis === zPdf ? `<span class="muted">předvyplněno z notifikačního PDF ${esc(n!.nazev)} – zkontrolujte a případně doplňte</span>` : ""}</div>
 </div></div>

@@ -4,6 +4,7 @@ import { parsujKz, parsujNotifikaci, parsujOddily, parsujZariadenia } from "../s
 import { kVytvoreni, parsujPriebeh, predpojenoZPriebehu, radekPriebehu, textBunky } from "../src/ingest/priebeh.js";
 import { googleChuze, gpsZTextu } from "../src/plan/chuze.js";
 import { udajeZFormulare } from "../src/web/planovani.js";
+import { parsujUzly } from "../src/ingest/notifikace.js";
 import { textNotifikace } from "../src/web/html.js";
 
 // Výřez textu notifikačního PDF (pdftotext -layout) pro O-8555864483_22243701#1-DDWX4YA
@@ -236,5 +237,28 @@ describe("formulář zápisu – KZ a záfuk", () => {
     expect(v?.zpusob).toBe("odhad");
     expect(v!.metry).toBeGreaterThan(120);
     expect(v!.metry).toBeLessThan(170); // ~111 m vzduchem × 1,3
+  });
+});
+
+describe("uzly trasy z Priebeh nový", () => {
+  const TEXT = `Priebeh optický:
+PODB: 000030 :BENE: 3.1.0- PODB: 000030 :BENE: 3.1.104
+Priebeh nový:
+Ethernet_bearer:4209054
+PODB:000030:BENE:Vlašimská 1796
+SPT128 port:3.1.0
+PODB:000030:BENE:3.1.0-PODB:000030:BENE:3.1.104
+PODB:000030:BENE:7.14-ZB:000024:BENE:1.13.2:50
+ZB:000024:BENE:K Pazderně 778
+OM Spoj/Zvar:1.13.2
+ZB:000024:BENE:1.13.2-ZB:000024:BENE:2.19.1
+ZB:000024:BENE:2.19.1-OUK:BENE:009460:1:20_19_1
+OUK:BENE:009460:Vlašimská 348:P/1
+Priebeh pôvodný:
+ZB:000099:BENE:Stará 1
+`;
+  it("ZB a PODB s adresou; spoje a původní trasa se neberou", () => {
+    expect(parsujUzly(TEXT)).toEqual({ zb: { kod: "000024", lokalita: "BENE", adresa: "K Pazderně 778" }, podb: { kod: "000030", lokalita: "BENE", adresa: "Vlašimská 1796" } });
+    expect(parsujUzly("Inštalačný predpis k\n-")).toEqual({ zb: null, podb: null });
   });
 });

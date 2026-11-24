@@ -50,7 +50,7 @@ import { kombinaceZakazky, popisKombinace, zkratkaKombinace } from "../domain/ko
 import { sestavUdalost } from "../gcal/udalost.js";
 import { odhadVzdalenosti } from "../plan/geo.js";
 import { googleGeokoder, sCache } from "../plan/geokod.js";
-import { googleChuze, type Chuze } from "../plan/chuze.js";
+import { googleChuze, sCacheChuze, type Chuze } from "../plan/chuze.js";
 import { slaKonec } from "../plan/kpi.js";
 import { webcalendar } from "../domain/webcalendar.js";
 import { geokodujVse, kontrolaBran, nabidniProZakazku, nejdrivePodleRfs, nactiKalendare, najdiTerminVKalendari, zapomenKalendar, navrhyProSlot, pracovniDny, prehledDne, textProMwf, type Nabidka, type ZavislostiPlanovace } from "../plan/planovac.js";
@@ -236,6 +236,17 @@ function posli(res: ServerResponse, kod: number, html: string) {
 
 export function vytvorHandler(db: Db, n: NastaveniWebu) {
   const ted = n.ted ?? (() => tedPraha());
+  // Záfuk: ZB z notifikačního PDF + orientační vzdálenost chůzí ZB → adresa instalace (obec ZB = obec zakázky)
+  const adresaCile = (z: { adresa: string; psc: string }) => [z.adresa, z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
+  const doplnZafuk = async <T extends { z: { typAktivity: string; adresa: string; psc: string }; notifikace: { uzly?: { zb: { kod: string; adresa: string } | null } | null } | null; zafuk?: unknown }>(detail: T): Promise<T> => {
+    const zb = /zafuk/i.test(detail.z.typAktivity) ? detail.notifikace?.uzly?.zb : null;
+    if (!zb) return detail;
+    const obec = detail.z.adresa.includes(",") ? detail.z.adresa.split(",")[0]!.trim() : "";
+    const adresa = [zb.adresa, obec].filter(Boolean).join(", ");
+    const v = n.chuze ? await n.chuze(adresa, adresaCile(detail.z)).catch(() => null) : null;
+    detail.zafuk = { kod: zb.kod, adresa, metry: v?.metry ?? null, ...(v ? { zpusob: v.zpusob } : {}) };
+    return detail;
+  };
   const geokoderWebu = async () => {
     try {
       return n.planovac ? (await n.planovac()).geokoder : null;
@@ -450,6 +461,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const detail = await nactiDetail(db, decodeURIComponent(mp[1]!), now);
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
         const kontext = await nactiKontext(db);
+        await doplnZafuk(detail);
 
         // zapis: GET = formulář, POST = zápis do kalendáře
         const formular = req.method === "POST" ? await ctiFormular(req) : url.searchParams;
@@ -458,8 +470,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (req.method === "GET" && formular.get("spocitat") === "1" && /zafuk/i.test(detail.z.typAktivity)) {
           formular.delete("spocitat");
           if (zbText && n.chuze) {
-            const cil = [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", ");
-            const v = await n.chuze(zbText, cil).catch(() => null);
+            const v = await n.chuze(zbText, adresaCile(detail.z)).catch(() => null);
             if (v) {
               formular.set("zafukM", String(v.metry));
               formular.set("zafukInfo", v.zpusob === "chuze" ? "trasa chůzí, Google" : "odhad vzdušnou čarou × 1,3 – trasu chůzí se nepodařilo spočítat");
@@ -539,7 +550,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         if (!detail) return posli(res, 404, strankaChyby(404, "Zakázka nenalezena."));
         // PDF chybí, nebo bylo načteno starší verzí bez tabulky Priebeh → dohledat / přečíst znovu hned
         // dohledání PDF na Disku běží souběžně s ostatními zdroji (níže), ne před nimi
-        const notifikaceSlib = (!detail.notifikace || !detail.notifikace.priebeh) && n.notifikace ? n.notifikace(detail.z.idAktivity, { idObjednavkyZaklad: detail.z.idObjednavkyZaklad, idS7: detail.z.idS7 }).catch(() => detail.notifikace) : Promise.resolve(detail.notifikace);
+        const notifikaceSlib = (!detail.notifikace || !detail.notifikace.priebeh || !detail.notifikace.uzly) && n.notifikace ? n.notifikace(detail.z.idAktivity, { idObjednavkyZaklad: detail.z.idObjednavkyZaklad, idS7: detail.z.idS7 }).catch(() => detail.notifikace) : Promise.resolve(detail.notifikace);
         const kontext = await nactiKontext(db);
         const planovac = n.planovac;
         // webcalendar: zakázka přišla s termínem jen v MWF → ověřit, zda je v kalendáři technika
@@ -603,6 +614,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
           mer("notifikace", notifikaceSlib),
         ]);
         detail.notifikace = notifikaceDohledana ?? detail.notifikace;
+        await mer("zafuk", doplnZafuk(detail));
         const casti = await mer("casti", mestskeCasti(await geokoderWebu(), [
           [detail.z.adresa, detail.z.psc.replace(/^=+/, "")].filter(Boolean).join(", "),
           ...(nabidka?.moznosti ?? []).flatMap((m) => [m.sousede?.pred.adresa, m.sousede?.po.adresa]),
@@ -990,7 +1002,7 @@ function main() {
           return (idAktivity, klice) => dohledejNotifikaci(db, drive, env.NOTIFIKACE_SLOZKA!, idAktivity, klice);
         })()
       : undefined,
-    chuze: googleChuze(sCache(db, googleGeokoder())),
+    chuze: sCacheChuze(db, googleChuze(sCache(db, googleGeokoder()))),
     planovac: (() => {
       // Kalendáře techniků jménem tmcz01 (delegace) – odpadá sdílení každého kalendáře servisnímu účtu.
       // Bez delegace čte a zapisuje servisní účet sám (kalendáře mu musí být nasdílené).

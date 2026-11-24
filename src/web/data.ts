@@ -194,6 +194,8 @@ export interface Detail extends PolozkaFronty {
   souvisejici: { id_aktivity: string; typ_aktivity: string; stav_mwf: string; uzavreno: Date | null }[];
   /** výpis z notifikačního PDF z MWF (null = PDF zatím nedorazilo) */
   notifikace: UlozenaNotifikace | null;
+  /** záfuk: ZB z notifikačního PDF a orientační vzdálenost chůzí ZB → adresa instalace (doplňuje web, jen u Zafuk_Pristupu_FTTH) */
+  zafuk?: { kod: string; adresa: string; metry: number | null; zpusob?: "chuze" | "odhad" } | null;
 }
 
 export async function nactiDetail(db: Dotaz, idAktivity: string, now: Date, pravidla?: PravidloPriority[]): Promise<Detail | null> {
