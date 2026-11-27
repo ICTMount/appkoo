@@ -465,7 +465,7 @@ body{font-variant-numeric:tabular-nums}:focus-visible{outline:2px solid var(--ac
 .ev-hl{display:flex;flex-wrap:wrap;gap:2px 3px;flex:none;max-width:100%}
 .ev.s-k .ev-hl,.ev.s-k .ev-b>.ev-st:first-child{max-width:calc(100% - .9em)}
 .ev-hl .ev-st{min-width:0;flex:0 1 auto}
-.ev-flex{background:transparent;color:inherit;box-shadow:inset 0 0 0 1.5px currentColor;flex:none}
+.ev-flex{background:#1e9e4a;color:#fff;box-shadow:0 0 0 1.5px #fff;flex:none}
 .ev-k{display:inline-block;width:.8em;height:.8em;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);flex:none}
 .ev-k.ok{background:#1e9e4a}.ev-k.pozor{background:#f59e0b}.ev-k.chyba{background:#dc2626}
 .ev>.ev-k{position:absolute;top:3px;right:4px;z-index:2;font-size:11px}
