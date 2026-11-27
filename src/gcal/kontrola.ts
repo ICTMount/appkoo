@@ -159,6 +159,8 @@ export type StavKontrolky = "ok" | "pozor" | "chyba";
 export interface Kontrolka {
   stav: StavKontrolky;
   duvody: string[];
+  /** shoda MWF ↔ kalendář v % (průměr: začátek termínu, technik, adresa); u červené se nezobrazuje */
+  shoda: number;
 }
 export interface UdalostKontroly {
   kalendar: string;
@@ -222,7 +224,7 @@ export function kontrolkyUdalosti(
     const kandidati = zakazky.filter((z) => (u.appkoo ? z.idAktivity === u.appkoo : false) || oCisla.includes(z.idObjednavkyZaklad) || s7(z));
     if (!kandidati.length) {
       // bez čísla zakázky to není zakázka (soukromá poznámka, školení…) – kontrolka se neukazuje
-      if (oCisla.length || u.appkoo) kontrolky.set(`${u.kalendar}|${u.id}`, { stav: "chyba", duvody: ["Zakázka z kalendáře není v exportu MWF."] });
+      if (oCisla.length || u.appkoo) kontrolky.set(`${u.kalendar}|${u.id}`, { stav: "chyba", duvody: ["Zakázka z kalendáře není v exportu MWF."], shoda: 0 });
       continue;
     }
     const otevrene = kandidati.filter((z) => !z.uzavreno);
@@ -234,21 +236,28 @@ export function kontrolkyUdalosti(
     let stav: StavKontrolky = "ok";
     const chyba = (d: string) => (duvody.push(d), (stav = "chyba"));
     const pozor = (d: string) => (duvody.push(d), stav === "ok" && (stav = "pozor"));
+    // dílčí shody 0–1: začátek termínu (do 30 min 1, do 60 min 0,75), technik, adresa
+    let sCas = 0;
+    let sTechnik = 0;
+    let sAdresa = 1;
     if (!z.termin) chyba("V MWF není u zakázky termín.");
     else if (isoDate(z.termin.od) !== den) chyba(`Jiný den: MWF ${dm(z.termin.od)} ${hhmm(z.termin.od)}, kalendář ${dm(u.od)} ${hhmm(u.od)}.`);
     else {
       const rozdil = Math.abs(minutesOfDay(u.od) - minutesOfDay(z.termin.od));
       if (rozdil > 60) chyba(`Začátek se liší o ${rozdil} min: MWF ${hhmm(z.termin.od)}, kalendář ${hhmm(u.od)}.`);
       else if (rozdil > 30) pozor(`Začátek se liší o ${rozdil} min: MWF ${hhmm(z.termin.od)}, kalendář ${hhmm(u.od)}.`);
+      sCas = rozdil > 60 ? 0 : rozdil > 30 ? 0.75 : 1;
     }
     if (!z.technik.trim()) chyba("V MWF není Pracovní zdroj.");
     else if (!u.technik.some((t) => stejnyTechnik(z.technik, t))) chyba(`Pracovní zdroj v MWF: ${z.technik}, kalendář: ${u.technik[0] ?? "?"}.`);
+    else sTechnik = 1;
     if (z.adresa) {
       const shoda = shodaAdres(z.adresa, `${u.location} ${u.summary}`);
+      sAdresa = shoda;
       if (shoda < 0.75) chyba(`Adresa nesedí (shoda ${Math.round(shoda * 100)} %): MWF ${z.adresa}.`);
       else if (shoda < 1) pozor(`Adresa sedí jen na ${Math.round(shoda * 100)} %: MWF ${z.adresa}.`);
     }
-    kontrolky.set(`${u.kalendar}|${u.id}`, { stav, duvody });
+    kontrolky.set(`${u.kalendar}|${u.id}`, { stav, duvody, shoda: Math.round(((sCas + sTechnik + sAdresa) / 3) * 100) });
   }
   // termín v MWF v zobrazeném období, u zobrazeného technika, a v jeho kalendáři zakázka není
   const jmena = [...new Set(udalosti.flatMap((u) => u.technik))];

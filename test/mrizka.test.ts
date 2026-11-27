@@ -190,7 +190,7 @@ describe("flexibilita zákazníka a kontrolka v okně události", () => {
     expect(html).toContain('ev-flex');
     expect(html).toContain("FLEX den");
     expect(html).toContain('class="ev-k chyba"');
-    expect(html).toContain("Jiný den: MWF 17.11.");
+    expect(html).toContain("MWF a GCal se neshoduje: Jiný den: MWF 17.11.");
     expect(html).toContain("Porovnáno s exportem MWF z 16.11. 7:10");
     expect(html).toContain("Novak Jan");
     expect(html).toContain(">Praha 10<");

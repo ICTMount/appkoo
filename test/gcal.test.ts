@@ -199,7 +199,7 @@ describe("kontrolka MWF export ↔ kalendář", () => {
   const stav = (zs: ReturnType<typeof z>[], us: UdalostKontroly[]) => kontrolkyUdalosti(zs, us, obdobi).kontrolky.get("c1|e1");
 
   it("zelená: stejný den, začátek do 30 min, technik odpovídá", () => {
-    expect(stav([z()], [e()])).toEqual({ stav: "ok", duvody: [] });
+    expect(stav([z()], [e()])).toEqual({ stav: "ok", duvody: [], shoda: 100 });
     expect(stav([z()], [e({ od: local(2026, 10, 16, 10, 30) })])!.stav).toBe("ok");
     // technik se v kalendáři jmenuje jinak než v číselníku (Lipka = Brestanský)
     expect(stav([z({ technik: "Lipka Jan (Vegacom)" })], [e({ technik: ["Lipka", "Brestanský"] })])!.stav).toBe("ok");
@@ -208,7 +208,7 @@ describe("kontrolka MWF export ↔ kalendář", () => {
     expect(stav([z()], [e({ od: local(2026, 10, 16, 11, 0) })])).toMatchObject({ stav: "pozor" });
     // adresa sedí na 75 %: ulice a číslo popisné ano, orientační chybí
     expect(shodaAdres("Na Strži 1702/65, Praha 4", "Na Strži 1702, Praha 4")).toBe(0.75);
-    expect(stav([z()], [e({ location: "Na Strži 1702, Praha 4" })])).toMatchObject({ stav: "pozor" });
+    expect(stav([z()], [e({ location: "Na Strži 1702, Praha 4" })])).toMatchObject({ stav: "pozor", shoda: 92 });
     expect(shodaAdres("Praha, Limuzská 1809/7, 10000", "Limuzská 1809/7, Praha 10")).toBe(1);
   });
   it("červená: jiný den, začátek o víc než 60 min, bez termínu v MWF, není v exportu, Pracovní zdroj není technik", () => {

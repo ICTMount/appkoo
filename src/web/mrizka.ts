@@ -144,7 +144,7 @@ export interface OznaceniMrizky {
   /** přejezdy: polohy adres (klíč = adresa události / výjezdu, oříznutá), výpočet km a poloha plánované zakázky */
   prejezdy?: { polohy: Map<string, Bod | null>; km: (a: Bod, b: Bod) => number; minuty?: (a: Bod, b: Bod) => number; cil?: Bod | null };
   /** kontrolky MWF export ↔ kalendář, klíč „kalendář|eventId“ */
-  kontrolky?: Map<string, { stav: "ok" | "pozor" | "chyba"; duvody: string[] }>;
+  kontrolky?: Map<string, { stav: "ok" | "pozor" | "chyba"; duvody: string[]; shoda?: number }>;
 }
 
 const hm = (t: Date) => `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
@@ -210,7 +210,7 @@ export interface BlokMrizky {
   /** časová flexibilita zákazníka z popisu události */
   flex?: "FLEX den" | "FLEX";
   /** kontrolka MWF export ↔ kalendář */
-  kontrolka?: { stav: "ok" | "pozor" | "chyba"; duvody: string[] };
+  kontrolka?: { stav: "ok" | "pozor" | "chyba"; duvody: string[]; shoda?: number };
   /** přejezd na tuto adresu z předchozí zastávky dne (nebo z výjezdu technika), km */
   prejezd?: { km: number; zVyjezdu: boolean; min?: number };
   /** VOLNY + plánovaná zakázka: přejezd z předchozí zastávky na adresu zakázky a z ní na další zastávku (nebo zpět na výjezd), km */
@@ -627,8 +627,8 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
     // typ instalace a město + městská část jsou zvýrazněné štítky (stejný vzhled jako přejezd), ať jsou vidět na první pohled
     const typ = b.typ || b.flex ? `<span class="ev-hl">${b.typ ? `<span class="ev-st ev-typ">${esc(b.typ)}</span>` : ""}${b.flex ? `<span class="ev-st ev-flex" title="${b.flex === "FLEX den" ? "Zákazník je flexibilní v den termínu" : "Zákazník je časově flexibilní (důchodce / rodičovská / HO)"}">${m.husta ? "FLEX" : b.flex}</span>` : ""}</span>` : "";
     // kontrolka MWF export ↔ kalendář v pravém horním rohu
-    const POPIS = { ok: "MWF a kalendář sedí", pozor: "Drobný nesoulad MWF a kalendáře", chyba: "MWF a kalendář nesedí" } as const;
-    const kDuvody = b.kontrolka ? `${POPIS[b.kontrolka.stav]}${b.kontrolka.duvody.length ? `: ${b.kontrolka.duvody.join(" ")}` : "."}` : "";
+    const kPopis = b.kontrolka ? (b.kontrolka.stav === "chyba" ? "MWF a GCal se neshoduje" : `MWF a GCal shoda ${b.kontrolka.stav === "ok" ? 100 : b.kontrolka.shoda ?? 75} %`) : "";
+    const kDuvody = b.kontrolka ? `${kPopis}${b.kontrolka.duvody.length ? `: ${b.kontrolka.duvody.join(" ")}` : "."}` : "";
     const kontrolka = b.kontrolka ? `<i class="ev-k ${b.kontrolka.stav}" title="${esc(`${kDuvody}${porovnano}`)}"></i>` : "";
     const mesto = b.cast && !b.volny ? `<span class="ev-st ev-mesto">${esc(b.cast)}</span>` : "";
     const km = (x: number) => `${x.toFixed(1).replace(".", ",")} km`;
