@@ -149,3 +149,89 @@ export function vytizeniDne(udalosti: UdalostTechnika[], technik: string, den: s
   const celkem = volnych + obsazenych;
   return { dilky, volnych, obsazenych, procento: celkem ? Math.round((obsazenych / celkem) * 100) : null };
 }
+
+// ---------- Kontrolka u události v Kalendáři techniků: MWF export ↔ kalendář ----------
+// zelená = sedí; oranžová = drobný nesoulad (začátek o 31–60 min, adresa); červená = jiný den, začátek o víc než
+// 60 min, zakázka chybí v jednom ze systémů nebo Pracovní zdroj v MWF není technik kalendáře.
+// Porovnává se jen ZAČÁTEK termínu. Uzavřené zakázky a události bez čísla zakázky kontrolku nemají.
+
+export type StavKontrolky = "ok" | "pozor" | "chyba";
+export interface Kontrolka {
+  stav: StavKontrolky;
+  duvody: string[];
+}
+export interface UdalostKontroly {
+  kalendar: string;
+  id: string;
+  summary: string;
+  description: string;
+  location: string;
+  od: Date;
+  appkoo?: string;
+  barva?: string;
+  /** jména technika kalendáře (číselník i jméno v kalendáři) – MWF musí odpovídat aspoň jednomu */
+  technik: string[];
+}
+export type ZakazkaKontroly = Pick<Zakazka, "idAktivity" | "idObjednavkyZaklad" | "idS7" | "technik" | "termin" | "adresa"> & { uzavreno: boolean };
+export interface ChybiVKalendari {
+  idAktivity: string;
+  oid: string;
+  termin: Date;
+  technik: string;
+}
+
+const hhmm = (t: Date) => `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
+const dm = (t: Date) => `${t.getUTCDate()}.${t.getUTCMonth() + 1}.`;
+
+/** Čísla O- (základ) v názvu a popisu události */
+export const oCislaUdalosti = (u: Pick<UdalostKontroly, "summary" | "description">): string[] =>
+  [...new Set([...`${u.summary}\n${u.description}`.matchAll(/O-\d{6,}/gi)].map((m) => zakladniCisloObjednavky(m[0])))];
+
+export function kontrolkyUdalosti(
+  zakazky: ZakazkaKontroly[],
+  udalosti: UdalostKontroly[],
+  obdobi: { od: Date; do: Date },
+): { kontrolky: Map<string, Kontrolka>; chybi: ChybiVKalendari[] } {
+  const kontrolky = new Map<string, Kontrolka>();
+  const sparovane = new Set<string>();
+  for (const u of udalosti) {
+    if (jeVolneOkno(u) || jeBlok(u)) continue;
+    const text = `${u.summary}\n${u.description}`;
+    const oCisla = oCislaUdalosti(u);
+    const s7 = (z: ZakazkaKontroly) => { const id = z.idS7.replace(/^=+/, "").trim(); return id.length >= 6 && text.includes(id); };
+    const kandidati = zakazky.filter((z) => (u.appkoo ? z.idAktivity === u.appkoo : false) || oCisla.includes(z.idObjednavkyZaklad) || s7(z));
+    if (!kandidati.length) {
+      // bez čísla zakázky to není zakázka (soukromá poznámka, školení…) – kontrolka se neukazuje
+      if (oCisla.length || u.appkoo) kontrolky.set(`${u.kalendar}|${u.id}`, { stav: "chyba", duvody: ["Zakázka z kalendáře není v exportu MWF."] });
+      continue;
+    }
+    const otevrene = kandidati.filter((z) => !z.uzavreno);
+    for (const z of otevrene) sparovane.add(z.idAktivity);
+    if (!otevrene.length) continue; // uzavřená zakázka – bez kontrolky
+    const den = isoDate(u.od);
+    const z = otevrene.find((x) => x.termin && isoDate(x.termin.od) === den) ?? otevrene.find((x) => x.termin) ?? otevrene[0]!;
+    const duvody: string[] = [];
+    let stav: StavKontrolky = "ok";
+    const chyba = (d: string) => (duvody.push(d), (stav = "chyba"));
+    const pozor = (d: string) => (duvody.push(d), stav === "ok" && (stav = "pozor"));
+    if (!z.termin) chyba("V MWF není u zakázky termín.");
+    else if (isoDate(z.termin.od) !== den) chyba(`Jiný den: MWF ${dm(z.termin.od)} ${hhmm(z.termin.od)}, kalendář ${dm(u.od)} ${hhmm(u.od)}.`);
+    else {
+      const rozdil = Math.abs(minutesOfDay(u.od) - minutesOfDay(z.termin.od));
+      if (rozdil > 60) chyba(`Začátek se liší o ${rozdil} min: MWF ${hhmm(z.termin.od)}, kalendář ${hhmm(u.od)}.`);
+      else if (rozdil > 30) pozor(`Začátek se liší o ${rozdil} min: MWF ${hhmm(z.termin.od)}, kalendář ${hhmm(u.od)}.`);
+    }
+    if (!z.technik.trim()) chyba("V MWF není Pracovní zdroj.");
+    else if (!u.technik.some((t) => stejnyTechnik(z.technik, t))) chyba(`Pracovní zdroj v MWF: ${z.technik}, kalendář: ${u.technik[0] ?? "?"}.`);
+    if (z.adresa && podobnostAdres(z.adresa, `${u.location} ${u.summary}`) < 0.9) pozor(`Adresa se liší: MWF ${z.adresa}.`);
+    kontrolky.set(`${u.kalendar}|${u.id}`, { stav, duvody });
+  }
+  // termín v MWF v zobrazeném období, u zobrazeného technika, a v jeho kalendáři zakázka není
+  const jmena = [...new Set(udalosti.flatMap((u) => u.technik))];
+  const chybi = zakazky
+    .filter((z) => !z.uzavreno && z.termin && z.termin.od >= obdobi.od && z.termin.od < obdobi.do && !sparovane.has(z.idAktivity))
+    .filter((z) => jmena.some((t) => stejnyTechnik(z.technik, t)))
+    .map((z) => ({ idAktivity: z.idAktivity, oid: z.idObjednavkyZaklad || z.idAktivity, termin: z.termin!.od, technik: z.technik }))
+    .sort((a, b) => a.termin.getTime() - b.termin.getTime());
+  return { kontrolky, chybi };
+}

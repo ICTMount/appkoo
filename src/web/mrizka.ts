@@ -59,12 +59,43 @@ export function typUdalosti(summary: string): { typ: string; zbytek: string } | 
   return { typ, zbytek: m[2]!.replace(/\s+(SLA|RFS)\b.*$/is, "").replace(/[,\s]+$/, "") };
 }
 
+/** Pražské PSČ 1X0 00 → poštovní obvod „Praha X“ (100 00 = Praha 10); mimo Prahu null */
+export function prahaZPsc(psc: string): string | null {
+  const m = /^1(\d)\d\s?\d{2}$/.exec(psc.trim());
+  return m ? `Praha ${m[1] === "0" ? 10 : m[1]}` : null;
+}
+
+/**
+ * Adresa události → ulice a zvýrazněná lokalita (obec / městská část). Zvládá „Ulice 1, Praha 5-Smíchov“,
+ * „Ulice 1, 150 00 Praha 5“ i tvar z MWF „Praha, Ulice 1, 10000“ (PSČ na konci není lokalita; u Prahy z něj
+ * vznikne „Praha 10“). „Praha-Praha 10“ se zkrátí na „Praha 10“.
+ */
 export function castAdresy(location: string): { ulice: string; cast: string } {
   const casti = location.split(",").map((s) => s.trim()).filter(Boolean);
   if (casti.length > 1 && /^(česko|czechia|česká republika|cz)$/i.test(casti.at(-1)!)) casti.pop();
+  let psc = "";
+  for (let i = casti.length - 1; i >= 0; i--) {
+    if (/^\d{3}\s?\d{2}$/.test(casti[i]!)) psc = casti.splice(i, 1)[0]!;
+  }
   if (casti.length < 2) return { ulice: casti[0] ?? "", cast: "" };
-  const cast = casti.pop()!.replace(/^\d{3}\s?\d{2}\s+/, "");
+  // ulice má číslo popisné; „Praha 10“ je lokalita, i když obsahuje číslo
+  const jeUlice = (s: string) => /\d/.test(s) && !/^praha[\s-]*\d{1,2}(\b|$)/i.test(s) && !/^\d{3}\s?\d{2}\s/.test(s);
+  const obecPrvni = jeUlice(casti.at(-1)!) && !jeUlice(casti[0]!);
+  const surova = obecPrvni ? casti.shift()! : casti.pop()!;
+  const m = /^(\d{3}\s?\d{2})\s+(.*)$/.exec(surova);
+  if (m) psc = psc || m[1]!;
+  let cast = (m ? m[2]! : surova).replace(/^(\p{L}+)\s*-\s*\1(?=\s|-|$)/iu, "$1").trim();
+  if (/^praha$/i.test(cast)) cast = prahaZPsc(psc) ?? cast;
   return { ulice: casti.join(", "), cast };
+}
+
+/** Flexibilita zákazníka z popisu události (řádek zapsaný formulářem): „FLEX den“ / „FLEX“; pevný termín nebo bez záznamu null */
+export function flexUdalosti(radky: string[]): "FLEX den" | "FLEX" | null {
+  for (const r of radky) {
+    if (/^\s*FLEX ten den\b/i.test(r)) return "FLEX den";
+    if (/^\s*FLEX\b/.test(r)) return "FLEX";
+  }
+  return null;
 }
 
 export interface VolbyMrizky {
@@ -112,6 +143,8 @@ export interface OznaceniMrizky {
   dohodnuty?: { od: Date; do: Date } | null;
   /** přejezdy: polohy adres (klíč = adresa události / výjezdu, oříznutá), výpočet km a poloha plánované zakázky */
   prejezdy?: { polohy: Map<string, Bod | null>; km: (a: Bod, b: Bod) => number; minuty?: (a: Bod, b: Bod) => number; cil?: Bod | null };
+  /** kontrolky MWF export ↔ kalendář, klíč „kalendář|eventId“ */
+  kontrolky?: Map<string, { stav: "ok" | "pozor" | "chyba"; duvody: string[] }>;
 }
 
 const hm = (t: Date) => `${t.getUTCHours()}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
@@ -174,6 +207,10 @@ export interface BlokMrizky {
   bezTypu?: string;
   /** VOLNY slot, který se kryje s dohodnutým termínem zákazníka (webcalendar) */
   dohod?: boolean;
+  /** časová flexibilita zákazníka z popisu události */
+  flex?: "FLEX den" | "FLEX";
+  /** kontrolka MWF export ↔ kalendář */
+  kontrolka?: { stav: "ok" | "pozor" | "chyba"; duvody: string[] };
   /** přejezd na tuto adresu z předchozí zastávky dne (nebo z výjezdu technika), km */
   prejezd?: { km: number; zVyjezdu: boolean; min?: number };
   /** VOLNY + plánovaná zakázka: přejezd z předchozí zastávky na adresu zakázky a z ní na další zastávku (nebo zpět na výjezd), km */
@@ -289,6 +326,9 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
           const bg = barvaUdalosti(u);
           const adr = castAdresy(u.location);
           const kratky = u.summary.replace(prefix, "").replace(/\s+(SLA|RFS)\b.*$/i, "");
+          const detail = radkyDetailu(u.description);
+          const flex = volny ? null : flexUdalosti(detail);
+          const kontrolka = volny ? undefined : oznaceni.kontrolky?.get(`${u.kalendar}|${u.id}`);
           return {
             top: ((od - start) / delka) * 100,
             vyska: ((doH - od) / delka) * 100,
@@ -303,7 +343,9 @@ export function sestavMrizku(udalosti: UdalostMrizky[], technici: TechnikMrizky[
             cast: adr.cast,
             adresa: u.location.trim(),
             plnyNazev: u.summary,
-            detail: radkyDetailu(u.description),
+            detail,
+            ...(flex ? { flex } : {}),
+            ...(kontrolka ? { kontrolka } : {}),
             odkaz: u.odkaz,
             oid: u.summary.match(/O-\d{8,}/)?.[0] ?? null,
             vlevo,
@@ -420,6 +462,23 @@ body{font-variant-numeric:tabular-nums}:focus-visible{outline:2px solid var(--ac
 .ev-b:hover{text-decoration:none;filter:brightness(.93)}
 .ev-b span.ev-n{font-weight:500}
 .ev-st{align-self:flex-start;max-width:100%;flex:none;background:rgba(0,0,0,.45);color:#fff;border-radius:1em;padding:0 .5em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.95em}
+.ev-hl{display:flex;flex-wrap:wrap;gap:2px 3px;flex:none;max-width:100%}
+.ev.s-k .ev-hl,.ev.s-k .ev-b>.ev-st:first-child{max-width:calc(100% - .9em)}
+.ev-hl .ev-st{min-width:0;flex:0 1 auto}
+.ev-flex{background:transparent;color:inherit;box-shadow:inset 0 0 0 1.5px currentColor;flex:none}
+.ev-k{display:inline-block;width:.8em;height:.8em;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);flex:none}
+.ev-k.ok{background:#1e9e4a}.ev-k.pozor{background:#f59e0b}.ev-k.chyba{background:#dc2626}
+.ev>.ev-k{position:absolute;top:3px;right:4px;z-index:2;font-size:11px}
+.tip-k{display:flex;flex-wrap:wrap;align-items:baseline;gap:.2em .5em;margin:.3em 0 .4em 0!important;font-weight:500}
+.tip-k small{flex-basis:100%;margin-left:1.5em;color:var(--muted);font-weight:400}
+.tip-k .ev-k{align-self:center;margin-right:.1em}
+.k-chybi{position:relative;font-size:13px}
+.k-chybi summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:.4em;padding:.25em .7em;border:1px solid var(--line);border-radius:1em;font-weight:600;white-space:nowrap}
+.k-chybi summary::-webkit-details-marker{display:none}
+.k-chybi>div{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:26em;max-width:90vw;max-height:60vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.7em 1em}
+.k-chybi p{margin:0 0 .5em;color:var(--muted)}
+.k-chybi ul{margin:0;padding:0;list-style:none}
+.k-chybi li{padding:.2em 0;font-variant-numeric:tabular-nums}
 .ev-mesto{background:rgba(255,255,255,.9);color:#111;white-space:normal;overflow-wrap:anywhere;line-height:1.2;padding:.1em .5em;border-radius:.6em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .tip{display:none;position:absolute;width:24em;max-width:60vw;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.25);padding:.8em 1em;font-size:13px;font-weight:400;line-height:1.5;text-align:left;letter-spacing:.01em}
 .tip-n{display:flex;gap:.6em;align-items:flex-start;font-size:15px;font-weight:400}
@@ -492,6 +551,8 @@ export interface StrankaMrizky {
   navrhChyba?: string;
   /** rychlá volba dnů v horní liště (nejbližší pracovní dny) – stejná jako v Doplnit technika */
   rychleDny?: IsoDate[];
+  /** kontrola MWF export ↔ kalendář: zakázky s termínem v MWF, které v kalendáři zobrazených techniků chybí; čas exportu, proti kterému se porovnávalo */
+  kontrola?: { chybi: { idAktivity: string; oid: string; termin: Date; technik: string }[]; export: Date | null } | null;
 }
 
 /** Parametry odkazu se zachováním výběru */
@@ -550,6 +611,12 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
   const vaha = (sl: SloupecMrizky) => Math.max(1, sl.pod.length);
   // hlavička sloupce (jméno technika, výjezd) decentně v barvě jeho kalendáře: proužek nahoře + jemný nádech pozadí
   const barvaHl = (kalendar: string | undefined) => { const bg = (kalendar && s.barvy.get(kalendar)) || VYCHOZI_BARVA; return `--tb:${bg}`; };
+  const dc = (t: Date) => `${t.getUTCDate()}.${t.getUTCMonth() + 1}. ${hm(t)}`;
+  const porovnano = s.kontrola?.export ? ` Porovnáno s exportem MWF z ${dc(s.kontrola.export)}.` : "";
+  const chybi = s.kontrola?.chybi ?? [];
+  const chybiHtml = chybi.length
+    ? `<details class="k-chybi"><summary><i class="ev-k chyba"></i>v kalendáři chybí: ${chybi.length}</summary><div><p>Termín je v MWF, v kalendáři technika zakázka není.${esc(porovnano)}</p><ul>${chybi.map((c) => `<li><a href="/zakazka/${encodeURIComponent(c.idAktivity)}"><b>${esc(c.oid)}</b></a> ${esc(dc(c.termin))} · ${esc(c.technik)}</li>`).join("")}</ul></div></details>`
+    : "";
   const blok = (b: BlokMrizky) => {
     // VOLNY + plánovaná zakázka + oprávnění + živá data + žádná blokace → klik otevře formulář zápisu
     const lzePlanovat = b.volny && !!z && !!s.planovani && s.zive !== false && !(z.blokace ?? []).length && s.planovani.smi(b.technik);
@@ -558,7 +625,11 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       : b.oid ? `/o/${encodeURIComponent(b.oid)}` : b.odkaz;
     const znak = b.navrh ? `<span class="ev-znak">${m.husta ? `${b.navrh.poradi}.` : `nejoptimálnější ${b.navrh.poradi}`}</span>` : b.tato ? `<span class="ev-znak">tato zakázka</span>` : b.dohod ? `<span class="ev-znak">${m.husta ? "termín" : "termín zákazníka"}</span>` : "";
     // typ instalace a město + městská část jsou zvýrazněné štítky (stejný vzhled jako přejezd), ať jsou vidět na první pohled
-    const typ = b.typ ? `<span class="ev-st ev-typ">${esc(b.typ)}</span>` : "";
+    const typ = b.typ || b.flex ? `<span class="ev-hl">${b.typ ? `<span class="ev-st ev-typ">${esc(b.typ)}</span>` : ""}${b.flex ? `<span class="ev-st ev-flex" title="${b.flex === "FLEX den" ? "Zákazník je flexibilní v den termínu" : "Zákazník je časově flexibilní (důchodce / rodičovská / HO)"}">${m.husta ? "FLEX" : b.flex}</span>` : ""}</span>` : "";
+    // kontrolka MWF export ↔ kalendář v pravém horním rohu
+    const POPIS = { ok: "MWF a kalendář sedí", pozor: "Drobný nesoulad MWF a kalendáře", chyba: "MWF a kalendář nesedí" } as const;
+    const kDuvody = b.kontrolka ? `${POPIS[b.kontrolka.stav]}${b.kontrolka.duvody.length ? `: ${b.kontrolka.duvody.join(" ")}` : "."}` : "";
+    const kontrolka = b.kontrolka ? `<i class="ev-k ${b.kontrolka.stav}" title="${esc(`${kDuvody}${porovnano}`)}"></i>` : "";
     const mesto = b.cast && !b.volny ? `<span class="ev-st ev-mesto">${esc(b.cast)}</span>` : "";
     const km = (x: number) => `${x.toFixed(1).replace(".", ",")} km`;
     // přejezdy: zakázka = km z předchozí zastávky; VOLNY = km sem z předchozí a odsud na další (s plánovanou zakázkou)
@@ -569,13 +640,13 @@ export function strankaMrizky(s: StrankaMrizky, dnes: IsoDate): string {
       ? `<div class="r">Přejezd ${b.prejezd.zVyjezdu ? "z výjezdu technika" : "z předchozí zakázky"}: <b>${km(b.prejezd.km)}</b>${b.prejezd.min != null ? `, asi ${Math.round(b.prejezd.min)} min` : ""}</div>`
       : b.vlozeni ? `<div class="r">S touto zakázkou: ${b.vlozeni.predVyjezd ? "z výjezdu" : "z předchozí zakázky"} <b>${km(b.vlozeni.pred)}</b>, ${b.vlozeni.poVyjezd ? "zpět na výjezd" : "na další zakázku"} <b>${km(b.vlozeni.po)}</b></div>` : "";
     // přejezd je vždy úplně dole v okně události (vpravo dole, i u krátkých bloků)
-    const obsah = `${typ}${mesto}<span class="ev-n">${esc(b.typ && b.bezTypu ? b.bezTypu : b.nazev)}</span><span>${esc(b.cas)}</span>${b.ulice && !b.volny ? `<span>${esc(b.ulice)}</span>` : ""}${znak || prejezd ? `<span class="ev-dole">${znak || "<i></i>"}${prejezd}</span>` : ""}`;
+    const obsah = `${typ}${mesto}<span class="ev-n">${esc((b.typ && b.bezTypu ? b.bezTypu : b.nazev).replace(/_+/g, " "))}</span><span>${esc(b.cas)}</span>${b.ulice && !b.volny ? `<span>${esc(b.ulice)}</span>` : ""}${znak || prejezd ? `<span class="ev-dole">${znak || "<i></i>"}${prejezd}</span>` : ""}`;
     const styl = `background:${b.bg};color:${b.fg}`;
     const telo = cil
       ? `<a class="ev-b" style="${styl}" href="${esc(cil)}"${lzePlanovat || b.oid ? "" : ` target="_blank" rel="noopener"`}>${obsah}</a>`
       : `<div class="ev-b" tabindex="0" style="${styl}">${obsah}</div>`;
-    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${prejezdDetail}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}${lzePlanovat ? `<div class="r"><b>Klik = naplánovat ${esc(z!.oid)} do tohoto slotu.</b></div>` : ""}${b.navrh ? `<div class="r">Nejoptimálnější ${b.navrh.poradi}: ${esc(b.navrh.duvod)}</div>` : ""}</div>`;
-    return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}${b.dohod ? " dohod" : ""}"${b.navrh ? ` id="navrh-${b.navrh.poradi}"` : ""} style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${tip}</div>`;
+    const tip = `<div class="tip" style="${b.vlevo ? "right:100%" : "left:100%"};${b.dole ? "bottom:0" : "top:0"}"><div class="tip-n"><i style="background:${b.bg}"></i><span>${esc(b.plnyNazev)}</span></div><div class="tip-c">${esc(b.cas)}</div>${b.adresa ? `<div class="r">${(() => { const a = castAdresy(b.adresa); return a.cast ? `${esc(a.ulice)}, <b>${esc(a.cast)}</b>` : esc(a.ulice); })()}</div>` : ""}${b.kontrolka ? `<div class="r tip-k ${b.kontrolka.stav}"><i class="ev-k ${b.kontrolka.stav}"></i>${esc(kDuvody)}<small>${esc(porovnano)}</small></div>` : ""}${prejezdDetail}${b.detail.map((r) => `<div class="r">${esc(r)}</div>`).join("")}${lzePlanovat ? `<div class="r"><b>Klik = naplánovat ${esc(z!.oid)} do tohoto slotu.</b></div>` : ""}${b.navrh ? `<div class="r">Nejoptimálnější ${b.navrh.poradi}: ${esc(b.navrh.duvod)}</div>` : ""}</div>`;
+    return `<div class="ev${b.navrh ? " navrh" : ""}${b.tato ? " tato" : ""}${b.dohod ? " dohod" : ""}${b.kontrolka ? " s-k" : ""}"${b.navrh ? ` id="navrh-${b.navrh.poradi}"` : ""} style="top:${b.top.toFixed(3)}%;height:${b.vyska.toFixed(3)}%">${telo}${kontrolka}${tip}</div>`;
   };
   const mrizka = m.sloupce.length
     ? `<div class="k-vnitrek" style="min-width:${60 + m.podsloupcu * sirka}px">
@@ -611,7 +682,7 @@ ${(z.blokace ?? []).length ? `<div class="k-blok">Termín teď nelze naplánovat
 <title>${z ? `${esc(z.oid)} – ` : ""}Kalendář techniků – AppKoo</title><style>${CSS}</style></head><body><div class="k">
 <div class="k-lista"><a class="k-logo" href="/">AppKoo</a>${
     `<nav class="k-zal"><a href="/">Plánovat zakázku</a><a href="/technik">Doplnit technika</a><a class="on" href="/kalendar">Kalendář techniků</a></nav>`
-  }${zive}<a class="k-tl" href="${esc(odkaz(v, {}))}">Obnovit</a>
+  }${zive}<a class="k-tl" href="${esc(odkaz(v, {}))}">Obnovit</a>${chybiHtml}
 <div class="k-nav">${(s.rychleDny ?? []).length ? rychleDny(s.rychleDny!, v.pohled === "den" ? v.den : "", (d) => odkaz(v, { pohled: "den", den: d })) : ""}${navDne({ dnes: odkaz(v, { den: dnes }), zpet: odkaz(v, { den: addDays(v.den, -krok) }), dal: odkaz(v, { den: addDays(v.den, krok) }), datum, krok: krok === 1 ? "den" : "týden" })}
 <span class="k-prep"><a class="${v.pohled === "den" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "den" }))}">Den</a><a class="${v.pohled === "tyden" ? "on" : ""}" href="${esc(odkaz(v, { pohled: "tyden" }))}">Týden</a></span></div></div>
 ${pruh}

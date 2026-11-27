@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { nactiUdalosti, zapisUdalost } from "../src/gcal/kalendar.js";
 import { jeFlex } from "../src/plan/doplneni.js";
-import { podobnostAdres, volnaOkna, zkontroluj, type UdalostTechnika } from "../src/gcal/kontrola.js";
+import { kontrolkyUdalosti, podobnostAdres, volnaOkna, zkontroluj, type UdalostKontroly, type UdalostTechnika } from "../src/gcal/kontrola.js";
 import { sestavUdalost, textFlex } from "../src/gcal/udalost.js";
 import { local } from "../src/domain/time.js";
 import type { Zakazka } from "../src/import/mwfExport.js";
@@ -186,5 +186,49 @@ describe("FLEX v popisu události", () => {
     expect(jeFlex(textFlex("den", "jen do 14 h"))).toBe(true);
     expect(jeFlex(textFlex("obecne"))).toBe(true);
     expect(textFlex("den", "jen do 14 h")).toBe("FLEX ten den – jen do 14 h");
+  });
+});
+
+describe("kontrolka MWF export ↔ kalendář", () => {
+  const z = (o: Partial<Zakazka> & { uzavreno?: boolean } = {}) => ({ ...zak(o), uzavreno: o.uzavreno ?? false });
+  const e = (o: Partial<UdalostKontroly> = {}): UdalostKontroly => ({
+    kalendar: "c1", id: "e1", summary: "Hristov - FTTH CETIN O-8532577900 Patera, Michal", description: "TEL: 603 354 035", location: "Na Strži 1702/65, Praha 4",
+    od: local(2026, 10, 16, 10, 0), technik: ["Hristov"], ...o,
+  });
+  const obdobi = { od: local(2026, 10, 16, 0, 0), do: local(2026, 10, 17, 0, 0) };
+  const stav = (zs: ReturnType<typeof z>[], us: UdalostKontroly[]) => kontrolkyUdalosti(zs, us, obdobi).kontrolky.get("c1|e1");
+
+  it("zelená: stejný den, začátek do 30 min, technik odpovídá", () => {
+    expect(stav([z()], [e()])).toEqual({ stav: "ok", duvody: [] });
+    expect(stav([z()], [e({ od: local(2026, 10, 16, 10, 30) })])!.stav).toBe("ok");
+    // technik se v kalendáři jmenuje jinak než v číselníku (Lipka = Brestanský)
+    expect(stav([z({ technik: "Lipka Jan (Vegacom)" })], [e({ technik: ["Lipka", "Brestanský"] })])!.stav).toBe("ok");
+  });
+  it("oranžová: začátek o 31–60 min nebo jiná adresa", () => {
+    expect(stav([z()], [e({ od: local(2026, 10, 16, 11, 0) })])).toMatchObject({ stav: "pozor" });
+    expect(stav([z()], [e({ location: "Jiná 5, Praha 4" })])).toMatchObject({ stav: "pozor" });
+  });
+  it("červená: jiný den, začátek o víc než 60 min, bez termínu v MWF, není v exportu, Pracovní zdroj není technik", () => {
+    expect(stav([z()], [e({ od: local(2026, 10, 16, 11, 1) })])!.stav).toBe("chyba");
+    expect(stav([z({ termin: { od: local(2026, 10, 17, 10, 0), do: local(2026, 10, 17, 12, 0) } })], [e()])!.duvody.join()).toMatch(/Jiný den/);
+    expect(stav([z({ termin: null })], [e()])!.duvody.join()).toMatch(/není u zakázky termín/);
+    expect(stav([], [e()])!.duvody.join()).toMatch(/není v exportu/);
+    expect(stav([z({ technik: "Hadravová Jana (Vegacom)" })], [e()])!.duvody.join()).toMatch(/Pracovní zdroj/);
+    expect(stav([z({ technik: "" })], [e()])!.stav).toBe("chyba");
+  });
+  it("bez kontrolky: uzavřená zakázka, VOLNY slot, událost bez čísla zakázky", () => {
+    expect(stav([z({ uzavreno: true })], [e()])).toBe(undefined);
+    expect(stav([z()], [e({ summary: "Hristov - VOLNY" })])).toBe(undefined);
+    expect(stav([z()], [e({ summary: "Hristov - servis auta", description: "" })])).toBe(undefined);
+  });
+  it("párování přes ID S7, když v události číslo O- chybí", () => {
+    expect(stav([z()], [e({ summary: "Hristov - FTTH (CETIN) 1-D79CTLE, Patera" })])!.stav).toBe("ok");
+  });
+  it("chybí v kalendáři: termín v MWF v období u zobrazeného technika a žádná událost", () => {
+    const jina = z({ idAktivity: "A2", idObjednavkyZaklad: "O-8500000002", idObjednavky: "O-8500000002:1", idS7: "1-XXXXXXX" });
+    const mimo = z({ idAktivity: "A3", idObjednavkyZaklad: "O-8500000003", idS7: "1-YYYYYYY", termin: { od: local(2026, 10, 19, 10, 0), do: local(2026, 10, 19, 12, 0) } });
+    const cizi = z({ idAktivity: "A4", idObjednavkyZaklad: "O-8500000004", idS7: "1-ZZZZZZZ", technik: "Vajc Tomáš (Vegacom)" });
+    const r = kontrolkyUdalosti([z(), jina, mimo, cizi], [e()], obdobi);
+    expect(r.chybi.map((c) => c.oid)).toEqual(["O-8500000002"]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barvaTextu, barvaUdalosti, castAdresy, miniMesic, pondeli, radkyDetailu, rozsahMrizky, sestavMrizku, strankaMrizky, typUdalosti, type TechnikMrizky, type VolbyMrizky } from "../src/web/mrizka.js";
+import { barvaTextu, barvaUdalosti, castAdresy, flexUdalosti, miniMesic, prahaZPsc, pondeli, radkyDetailu, rozsahMrizky, sestavMrizku, strankaMrizky, typUdalosti, type TechnikMrizky, type VolbyMrizky } from "../src/web/mrizka.js";
 import type { UdalostMrizky } from "../src/zdroje/sync.js";
 
 const T: TechnikMrizky[] = [
@@ -92,6 +92,13 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(castAdresy("Plovdivská 3265/4, 143 00 Praha 12 - Modřany")).toEqual({ ulice: "Plovdivská 3265/4", cast: "Praha 12 - Modřany" });
     expect(castAdresy("Brožíkova 445, 530 09 Pardubice II, Česko")).toEqual({ ulice: "Brožíkova 445", cast: "Pardubice II" });
     expect(castAdresy("Krčská 991")).toEqual({ ulice: "Krčská 991", cast: "" });
+    // tvar z MWF „Obec, Ulice, PSČ“: PSČ není lokalita; u Prahy z něj vznikne poštovní obvod
+    expect(castAdresy("Praha, Limuzská 1809/7, 10000")).toEqual({ ulice: "Limuzská 1809/7", cast: "Praha 10" });
+    expect(castAdresy("Benešov, K Pazderně 778, 256 01")).toEqual({ ulice: "K Pazderně 778", cast: "Benešov" });
+    expect(castAdresy("Limuzská 1809/7, Praha-Praha 10")).toEqual({ ulice: "Limuzská 1809/7", cast: "Praha 10" });
+    expect(castAdresy("Praha 5-Smíchov, Plzeňská 12")).toEqual({ ulice: "Plzeňská 12", cast: "Praha 5-Smíchov" });
+    expect(prahaZPsc("150 00")).toBe("Praha 5");
+    expect(prahaZPsc("25601")).toBeNull();
     const v = volby();
     const m = sestavMrizku(UD, T, v);
     expect(m.sloupce[0]!.pod[0]!.stitek).toBe("výjezd: Praha 4, Krč");
@@ -165,5 +172,29 @@ describe("mřížka kalendáře (zrcadlo Google Kalendáře)", () => {
     expect(typUdalosti("Hristov - FTTH O-8553401092 Bažantová SLA 17.10.2026 17:42 (AP)")).toEqual({ typ: "FTTH", zbytek: "O-8553401092 Bažantová" });
     expect(typUdalosti("mesh Koval - Instal_PIV O-8559223745 SEKTOROVÝ NÁBYTEK CZ s.r.o.")?.typ).toBe("mesh Instal_PIV");
     expect(typUdalosti("NEPLANOVAT")).toBeNull();
+  });
+});
+
+describe("flexibilita zákazníka a kontrolka v okně události", () => {
+  it("flexUdalosti: štítek jen u flexibilních zákazníků", () => {
+    expect(flexUdalosti(["TEL: 603", "FLEX ten den – po 14. hodině"])).toBe("FLEX den");
+    expect(flexUdalosti(["FLEX obecně (důchodce / rodičovská / HO)"])).toBe("FLEX");
+    expect(flexUdalosti(["Pevný termín"])).toBeNull();
+    expect(flexUdalosti(["TEL: 603"])).toBeNull();
+  });
+  it("stránka: štítek FLEX, kontrolka s důvodem, podtržítka ve jméně jako mezery, počet chybějících v liště", () => {
+    const v: VolbyMrizky = { pohled: "den", den: "2026-11-16", vybrani: [], jenVolny: false };
+    const ud = [u("K1", "2026-11-16", "08:00", "10:00", "Vajc - FTTH CETIN O-8561401285 Novak_Jan", { description: "TEL: 603\nFLEX ten den", location: "Praha, Limuzská 1809/7, 10000" })];
+    const kontrolky = new Map([["K1|" + ud[0]!.id, { stav: "chyba" as const, duvody: ["Jiný den: MWF 17.11. 8:00, kalendář 16.11. 8:00."] }]]);
+    const html = strankaMrizky({ volby: v, technici: T, barvy: new Map(), mrizka: sestavMrizku(ud, T, v, { kontrolky }), synchronizace: null, uzivatel: "x", kontrola: { chybi: [{ idAktivity: "A9", oid: "O-8500000009", termin: new Date("2026-11-16T12:00:00Z"), technik: "Vajc Tomáš (Vegacom)" }], export: new Date("2026-11-16T07:10:00Z") } }, "2026-11-16");
+    expect(html).toContain('ev-flex');
+    expect(html).toContain("FLEX den");
+    expect(html).toContain('class="ev-k chyba"');
+    expect(html).toContain("Jiný den: MWF 17.11.");
+    expect(html).toContain("Porovnáno s exportem MWF z 16.11. 7:10");
+    expect(html).toContain("Novak Jan");
+    expect(html).toContain(">Praha 10<");
+    expect(html).toContain("v kalendáři chybí: 1");
+    expect(html).toContain("O-8500000009");
   });
 });

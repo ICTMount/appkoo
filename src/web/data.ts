@@ -122,6 +122,18 @@ export interface Fronta {
 const PORADI_PRIORITY: Record<Priorita, number> = { P1: 0, P2: 1, P3: 2, P0: 3 };
 
 /** Pravidla priority z číselníku v DB; když tam nejsou, výchozí */
+/**
+ * Zakázky pro kontrolku MWF ↔ kalendář: všechny aktivity objednávek z událostí (i uzavřené – ty kontrolku nemají)
+ * a otevřené zakázky s termínem v zobrazeném období (hledají se ty, které v kalendáři chybí).
+ */
+export async function nactiProKontrolu(db: Dotaz, oCisla: string[], od: Date, do_: Date): Promise<(Zakazka & { uzavreno: boolean })[]> {
+  const { rows } = await db.query<ZakazkaRow>(
+    `SELECT ${SLOUPCE} FROM zakazka WHERE id_objednavky_zaklad = ANY($1::text[]) OR (uzavreno IS NULL AND termin_od >= $2 AND termin_od < $3)`,
+    [oCisla, od, do_],
+  );
+  return rows.map((r) => ({ ...zRadku(r), uzavreno: !!r.uzavreno }));
+}
+
 export async function nactiPravidla(db: Dotaz): Promise<PravidloPriority[]> {
   const { rows } = await db.query<{ data: Record<string, unknown> }>(
     "SELECT data FROM ciselnik_polozka WHERE ciselnik = 'pravidlaPriority' AND aktivni",

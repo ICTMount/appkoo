@@ -64,12 +64,12 @@ import { dekodujVyber, klicPrilohy, nactiSoubory, nazevSouboru, stahniPrilohu, u
 import { pipeline } from "node:stream/promises";
 import { hledejNaLokaliteDb } from "../zdroje/sync.js";
 import { hledejNaLokalite, hledejVsude, ocistitDotaz, prohrejPamet, sLimitem, synchronizovano, vyrazyZakazky, type ZavislostiZdroju } from "../zdroje/hledani.js";
-import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiStavImportu } from "./data.js";
+import { hledejZakazky, najdiAktivitu, nactiDetail, nactiFrontu, nactiProKontrolu, nactiStavImportu } from "./data.js";
 import type { Lokalita } from "./html.js";
 import { nastavZobrazeniPriorit, strankaChyby, strankaTechnika, strankaUvod, strankaVysledku, strankaZakazky, strankaZapisu, strankaZapsano, type StrankaTechnika } from "./html.js";
 import { chybejiciPole, chybejiciPotvrzeni, inicialy, iruLokalita, kandidatiKDoplneni, mestskeCasti, nactiKontext, nestandardZFormulare, potvrzeniZakazky, presunZParametru, smazUdalost, smiZapisovat, udajeZFormulare, ulozUdalost } from "./planovani.js";
 import type { OkoliZapisu } from "./html.js";
-import { jeBlok, jeVolneOkno } from "../gcal/kontrola.js";
+import { jeBlok, jeVolneOkno, kontrolkyUdalosti, oCislaUdalosti, type ChybiVKalendari, type Kontrolka, type UdalostKontroly } from "../gcal/kontrola.js";
 import type { TechnikPlanu } from "../plan/planovac.js";
 import type { Zakazka } from "../import/mwfExport.js";
 
@@ -732,10 +732,21 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         const zive = !!udalosti;
         if (!udalosti) udalosti = await udalostiMrizky(db, zobrazeni.map((t) => t.kalendar), rozsah.od, rozsah.do);
 
+        // kontrolky MWF export ↔ kalendář: počítají se při každém zobrazení proti poslednímu importovanému exportu
+        const jmenaKal = new Map(kontext.technici.map((t) => [t.kalendar, [...new Set([t.jmeno, t.nazevVKalendari].filter(Boolean))]]));
+        const proKontrolu: UdalostKontroly[] = udalosti.map((u) => ({ kalendar: u.kalendar, id: u.id, summary: u.summary, description: u.description, location: u.location, od: u.od, ...(u.barvaId ? { barva: u.barvaId } : {}), technik: jmenaKal.get(u.kalendar) ?? [] }));
+        let kontrola: { kontrolky: Map<string, Kontrolka>; chybi: ChybiVKalendari[] } | null = null;
+        try {
+          const oCisla = [...new Set(proKontrolu.flatMap((u) => oCislaUdalosti(u)))];
+          kontrola = kontrolkyUdalosti(await nactiProKontrolu(db, oCisla, rozsah.od, rozsah.do), proKontrolu, rozsah);
+        } catch {
+          kontrola = null; // bez kontrolek – mřížka se zobrazí i tak
+        }
+
         // našeptávač: nejoptimálnější VOLNY sloty vyznačené v mřížce + seznam vlevo
         let navrhy: NonNullable<Parameters<typeof strankaMrizky>[0]["navrhy"]> = [];
         let navrhChyba: string | undefined;
-        const oznaceni: OznaceniMrizky = { tato: puvodni ? { kalendar: puvodni.kalendar, eventId: puvodni.eventId } : null, dohodnuty: doplnit && detail?.z.termin ? detail.z.termin : null };
+        const oznaceni: OznaceniMrizky = { tato: puvodni ? { kalendar: puvodni.kalendar, eventId: puvodni.eventId } : null, dohodnuty: doplnit && detail?.z.termin ? detail.z.termin : null, ...(kontrola ? { kontrolky: kontrola.kontrolky } : {}) };
         if (volby.navrh && detail && planovac && !blokace.length) {
           try {
             // doporučení se počítá vždy ode dneška – pořadí je stejné v denním i týdenním pohledu a při listování
@@ -787,7 +798,7 @@ export function vytvorHandler(db: Db, n: NastaveniWebu) {
         }
         const smiPlanovat = !!detail && role !== "cteni" && zapis.zapnuty && zive && !blokace.length;
         return posli(res, 200, strankaMrizky({
-          volby, technici, barvy, synchronizace, uzivatel: email, zive, nacteno: now, nedostupne, navrhy, rychleDny: pracovniDny(dnes, 6), ...(navrhChyba ? { navrhChyba } : {}),
+          volby, technici, barvy, synchronizace, uzivatel: email, zive, nacteno: now, nedostupne, navrhy, rychleDny: pracovniDny(dnes, 6), kontrola: kontrola ? { chybi: kontrola.chybi, export: stav.posledniExport ?? null } : null, ...(navrhChyba ? { navrhChyba } : {}),
           mrizka: sestavMrizku(udalosti, technici, volby, oznaceni),
           planovani: smiPlanovat
             ? { smi: (t) => smiTechnik(t) && (!puvodni || smiTechnik(puvodni.technik)), navic: puvodni ? { pk: puvodni.kalendar, pe: puvodni.eventId, pt: puvodni.technik } : doplnit ? { pp: "1" } : {} }
