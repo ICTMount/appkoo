@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { nactiUdalosti, zapisUdalost } from "../src/gcal/kalendar.js";
 import { jeFlex } from "../src/plan/doplneni.js";
-import { kontrolkyUdalosti, podobnostAdres, volnaOkna, zkontroluj, type UdalostKontroly, type UdalostTechnika } from "../src/gcal/kontrola.js";
+import { kontrolkyUdalosti, podobnostAdres, shodaAdres, volnaOkna, zkontroluj, type UdalostKontroly, type UdalostTechnika } from "../src/gcal/kontrola.js";
 import { sestavUdalost, textFlex } from "../src/gcal/udalost.js";
 import { local } from "../src/domain/time.js";
 import type { Zakazka } from "../src/import/mwfExport.js";
@@ -206,7 +206,10 @@ describe("kontrolka MWF export ↔ kalendář", () => {
   });
   it("oranžová: začátek o 31–60 min nebo jiná adresa", () => {
     expect(stav([z()], [e({ od: local(2026, 10, 16, 11, 0) })])).toMatchObject({ stav: "pozor" });
-    expect(stav([z()], [e({ location: "Jiná 5, Praha 4" })])).toMatchObject({ stav: "pozor" });
+    // adresa sedí na 75 %: ulice a číslo popisné ano, orientační chybí
+    expect(shodaAdres("Na Strži 1702/65, Praha 4", "Na Strži 1702, Praha 4")).toBe(0.75);
+    expect(stav([z()], [e({ location: "Na Strži 1702, Praha 4" })])).toMatchObject({ stav: "pozor" });
+    expect(shodaAdres("Praha, Limuzská 1809/7, 10000", "Limuzská 1809/7, Praha 10")).toBe(1);
   });
   it("červená: jiný den, začátek o víc než 60 min, bez termínu v MWF, není v exportu, Pracovní zdroj není technik", () => {
     expect(stav([z()], [e({ od: local(2026, 10, 16, 11, 1) })])!.stav).toBe("chyba");
@@ -215,6 +218,9 @@ describe("kontrolka MWF export ↔ kalendář", () => {
     expect(stav([], [e()])!.duvody.join()).toMatch(/není v exportu/);
     expect(stav([z({ technik: "Hadravová Jana (Vegacom)" })], [e()])!.duvody.join()).toMatch(/Pracovní zdroj/);
     expect(stav([z({ technik: "" })], [e()])!.stav).toBe("chyba");
+    // adresa nesedí (shoda pod 75 %)
+    expect(stav([z()], [e({ location: "Jiná 5, Praha 4" })])!.duvody.join()).toMatch(/Adresa nesedí/);
+    expect(stav([z()], [e({ location: "Na Strži 12, Praha 4" })])!.stav).toBe("chyba");
   });
   it("bez kontrolky: uzavřená zakázka, VOLNY slot, událost bez čísla zakázky", () => {
     expect(stav([z({ uzavreno: true })], [e()])).toBe(undefined);

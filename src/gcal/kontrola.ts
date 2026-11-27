@@ -151,8 +151,8 @@ export function vytizeniDne(udalosti: UdalostTechnika[], technik: string, den: s
 }
 
 // ---------- Kontrolka u události v Kalendáři techniků: MWF export ↔ kalendář ----------
-// zelená = sedí; oranžová = drobný nesoulad (začátek o 31–60 min, adresa); červená = jiný den, začátek o víc než
-// 60 min, zakázka chybí v jednom ze systémů nebo Pracovní zdroj v MWF není technik kalendáře.
+// zelená = sedí; oranžová = drobný nesoulad (začátek o 31–60 min, adresa sedí jen na 75 %); červená = jiný den, začátek o víc než
+// 60 min, adresa nesedí, zakázka chybí v jednom ze systémů nebo Pracovní zdroj v MWF není technik kalendáře.
 // Porovnává se jen ZAČÁTEK termínu. Uzavřené zakázky a události bez čísla zakázky kontrolku nemají.
 
 export type StavKontrolky = "ok" | "pozor" | "chyba";
@@ -186,6 +186,26 @@ const dm = (t: Date) => `${t.getUTCDate()}.${t.getUTCMonth() + 1}.`;
 /** Čísla O- (základ) v názvu a popisu události */
 export const oCislaUdalosti = (u: Pick<UdalostKontroly, "summary" | "description">): string[] =>
   [...new Set([...`${u.summary}\n${u.description}`.matchAll(/O-\d{6,}/gi)].map((m) => zakladniCisloObjednavky(m[0])))];
+
+/**
+ * Shoda adresy MWF ↔ kalendář pro kontrolku (0–1): ulice 50 %, číslo popisné 25 %, číslo orientační 25 %
+ * (adresa bez orientačního čísla: popisné 50 %). Obec se neporovnává – kalendář ji často nemá.
+ * 100 % = zelená, 75 % (např. chybí orientační číslo) = oranžová, méně = červená.
+ */
+export function shodaAdres(mwf: string, kalendar: string): number {
+  const a = norm(mwf).replace(/\b\d{3}\s?\d{2}\b/g, " "); // bez PSČ
+  const b = norm(kalendar);
+  const obce = new Set(["praha", "brno", "ostrava", "plzen"]);
+  const ulice = (a.match(/\p{L}{4,}/gu) ?? []).filter((w) => !obce.has(w));
+  const uliceSedi = !ulice.length || ulice.some((w) => b.includes(w));
+  const m = /(\d+)\s*\/\s*(\d+\w?)/.exec(a);
+  const cislo = (c: string) => new RegExp(`(^|[^\\d])${c}($|[^\\d])`).test(b);
+  const popisne = m ? m[1]! : (a.match(/\d+\w?/g) ?? []).at(-1) ?? "";
+  const orientacni = m ? m[2]! : "";
+  if (!popisne) return uliceSedi ? 1 : 0;
+  const cisla = orientacni ? (cislo(popisne) ? 0.25 : 0) + (cislo(orientacni) ? 0.25 : 0) : cislo(popisne) ? 0.5 : 0;
+  return (uliceSedi ? 0.5 : 0) + cisla;
+}
 
 export function kontrolkyUdalosti(
   zakazky: ZakazkaKontroly[],
@@ -223,7 +243,11 @@ export function kontrolkyUdalosti(
     }
     if (!z.technik.trim()) chyba("V MWF není Pracovní zdroj.");
     else if (!u.technik.some((t) => stejnyTechnik(z.technik, t))) chyba(`Pracovní zdroj v MWF: ${z.technik}, kalendář: ${u.technik[0] ?? "?"}.`);
-    if (z.adresa && podobnostAdres(z.adresa, `${u.location} ${u.summary}`) < 0.9) pozor(`Adresa se liší: MWF ${z.adresa}.`);
+    if (z.adresa) {
+      const shoda = shodaAdres(z.adresa, `${u.location} ${u.summary}`);
+      if (shoda < 0.75) chyba(`Adresa nesedí (shoda ${Math.round(shoda * 100)} %): MWF ${z.adresa}.`);
+      else if (shoda < 1) pozor(`Adresa sedí jen na ${Math.round(shoda * 100)} %: MWF ${z.adresa}.`);
+    }
     kontrolky.set(`${u.kalendar}|${u.id}`, { stav, duvody });
   }
   // termín v MWF v zobrazeném období, u zobrazeného technika, a v jeho kalendáři zakázka není
